@@ -4,19 +4,18 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
-import { useState } from 'react';
-import Image from 'next/image'; // <-- 1. Importar Image de Next.js
+import { useState, Suspense } from 'react';
+import Image from 'next/image';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Mail, Lock, User } from "lucide-react";
 
-// ... (Los 'types' de los formularios siguen igual)
 type LoginFormInputs = { email: string; password: string; };
 type RegisterFormInputs = LoginFormInputs & { name: string; };
 
-export default function LoginPage() {
+function AuthComponent() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [registerSuccess, setRegisterSuccess] = useState<string | null>(null);
@@ -37,6 +36,7 @@ export default function LoginPage() {
     setIsLoginLoading(false);
     if (result?.ok) {
       router.push('/dashboard');
+      router.refresh();
     } else {
       setError(result?.error || 'Credenciales inválidas');
     }
@@ -57,83 +57,80 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-muted p-4">
-        {/* --- 2. AÑADIR EL LOGO --- */}
-        <div className="mb-8">
+    <div className="w-full lg:grid lg:min-h-screen lg:grid-cols-2">
+      {/* --- Columna Derecha (Formulario) --- */}
+      <div className="flex items-center justify-center py-12">
+        <div className="mx-auto grid w-[350px] gap-6">
+          <div className="grid gap-2 text-center">
             <Image
-                src="/logo.png" // Asegúrate de que el nombre del archivo coincida
+                src="/logo.png"
                 alt="Logo de la Empresa"
-                width={150} // Ajusta el tamaño según tu logo
-                height={150}
-                priority // Carga el logo más rápido
+                width={100}
+                height={100}
+                priority
+                className="mx-auto"
             />
-        </div>
-
-        <Tabs defaultValue="login" className="w-full max-w-sm">
+            <h1 className="text-3xl font-bold mt-4">Acceso al CRM</h1>
+            <p className="text-balance text-muted-foreground">
+              Ingresa tus credenciales para continuar
+            </p>
+          </div>
+          <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
-                {/* --- 3. APLICAR COLOR PRIMARIO A LAS PESTAÑAS --- */}
-                <TabsTrigger value="login" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Iniciar Sesión</TabsTrigger>
-                <TabsTrigger value="register" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Registrarse</TabsTrigger>
+              <TabsTrigger value="login">Iniciar Sesión</TabsTrigger>
+              <TabsTrigger value="register">Registrarse</TabsTrigger>
             </TabsList>
-            
-            <TabsContent value="login">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Bienvenido de Nuevo</CardTitle>
-                        <CardDescription>Accede a tu cuenta para continuar.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
-                            {/* ... (campos del formulario de login sin cambios) ... */}
-                            <div className="space-y-2">
-                                <Label htmlFor="email">Email</Label>
-                                <Input id="email" type="email" {...loginForm.register("email", { required: true })} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="password">Contraseña</Label>
-                                <Input id="password" type="password" {...loginForm.register("password", { required: true })} />
-                            </div>
-                            {error && <p className="text-sm text-red-500">{error}</p>}
-                            {/* --- 4. APLICAR COLOR PRIMARIO AL BOTÓN --- */}
-                            <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoginLoading}>
-                                {isLoginLoading ? "Accediendo..." : "Acceder"}
-                            </Button>
-                        </form>
-                    </CardContent>
-                </Card>
+            <TabsContent value="login" className="mt-4">
+              <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="grid gap-4">
+                <div className="grid gap-2 relative"><Label htmlFor="email-login">Email</Label><Mail className="absolute left-3 top-9 h-4 w-4 text-muted-foreground" /><Input id="email-login" type="email" placeholder="nombre@ejemplo.com" required {...loginForm.register("email")} className="pl-9" /></div>
+                <div className="grid gap-2 relative"><Label htmlFor="password-login">Contraseña</Label><Lock className="absolute left-3 top-9 h-4 w-4 text-muted-foreground" /><Input id="password-login" type="password" required {...loginForm.register("password")} className="pl-9" /></div>
+                {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+                <Button type="submit" className="w-full" disabled={isLoginLoading}>{isLoginLoading ? "Accediendo..." : "Acceder"}</Button>
+              </form>
             </TabsContent>
+            <TabsContent value="register" className="mt-4">
+              <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="grid gap-4">
+                <div className="grid gap-2 relative"><Label htmlFor="name-reg">Nombre</Label><User className="absolute left-3 top-9 h-4 w-4 text-muted-foreground" /><Input id="name-reg" placeholder="Tu nombre completo" required {...registerForm.register("name")} className="pl-9" /></div>
+                <div className="grid gap-2 relative"><Label htmlFor="email-reg">Email</Label><Mail className="absolute left-3 top-9 h-4 w-4 text-muted-foreground" /><Input id="email-reg" type="email" placeholder="nombre@ejemplo.com" required {...registerForm.register("email")} className="pl-9" /></div>
+                <div className="grid gap-2 relative"><Label htmlFor="password-reg">Contraseña</Label><Lock className="absolute left-3 top-9 h-4 w-4 text-muted-foreground" /><Input id="password-reg" type="password" required {...registerForm.register("password")} className="pl-9" /></div>
+                {error && !registerSuccess && <p className="text-sm text-red-500 text-center">{error}</p>}
+                {registerSuccess && <p className="text-sm text-green-500 text-center">{registerSuccess}</p>}
+                <Button type="submit" className="w-full" disabled={isRegisterLoading}>{isRegisterLoading ? "Creando cuenta..." : "Crear Cuenta"}</Button>
+              </form>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
 
-            <TabsContent value="register">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Crear Cuenta</CardTitle>
-                        <CardDescription>Regístrate para empezar a usar el CRM.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
-                            {/* ... (campos del formulario de registro sin cambios) ... */}
-                            <div className="space-y-2">
-                                <Label htmlFor="name-reg">Nombre</Label>
-                                <Input id="name-reg" {...registerForm.register("name", { required: true })} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="email-reg">Email</Label>
-                                <Input id="email-reg" type="email" {...registerForm.register("email", { required: true })} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="password-reg">Contraseña</Label>
-                                <Input id="password-reg" type="password" {...registerForm.register("password", { required: true })} />
-                            </div>
-                            {error && <p className="text-sm text-red-500">{error}</p>}
-                            {registerSuccess && <p className="text-sm text-green-500">{registerSuccess}</p>}
-                            <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isRegisterLoading}>
-                                {isRegisterLoading ? "Creando cuenta..." : "Crear Cuenta"}
-                            </Button>
-                        </form>
-                    </CardContent>
-                </Card>
-            </TabsContent>
-        </Tabs>
+      {/* --- Columna Izquierda (Branding con tu otra imagen) --- */}
+      {/* 1. Contenedor principal con posicionamiento relativo y flexbox */}
+      <div className="hidden bg-gray-900 lg:flex relative flex-col justify-end p-10">
+        {/* 2. La imagen de fondo (ocupa todo el espacio) */}
+        <Image
+          src="/imagen-login.jpg" // Reemplaza con el nombre de tu imagen en /public
+          alt="Imagen de Aberturas"
+          fill // La propiedad 'fill' hace que la imagen cubra el contenedor
+          className="object-cover" // object-cover asegura que la imagen cubra sin deformarse
+        />
+        {/* 3. El filtro de color superpuesto */}
+        <div className="absolute inset-0 bg-primary opacity-60 mix-blend-multiply"></div>
+
+        {/* 4. El contenido de texto superpuesto (posicionado relativamente) */}
+        <div className="relative z-10 text-white">
+            <h2 className="text-4xl font-bold">La gestión de tus clientes, simplificada.</h2>
+            <p className="mt-4 text-lg text-primary-foreground/80">
+                Nuestro CRM te da las herramientas para nunca perder una oportunidad de venta.
+            </p>
+        </div>
+      </div>
     </div>
-  );
+  )
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={<div>Cargando...</div>}>
+            <AuthComponent />
+        </Suspense>
+    );
 }
