@@ -13,7 +13,8 @@ export interface IUser extends Document {
 const UserSchema: Schema = new Schema({
   name: { // El campo se llama 'name' para ser consistente
     type: String,
-    // Quitamos 'required' aquí porque NextAuth y nuestra API de registro ya lo manejan
+    // La validación 'required' se maneja en el frontend y la API,
+    // por lo que podemos quitarla de aquí para evitar conflictos.
   },
   email: {
     type: String,

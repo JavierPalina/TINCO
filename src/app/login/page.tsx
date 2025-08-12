@@ -58,7 +58,6 @@ function AuthComponent() {
 
   return (
     <div className="w-full lg:grid lg:min-h-screen lg:grid-cols-2">
-      {/* --- Columna Derecha (Formulario) --- */}
       <div className="flex items-center justify-center py-12">
         <div className="mx-auto grid w-[350px] gap-6">
           <div className="grid gap-2 text-center">
@@ -102,20 +101,15 @@ function AuthComponent() {
         </div>
       </div>
 
-      {/* --- Columna Izquierda (Branding con tu otra imagen) --- */}
-      {/* 1. Contenedor principal con posicionamiento relativo y flexbox */}
       <div className="hidden bg-gray-900 lg:flex relative flex-col justify-end p-10">
-        {/* 2. La imagen de fondo (ocupa todo el espacio) */}
         <Image
-          src="/imagen-login.jpg" // Reemplaza con el nombre de tu imagen en /public
+          src="/imagen-login.jpg"
           alt="Imagen de Aberturas"
-          fill // La propiedad 'fill' hace que la imagen cubra el contenedor
-          className="object-cover" // object-cover asegura que la imagen cubra sin deformarse
+          fill
+          className="object-cover"
         />
-        {/* 3. El filtro de color superpuesto */}
         <div className="absolute inset-0 bg-primary opacity-60 mix-blend-multiply"></div>
 
-        {/* 4. El contenido de texto superpuesto (posicionado relativamente) */}
         <div className="relative z-10 text-white">
             <h2 className="text-4xl font-bold">La gestión de tus clientes, simplificada.</h2>
             <p className="mt-4 text-lg text-primary-foreground/80">

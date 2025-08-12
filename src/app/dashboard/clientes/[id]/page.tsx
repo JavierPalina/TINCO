@@ -15,7 +15,7 @@ import { es } from 'date-fns/locale';
 
 interface Vendedor {
   _id: string;
-  nombre: string;
+  name: string;
 }
 
 interface ClientData {
@@ -82,7 +82,7 @@ export default function ClienteDetailPage() {
           <CardContent className="grid gap-2 text-sm">
             <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground" /> <span>{cliente.email || 'No disponible'}</span></div>
             <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" /> <span>{cliente.telefono}</span></div>
-            <div className="flex items-center gap-2"><UserIcon className="h-4 w-4 text-muted-foreground" /> <span>Vendedor: {cliente.vendedorAsignado?.nombre || 'No asignado'}</span></div>
+            <div className="flex items-center gap-2"><UserIcon className="h-4 w-4 text-muted-foreground" /> <span>Vendedor: {cliente.vendedorAsignado?.name || 'No asignado'}</span></div>
           </CardContent>
         </Card>
         
@@ -110,7 +110,7 @@ export default function ClienteDetailPage() {
                   <p className="text-sm text-muted-foreground">
                     {format(new Date(interaction.createdAt), "d MMM yyyy 'a las' HH:mm", { locale: es })}
                     {' - por '}
-                    <span className="font-medium">{interaction.usuario?.nombre || 'Usuario desconocido'}</span>
+                    <span className="font-medium">{interaction.usuario?.name || 'Usuario desconocido'}</span>
                   </p>
                   <p className="mt-2 text-sm">{interaction.nota}</p>
                 </div>

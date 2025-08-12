@@ -2,36 +2,46 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import Link from 'next/link';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { GripVertical } from 'lucide-react';
 
-interface Client {
+export interface ClientCardProps {
     _id: string;
     nombreCompleto: string;
-    // Otros campos que necesites
+    etapa: string;
+    // You can add more props like 'telefono', 'montoOportunidad', etc.
 }
 
-export function ClientCard({ client }: { client: Client }) {
-    // 1. Hook de dnd-kit que hace la magia
+export function ClientCard({ client }: { client: ClientCardProps }) {
     const {
         attributes,
         listeners,
         setNodeRef,
         transform,
         transition,
-    } = useSortable({ id: client._id });
+        isDragging,
+    } = useSortable({ id: client._id, data: { type: 'Client', client } });
 
-    // 2. Estilos para la animación de movimiento
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
+        opacity: isDragging ? 0.3 : 1, // Make it more transparent when dragging
     };
 
     return (
-        // 3. Conectamos los props del hook al elemento
-        <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-            <Card className="mb-2 hover:shadow-lg cursor-grab active:cursor-grabbing">
-                <CardHeader className="p-4">
-                    <CardTitle className="text-sm font-medium">{client.nombreCompleto}</CardTitle>
+        <div ref={setNodeRef} style={style}>
+            <Card className="mb-3 shadow-sm hover:shadow-lg transition-shadow duration-200">
+                <CardHeader className="flex flex-row items-center justify-between p-3 space-y-0">
+                    <CardTitle className="text-sm font-medium leading-none">
+                        <Link href={`/dashboard/clientes/${client._id}`} className="hover:underline">
+                            {client.nombreCompleto}
+                        </Link>
+                    </CardTitle>
+                    {/* Grip handle for better UX, indicating it's draggable */}
+                    <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1">
+                        <GripVertical className="h-5 w-5 text-muted-foreground" />
+                    </div>
                 </CardHeader>
             </Card>
         </div>
