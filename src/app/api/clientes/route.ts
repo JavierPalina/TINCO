@@ -1,26 +1,40 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Cliente from '@/models/Cliente';
-import User from '@/models/User'; // <--- ¡AÑADE ESTA LÍNEA!
+import mongoose from 'mongoose';
 
-// --- FUNCIÓN GET: Para obtener todos los clientes ---
-export async function GET() {
-  // Importar el modelo User aquí asegura que Mongoose lo tenga registrado
-  // antes de que .populate() intente usarlo.
-  User;
-
+export async function GET(request: NextRequest) {
   await dbConnect();
   try {
-    const clientes = await Cliente.find({}).populate('vendedorAsignado', 'nombre email');
+    const clientes = await Cliente.aggregate([
+      {
+        $lookup: {
+          from: 'interaccions',
+          localField: '_id',
+          foreignField: 'cliente',
+          as: 'interacciones',
+        },
+      },
+      {
+        $addFields: {
+          ultimoContacto: { $max: '$interacciones.createdAt' },
+        },
+      },
+      {
+        $project: {
+          interacciones: 0,
+        },
+      },
+      { $sort: { createdAt: -1 } },
+    ]);
     
     return NextResponse.json({ success: true, data: clientes });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Ocurrió un error desconocido';
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ success: false, error: errorMessage }, { status: 400 });
   }
 }
 
-// --- FUNCIÓN POST: Para crear un nuevo cliente ---
 export async function POST(request: Request) {
   await dbConnect();
   try {

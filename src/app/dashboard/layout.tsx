@@ -16,7 +16,7 @@ export default async function DashboardLayout({
 
   return (
     <div>
-      <Header /> {/* <-- Añadimos el Header */}
+      <Header />
       <main>{children}</main>
     </div>
   );
