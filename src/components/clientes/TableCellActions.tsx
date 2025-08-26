@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Eye, MessageSquarePlus, StickyNote, PlusCircle } from 'lucide-react';
 import { Client } from '@/types/client';
+import { Button } from '../ui/button';
 
 import { ViewNotesDialog } from './ViewNotesDialog';
 import { AddNoteDialog } from './AddNoteDialog';
@@ -22,14 +23,22 @@ export function TableCellActions({ client, actionType }: Props) {
       <div className="flex items-center justify-center gap-2">
         {actionType === 'notas' && (
           <>
-            <button onClick={() => setViewNotesOpen(true)} title="Ver Notas"><Eye className="h-4 w-4 text-muted-foreground hover:text-primary" /></button>
-            <button onClick={() => setAddNoteOpen(true)} title="Añadir Nota"><PlusCircle className="h-4 w-4 text-muted-foreground hover:text-primary" /></button>
+            <Button onClick={() => setViewNotesOpen(true)} title="Ver Notas" className="h-7 w-7 bg-primary hover:bg-primary/90 text-primary-foreground" >
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button onClick={() => setAddNoteOpen(true)} title="Añadir Nota" className="h-7 w-7 bg-primary hover:bg-primary/90 text-primary-foreground">
+              <PlusCircle className="h-4 w-4" />
+            </Button>
           </>
         )}
         {actionType === 'interacciones' && (
           <>
-            <button onClick={() => setViewInteractionsOpen(true)} title="Ver Interacciones"><Eye className="h-4 w-4 text-muted-foreground hover:text-primary" /></button>
-            <button onClick={() => setAddInteractionOpen(true)} title="Añadir Interacción"><MessageSquarePlus className="h-4 w-4 text-muted-foreground hover:text-primary" /></button>
+            <Button onClick={() => setViewInteractionsOpen(true)} title="Ver Interacciones" className="h-7 w-7 bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button onClick={() => setAddInteractionOpen(true)} title="Añadir Interacción" className="h-7 w-7 bg-primary hover:bg-primary/90 text-primary-foreground">
+              <MessageSquarePlus className="h-4 w-4" />
+            </Button>
           </>
         )}
       </div>

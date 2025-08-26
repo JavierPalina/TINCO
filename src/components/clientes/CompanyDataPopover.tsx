@@ -58,8 +58,8 @@ export function CompanyDataPopover({ client }: { client: Client }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 shrink-0">
-          <Building2 className="h-4 w-4 text-muted-foreground hover:text-primary" />
+        <Button size="icon" className="h-7 w-7 bg-primary hover:bg-primary/90 text-primary-foreground" style={{marginLeft: "4px"}}>
+          <Building2 className="h-4 w-4" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-96">

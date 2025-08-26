@@ -15,11 +15,7 @@ interface InteractionData {
   usuario: { name: string; };
 }
 
-type Props = {
-  client: Client;
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-}
+type Props = { client: Client; isOpen: boolean; onOpenChange: (open: boolean) => void; }
 
 export function ViewInteractionsDialog({ client, isOpen, onOpenChange }: Props) {
   const { data: interacciones, isLoading } = useQuery<InteractionData[]>({
@@ -28,7 +24,7 @@ export function ViewInteractionsDialog({ client, isOpen, onOpenChange }: Props) 
       const { data } = await axios.get(`/api/clientes/${client._id}/interacciones`);
       return data.data;
     },
-    enabled: isOpen, // Only fetch when the dialog is open
+    enabled: isOpen,
   });
 
   return (

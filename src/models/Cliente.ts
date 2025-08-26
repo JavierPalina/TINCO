@@ -11,10 +11,11 @@ export interface ICliente extends Document {
   razonSocial?: string;
   contactoEmpresa?: string;
   cuil?: string;
-  prioridad: 'Alta' | 'Media' | 'Baja';
+  prioridad: string;
   origenContacto?: string;
   direccion?: string;
   pais?: string;
+  dni?: string;
   ciudad?: string;
   notas?: string;
   etapa: 'Nuevo' | 'Contactado' | 'Cotizado' | 'Negociación' | 'Ganado' | 'Perdido';
@@ -33,11 +34,16 @@ const ClienteSchema: Schema = new Schema({
   paisEmpresa: { type: String, trim: true },
   razonSocial: { type: String, trim: true },
   contactoEmpresa: { type: String, trim: true },
-  cuil: { type: String, trim: true },  
-  prioridad: { type: String, enum: ['Alta', 'Media', 'Baja'], default: 'Media' },
+  cuil: { type: String, trim: true }, 	
+  prioridad: {
+    type: String,
+    trim: true,
+    default: 'Media',
+  },
   origenContacto: { type: String, trim: true },
   direccion: { type: String, trim: true },
   pais: { type: String, trim: true },
+  dni: { type: String, trim: true },
   ciudad: { type: String, trim: true },
   notas: { type: String, trim: true },
   etapa: { type: String, required: true, enum: ['Nuevo', 'Contactado', 'Cotizado', 'Negociación', 'Ganado', 'Perdido'], default: 'Nuevo' },

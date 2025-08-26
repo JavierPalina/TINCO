@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm, SubmitHandler, Controller } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { CompanyDataDialog } from './CompanyDataDialog';
 import { Pencil } from 'lucide-react';
+import { Combobox } from '../ui/combobox';
 
 type FormInputs = {
   nombreCompleto: string;
@@ -25,6 +26,7 @@ type FormInputs = {
   direccion?: string;
   ciudad?: string;
   pais?: string;
+  dni?: string;
   razonSocial?: string;
   contactoEmpresa?: string;
   cuil?: string;
@@ -34,7 +36,9 @@ type FormInputs = {
   notas?: string;
 };
 
-export function AddClientDialog() {
+const defaultPrioridades = ["Alta", "Media", "Baja"];
+
+export function AddClientDialog({ prioridadesOptions }: { prioridadesOptions: string[] }) {
   const [open, setOpen] = useState(false);
   const [isCompanyDialogOpen, setCompanyDialogOpen] = useState(false);
   const { data: session } = useSession();
@@ -60,10 +64,18 @@ export function AddClientDialog() {
   });
 
   const onSubmit: SubmitHandler<FormInputs> = (data) => {
+    // AÑADE ESTA LÍNEA PARA VER LOS DATOS EN LA CONSOLA DEL NAVEGADOR
+    console.log("Datos enviados a la API:", data); 
+
     if (!session?.user?.id) return alert("You must be logged in.");
     const clientData = { ...data, vendedorAsignado: session.user.id };
     mutation.mutate(clientData);
   };
+
+  const opcionesDePrioridad = useMemo(() => {
+    const combined = [...new Set([...defaultPrioridades, ...prioridadesOptions])];
+    return combined.map(p => ({ value: p, label: p }));
+  }, [prioridadesOptions]);
 
   return (
     <>
@@ -83,21 +95,25 @@ export function AddClientDialog() {
               <div className="space-y-2"><Label>Nombre Completo *</Label><Input {...register("nombreCompleto", { required: true })} /></div>
               <div className="space-y-2"><Label>Teléfono *</Label><Input {...register("telefono", { required: true })} /></div>
               <div className="space-y-2"><Label>Email (Opcional)</Label><Input type="email" {...register("email")} /></div>
+              <div className="space-y-2"><Label>DNI</Label><Input {...register("dni")} /></div>
               <div className="space-y-2"><Label>Dirección</Label><Input {...register("direccion")} /></div>
               <div className="space-y-2"><Label>Ciudad</Label><Input {...register("ciudad")} /></div>
               <div className="space-y-2"><Label>País</Label><Input {...register("pais")} /></div>
               <div className="space-y-2">
                 <Label>Prioridad *</Label>
-                <Controller name="prioridad" control={control} render={({ field }) => (
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Alta">Alta</SelectItem>
-                      <SelectItem value="Media">Media</SelectItem>
-                      <SelectItem value="Baja">Baja</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )} />
+                <Controller
+                  name="prioridad"
+                  control={control}
+                  rules={{ required: "La prioridad es obligatoria" }}
+                  render={({ field }) => (
+                    <Combobox
+                      options={opcionesDePrioridad}
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Selecciona o crea una prioridad..."
+                    />
+                  )}
+                />
               </div>
               <div className="space-y-2"><Label>Origen de Contacto</Label><Input {...register("origenContacto")} placeholder="Ej: Instagram, Referido..." /></div>
             </div>

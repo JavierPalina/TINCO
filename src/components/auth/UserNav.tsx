@@ -8,7 +8,7 @@ export function UserNav() {
 
     if (session) {
         return (
-            <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-6">
                 <p>Hola, {session.user?.name}</p>
                 <Button onClick={() => signOut({ callbackUrl: '/login' })} variant="outline">
                     Cerrar Sesión

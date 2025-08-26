@@ -10,7 +10,7 @@ export interface Client {
   razonSocial?: string;
   contactoEmpresa?: string;
   cuil?: string;
-  prioridad: 'Alta' | 'Media' | 'Baja';
+  prioridad: string;
   etapa: string;
   createdAt: string;
   ultimoContacto?: string;
@@ -18,6 +18,7 @@ export interface Client {
   origenContacto?: string;
   direccion?: string;
   pais?: string;
+  dni?: string;
   ciudad?: string;
   notas?: string;
 }
