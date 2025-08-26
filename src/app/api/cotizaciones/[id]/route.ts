@@ -5,13 +5,13 @@ import dbConnect from '@/lib/dbConnect';
 import Cotizacion from '@/models/Cotizacion';
 
 // --- GET: Obtener TODAS las cotizaciones de un cliente ---
-export async function GET(request: NextRequest, { params }: { params: { clienteId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse('No autorizado', { status: 401 });
 
   await dbConnect();
   try {
-    const cotizaciones = await Cotizacion.find({ cliente: params.clienteId })
+    const cotizaciones = await Cotizacion.find({ cliente: params.id })
       .populate('vendedor', 'name')
       .sort({ createdAt: -1 });
     return NextResponse.json({ success: true, data: cotizaciones });
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest, { params }: { params: { clienteI
 }
 
 // --- POST: Crear una NUEVA cotización para un cliente ---
-export async function POST(request: NextRequest, { params }: { params: { clienteId: string } }) {
+export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return new NextResponse('No autorizado', { status: 401 });
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest, { params }: { params: { cliente
 
     const nuevaCotizacion = await Cotizacion.create({
       ...body,
-      cliente: params.clienteId, // Usamos el parámetro correcto
+      cliente: params.id, // Usamos el parámetro correcto
       vendedor: session.user.id,
       codigo: nuevoCodigo,
     });
