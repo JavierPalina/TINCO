@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import axios from 'axios';
 import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors, DragOverlay, closestCorners } from '@dnd-kit/core';
-import { SortableContext } from '@dnd-kit/sortable';
 import { createPortal } from 'react-dom';
 import { useDebounce } from 'use-debounce';
 
@@ -122,9 +121,9 @@ export function KanbanBoard() {
             return prev;
         }
 
-        let overIndex = over.data.current?.type === 'Client' 
-            ? overItems.findIndex(item => item._id === overId)
-            : overItems.length;
+        const overIndex = over.data.current?.type === 'Client' 
+        ? overItems.findIndex(item => item._id === overId)
+        : overItems.length;
 
         const newColumns = {...prev};
         const [movedItem] = newColumns[activeContainer].splice(activeIndex, 1);

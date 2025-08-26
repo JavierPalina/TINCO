@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Mail, Lock, User } from "lucide-react";
+import type { AxiosError } from 'axios';
 
 type LoginFormInputs = { email: string; password: string; };
 type RegisterFormInputs = LoginFormInputs & { name: string; };
@@ -50,8 +51,9 @@ function AuthComponent() {
       await axios.post('/api/register', data);
       setRegisterSuccess('¡Registro exitoso! Ahora puedes iniciar sesión.');
       registerForm.reset();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Error en el registro');
+    } catch (err: unknown) {
+      const axiosError = err as AxiosError<{ error: string }>;
+      setError(axiosError.response?.data?.error || 'Error en el registro');
     }
     setIsRegisterLoading(false);
   };

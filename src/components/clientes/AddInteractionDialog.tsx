@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Client } from '@/types/client';
+import type { AxiosError } from 'axios';
 
 interface Props { client: Client; isOpen: boolean; onOpenChange: (open: boolean) => void; }
 type FormInputs = { tipo: 'Llamada' | 'WhatsApp' | 'Email' | 'Reunión' | 'Nota'; nota: string; };
@@ -39,8 +40,9 @@ export function AddInteractionDialog({ client, isOpen, onOpenChange }: Props) {
       reset();
       onOpenChange(false);
     },
-    onError: (error: any) => {
-      const errorMessage = error.response?.data?.error || "No se pudo añadir la interacción.";
+    onError: (error: unknown) => {
+      const axiosError = error as AxiosError<{ error: string }>;
+      const errorMessage = axiosError.response?.data?.error || "No se pudo añadir la interacción.";
       toast.error("Error al guardar", { description: errorMessage });
     },
   });

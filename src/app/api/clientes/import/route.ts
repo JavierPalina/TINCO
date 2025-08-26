@@ -21,7 +21,6 @@ export async function POST(request: NextRequest) {
     const clientesConVendedor = clientesParaImportar.map(cliente => ({
       ...cliente,
       vendedorAsignado: session.user.id,
-      // Puedes añadir valores por defecto si faltan en el CSV
       etapa: cliente.etapa || 'Nuevo',
       prioridad: cliente.prioridad || 'Media',
     }));
@@ -30,12 +29,21 @@ export async function POST(request: NextRequest) {
     const resultado = await Cliente.insertMany(clientesConVendedor, { ordered: false });
 
     return NextResponse.json({ success: true, message: `${resultado.length} clientes importados con éxito.` });
-  } catch (error: any) {
-    // ordered: false permite que si un cliente falla (ej. duplicado), los otros se inserten.
-    if (error.writeErrors) {
-      const successfulCount = error.result.nInserted;
-      return NextResponse.json({ success: true, message: `${successfulCount} clientes importados. Algunos registros fallaron (ej. duplicados).` });
+  } catch (error: unknown) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "writeErrors" in error &&
+      "result" in error
+    ) {
+      const mongoError = error as { writeErrors: unknown[]; result: { nInserted: number } };
+      const successfulCount = mongoError.result.nInserted;
+      return NextResponse.json({
+        success: true,
+        message: `${successfulCount} clientes importados. Algunos registros fallaron (ej. duplicados).`,
+      });
     }
+
     return NextResponse.json({ success: false, error: "Error en la importación masiva." }, { status: 500 });
   }
 }

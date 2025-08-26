@@ -12,14 +12,14 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
   await dbConnect();
   try {
-    User; // Aseguramos que el modelo User esté disponible
+    void User; // asegura que el modelo esté cargado, sin warning
+
     const notas = await Nota.find({ cliente: params.id })
-      // --- ESTE ES EL CAMBIO ---
-      .populate('usuario', 'name') // Debe ser 'name' para coincidir con tu UserSchema
+      .populate('usuario', 'name')
       .sort({ createdAt: -1 });
       
     return NextResponse.json({ success: true, data: notas });
-  } catch (error) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Error del servidor';
     return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   }
@@ -64,11 +64,24 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     
     return NextResponse.json({ success: true, data: nuevaNota }, { status: 201 });
 
-  } catch (error: any) {
-    console.error("--- ERROR AL CREAR LA NOTA ---");
-    console.error("Mensaje de error completo:", error);
-    
-    const errorMessage = error.errors ? Object.values(error.errors).map((e: any) => e.message).join(', ') : 'Error desconocido';
+  } catch (error: unknown) {
+    console.error("--- ERROR AL CREAR LA NOTA ---", error);
+
+    let errorMessage = "Error desconocido";
+
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (
+      typeof error === "object" &&
+      error !== null &&
+      "errors" in error
+    ) {
+      const validationErr = error as { errors: Record<string, { message: string }> };
+      errorMessage = Object.values(validationErr.errors)
+        .map((e) => e.message)
+        .join(", ");
+    }
+
     return NextResponse.json({ success: false, error: errorMessage }, { status: 400 });
   }
 }

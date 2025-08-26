@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server'; 
 import dbConnect from '@/lib/dbConnect';
 import Cliente from '@/models/Cliente';
-import mongoose from 'mongoose';
 
 export async function GET(request: NextRequest) {
   await dbConnect();
@@ -10,10 +9,11 @@ export async function GET(request: NextRequest) {
     const searchTerm = searchParams.get('searchTerm');
     const etapa = searchParams.get('etapa');
     const prioridad = searchParams.get('prioridad');
-    const matchFilter: any = {};
+
+    const matchFilter: Record<string, unknown> = {};
+
     if (searchTerm) {
       const searchRegex = new RegExp(`^${searchTerm}`, 'i');
-      
       matchFilter.$or = [
         { nombreCompleto: { $regex: searchRegex } },
         { email: { $regex: searchRegex } },
@@ -21,12 +21,14 @@ export async function GET(request: NextRequest) {
         { empresa: { $regex: searchRegex } },
       ];
     }
+
     if (etapa) {
       matchFilter.etapa = etapa;
     }
     if (prioridad) {
       matchFilter.prioridad = prioridad;
     }
+
     const clientes = await Cliente.aggregate([
       { $match: matchFilter },
       {

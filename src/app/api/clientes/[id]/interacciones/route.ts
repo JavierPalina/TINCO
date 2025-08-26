@@ -3,8 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../auth/[...nextauth]/route';
 import dbConnect from '@/lib/dbConnect';
 import Interaccion from '@/models/Interaccion';
-import User from '@/models/User';
-import Cliente from '@/models/Cliente';
+import mongoose from 'mongoose';
 
 // --- La función GET no necesita cambios ---
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
@@ -15,7 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       .populate('usuario', 'name')
       .sort({ createdAt: -1 });
     return NextResponse.json({ success: true, data: interacciones });
-  } catch (error) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
     return NextResponse.json({ success: false, error: errorMessage }, { status: 400 });
   }
@@ -36,7 +35,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     // 1. Verificaciones explícitas de los datos requeridos
     if (!id || !usuario || !tipo || !nota) {
-        return NextResponse.json({ success: false, error: "Faltan datos requeridos (cliente, usuario, tipo o nota)." }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Faltan datos requeridos (cliente, usuario, tipo o nota)." }, { status: 400 });
     }
 
     const nuevaInteraccion = await Interaccion.create({
@@ -47,12 +46,19 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     });
 
     return NextResponse.json({ success: true, data: nuevaInteraccion }, { status: 201 });
-  } catch (error: any) {
-    // 2. Devolvemos el mensaje de error específico de la base de datos
+  } catch (error: unknown) {
     console.error("Error al crear interacción:", error);
-    const errorMessage = error.errors 
-      ? Object.values(error.errors).map((e: any) => e.message).join(', ') 
-      : 'Error desconocido al guardar en la base de datos.';
+
+    let errorMessage = "Error desconocido al guardar en la base de datos.";
+
+    if (error instanceof mongoose.Error.ValidationError) {
+      errorMessage = Object.values(error.errors)
+        .map((e) => e.message)
+        .join(", ");
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+
     return NextResponse.json({ success: false, error: errorMessage }, { status: 400 });
   }
 }

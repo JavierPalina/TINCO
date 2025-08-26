@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from '@/components/ui/textarea';
 import { Client } from '@/types/client';
+import type { AxiosError } from 'axios';
 
 type Props = { client: Client; isOpen: boolean; onOpenChange: (open: boolean) => void; }
 type FormInputs = { contenido: string };
@@ -25,11 +26,11 @@ export function AddNoteDialog({ client, isOpen, onOpenChange }: Props) {
       reset();
       onOpenChange(false);
     },
-    onError: (error: any) => {
-      // Show the specific error message from the backend if available
-      const errorMessage = error.response?.data?.error || "No se pudo añadir la nota.";
+    onError: (error: unknown) => {
+      const axiosError = error as AxiosError<{ error: string }>;
+      const errorMessage = axiosError.response?.data?.error || "No se pudo añadir la nota.";
       toast.error("Error", { description: errorMessage });
-    }
+    },
   });
 
   const onSubmit: SubmitHandler<FormInputs> = (data) => mutation.mutate(data);

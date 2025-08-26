@@ -14,9 +14,9 @@ type Props = {
   client: Partial<Client>;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  getValues: () => any;
-  setValue: (name: any, value: any) => void;
-}
+  getValues: () => Partial<CompanyFormInputs>; 
+  setValue: <K extends keyof CompanyFormInputs>(name: K, value: CompanyFormInputs[K]) => void;
+};
 
 type CompanyFormInputs = {
   empresa?: string;

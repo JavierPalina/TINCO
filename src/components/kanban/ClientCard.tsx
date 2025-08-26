@@ -11,6 +11,7 @@ import { es } from 'date-fns/locale';
 import { ViewNotesDialog } from '../clientes/ViewNotesDialog';
 import { WhatsAppButton } from '../clientes/WhatsAppButton';
 import { EmailButton } from '../clientes/EmailButton';
+import Cliente from '@/models/Cliente';
 
 export interface ClientCardProps {
     _id: string;
@@ -46,7 +47,7 @@ export function ClientCard({ client }: { client: ClientCardProps }) {
 
     return (
         <>
-            <ViewNotesDialog client={client as any} isOpen={isNotesOpen} onOpenChange={setNotesOpen} />
+            {/* <ViewNotesDialog client={client as any} isOpen={isNotesOpen} onOpenChange={setNotesOpen} /> */}
             <div ref={setNodeRef} style={style}>
                 <Card className="mb-3 shadow-sm hover:shadow-lg transition-shadow duration-200 gap-0 py-2">
                     <CardHeader className="flex flex-row items-start justify-between p-3 space-y-0">
@@ -89,7 +90,7 @@ export function ClientCard({ client }: { client: ClientCardProps }) {
                         </div>
 
                         {/* Acciones Rápidas */}
-                        <div className="flex items-center justify-between border-t pt-2 mt-2">
+                        {/* <div className="flex items-center justify-between border-t pt-2 mt-2">
                             <div className="flex items-center gap-1">
                                 <WhatsAppButton telefono={client.telefono} />
                                 {client.email && <EmailButton email={client.email} />}
@@ -97,7 +98,7 @@ export function ClientCard({ client }: { client: ClientCardProps }) {
                             <button onClick={() => setNotesOpen(true)} title="Ver/Editar Notas" className="p-1.5 rounded-md hover:bg-muted">
                                 <FileText className="h-4 w-4 text-muted-foreground" />
                             </button>
-                        </div>
+                        </div> */}
                     </CardContent>
                 </Card>
             </div>

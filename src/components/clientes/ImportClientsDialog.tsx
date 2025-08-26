@@ -10,28 +10,37 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from "@/components/ui/input";
 import { Upload } from 'lucide-react';
 
+// --- Definimos un tipo tipado para los clientes importados ---
+type ImportedClient = {
+  nombreCompleto?: string;
+  telefono?: string;
+  email?: string;
+  empresa?: string;
+  prioridad?: string;
+  [key: string]: string | undefined; // permite acceder a cualquier columna del CSV
+};
+
 export function ImportClientsDialog() {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: (clientes: any[]) => axios.post('/api/clientes/import', { clientes }),
+    mutationFn: (clientes: ImportedClient[]) => axios.post('/api/clientes/import', { clientes }),
     onSuccess: (response) => {
       toast.success("Importación completada", { description: response.data.message });
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
       setOpen(false);
       setFile(null);
     },
-    onError: (error: any) => {
-      toast.error("Error en la importación", { description: error.response?.data?.error || "No se pudieron importar los clientes." });
+    onError: (error: unknown) => {
+      const msg = axios.isAxiosError(error) ? error.response?.data?.error : "No se pudieron importar los clientes.";
+      toast.error("Error en la importación", { description: msg });
     }
   });
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files) {
-      setFile(event.target.files[0]);
-    }
+    if (event.target.files) setFile(event.target.files[0]);
   };
 
   const handleImport = () => {
@@ -40,22 +49,20 @@ export function ImportClientsDialog() {
       return;
     }
 
-    Papa.parse(file, {
+    Papa.parse<ImportedClient>(file, {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        // Mapeamos los nombres de columna del CSV a los nombres del modelo
-        const mappedData = results.data.map((row: any) => ({
-            nombreCompleto: row["Nombre Completo"] || row["nombreCompleto"],
-            telefono: row["Teléfono"] || row["telefono"],
-            email: row["Email"] || row["email"],
-            empresa: row["Empresa"] || row["empresa"],
-            prioridad: row["Prioridad"] || row["prioridad"],
-            // Añade más campos aquí
+        const mappedData: ImportedClient[] = results.data.map((row) => ({
+          nombreCompleto: row["Nombre Completo"] || row["nombreCompleto"],
+          telefono: row["Teléfono"] || row["telefono"],
+          email: row["Email"] || row["email"],
+          empresa: row["Empresa"] || row["empresa"],
+          prioridad: row["Prioridad"] || row["prioridad"],
         }));
         mutation.mutate(mappedData);
       },
-      error: (error) => {
+      error: () => {
         toast.error("Error al procesar el archivo CSV.");
       }
     });
@@ -74,8 +81,8 @@ export function ImportClientsDialog() {
           </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-4">
-            <Input type="file" accept=".csv" onChange={handleFileChange} />
-            {file && <p className="text-sm text-muted-foreground">Archivo seleccionado: {file.name}</p>}
+          <Input type="file" accept=".csv" onChange={handleFileChange} />
+          {file && <p className="text-sm text-muted-foreground">Archivo seleccionado: {file.name}</p>}
         </div>
         <Button onClick={handleImport} disabled={mutation.isPending}>
           {mutation.isPending ? "Importando..." : "Iniciar Importación"}
