@@ -65,7 +65,7 @@ export function KanbanBoard() {
       });
       setColumns(initialColumns);
     }
-  }, [clientes]);
+  }, [clientes, columnOrder]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 10 } }));
 

@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import mongoose, { Mongoose } from 'mongoose';
 
 const MONGODB_URI = process.env.MONGODB_URI!;
 
@@ -8,17 +8,25 @@ if (!MONGODB_URI) {
   );
 }
 
-// Usamos una caché global para la conexión para evitar reconexiones en desarrollo.
-// En producción, Next.js maneja esto de manera diferente.
-let cached = (global as any).mongoose;
+// Define a type for our cached connection on the global object
+interface MongooseCache {
+  conn: Mongoose | null;
+  promise: Promise<Mongoose> | null;
+}
+
+// Type assertion for the global object
+const globalWithMongoose = global as typeof globalThis & {
+    mongoose: MongooseCache;
+};
+
+let cached = globalWithMongoose.mongoose;
 
 if (!cached) {
-  cached = (global as any).mongoose = { conn: null, promise: null };
+  cached = globalWithMongoose.mongoose = { conn: null, promise: null };
 }
 
 async function dbConnect() {
   if (cached.conn) {
-    console.log('🚀 Using cached database connection');
     return cached.conn;
   }
 
@@ -28,7 +36,6 @@ async function dbConnect() {
     };
 
     cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
-      console.log('✅ New database connection established');
       return mongoose;
     });
   }

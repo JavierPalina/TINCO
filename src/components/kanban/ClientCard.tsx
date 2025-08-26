@@ -23,6 +23,7 @@ export interface ClientCardProps {
     ultimaInteraccionTipo?: string;
     ultimaInteraccionFecha?: string;
     ultimaCotizacionMonto?: number;
+    notas?: string;
 }
 
 export function ClientCard({ client }: { client: ClientCardProps }) {

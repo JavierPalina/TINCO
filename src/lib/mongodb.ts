@@ -9,9 +9,7 @@ let client: MongoClient
 let clientPromise: Promise<MongoClient>
 
 if (process.env.NODE_ENV === 'development') {
-  // En desarrollo, usa una variable global para preservar el valor
-  // a través de las recargas de módulos causadas por HMR (Hot Module Replacement).
-  let globalWithMongo = global as typeof globalThis & {
+  const globalWithMongo = global as typeof globalThis & {
     _mongoClientPromise?: Promise<MongoClient>
   }
 
@@ -21,7 +19,6 @@ if (process.env.NODE_ENV === 'development') {
   }
   clientPromise = globalWithMongo._mongoClientPromise
 } else {
-  // En producción, es más simple.
   client = new MongoClient(uri)
   clientPromise = client.connect()
 }
