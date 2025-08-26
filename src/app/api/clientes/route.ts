@@ -10,11 +10,8 @@ export async function GET(request: NextRequest) {
     const searchTerm = searchParams.get('searchTerm');
     const etapa = searchParams.get('etapa');
     const prioridad = searchParams.get('prioridad');
-
-    // Construimos el objeto de filtro para MongoDB
     const matchFilter: any = {};
     if (searchTerm) {
-      // Usamos un ancla (^) para que la búsqueda sea "empieza con"
       const searchRegex = new RegExp(`^${searchTerm}`, 'i');
       
       matchFilter.$or = [
@@ -32,8 +29,6 @@ export async function GET(request: NextRequest) {
     }
     const clientes = await Cliente.aggregate([
       { $match: matchFilter },
-      // --- THIS IS THE KEY CHANGE ---
-      // 1. Join with the 'users' collection to get the creator's data
       {
         $lookup: {
           from: 'users',
@@ -42,21 +37,17 @@ export async function GET(request: NextRequest) {
           as: 'creadorInfo',
         },
       },
-      // ... (The other lookups and addFields for interactions/quotes remain the same)
       { $lookup: { from: 'interaccions', localField: '_id', foreignField: 'cliente', as: 'interacciones' } },
       { $lookup: { from: 'cotizacions', localField: '_id', foreignField: 'cliente', as: 'cotizaciones' } },
       {
         $addFields: {
           ultimaInteraccion: { $arrayElemAt: [ "$interacciones", -1 ] },
           ultimaCotizacion: { $arrayElemAt: [ "$cotizaciones", -1 ] },
-          // Get the creator's name from the joined data
           creadoPor: { $arrayElemAt: [ "$creadorInfo.name", 0 ] },
         },
       },
-      // 2. Add 'direccion' to the fields we want to keep
       {
         $project: {
-          // --- ESTA ES LA LISTA COMPLETA Y CORREGIDA ---
           nombreCompleto: 1,
           email: 1,
           telefono: 1,
@@ -66,24 +57,18 @@ export async function GET(request: NextRequest) {
           empresa: 1,
           vendedorAsignado: 1,
           createdAt: 1,
-          
-          // Campos de dirección personal
           direccion: 1,
           ciudad: 1,
           pais: 1,
           dni: 1,
-          
-          // Campos de empresa
           direccionEmpresa: 1,
           ciudadEmpresa: 1,
           paisEmpresa: 1,
           razonSocial: 1,
           contactoEmpresa: 1,
           cuil: 1,
-          
-          // Campos calculados
           creadoPor: 1,
-          ultimoContacto: "$ultimaInteraccion.createdAt", // Simplificado para devolver solo la fecha
+          ultimoContacto: "$ultimaInteraccion.createdAt",
           ultimaCotizacionMonto: "$ultimaCotizacion.montoTotal",
         },
       },
