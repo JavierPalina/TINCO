@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'; // Importar NextRequest
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../auth/[...nextauth]/route';
+import { authOptions } from "@/lib/authOptions";
 import dbConnect from '@/lib/dbConnect';
 import Tarea from '@/models/Tarea';
 

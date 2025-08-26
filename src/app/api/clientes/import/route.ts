@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Cliente from '@/models/Cliente';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../../auth/[...nextauth]/route';
+import { authOptions } from "@/lib/authOptions";
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);

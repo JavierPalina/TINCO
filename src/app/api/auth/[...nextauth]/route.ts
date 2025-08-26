@@ -6,7 +6,6 @@ import dbConnect from "@/lib/dbConnect"
 import UserModel from "@/models/User"
 import bcrypt from "bcrypt"
 
-// --- ESTE ES EL CAMBIO: Quitamos la palabra "export" ---
 const authOptions: NextAuthOptions = {
   adapter: MongoDBAdapter(clientPromise),
   providers: [
