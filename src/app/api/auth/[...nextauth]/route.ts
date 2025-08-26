@@ -1,13 +1,13 @@
-import NextAuth, { User, Session } from "next-auth"
+import NextAuth, { NextAuthOptions } from "next-auth" // <-- 1. Importar NextAuthOptions
 import { MongoDBAdapter } from "@next-auth/mongodb-adapter"
 import clientPromise from "@/lib/mongodb"
 import CredentialsProvider from "next-auth/providers/credentials"
 import dbConnect from "@/lib/dbConnect"
 import UserModel from "@/models/User"
 import bcrypt from "bcrypt"
-import { JWT } from "next-auth/jwt"
 
-export const authOptions = {
+// --- 2. AÑADIMOS EL TIPO A LA CONFIGURACIÓN ---
+export const authOptions: NextAuthOptions = {
   adapter: MongoDBAdapter(clientPromise),
   providers: [
     CredentialsProvider({
@@ -16,7 +16,6 @@ export const authOptions = {
         email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
       },
-      // Esta función se llama cuando un usuario intenta iniciar sesión
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
           throw new Error("Credenciales inválidas")
@@ -24,14 +23,12 @@ export const authOptions = {
 
         await dbConnect()
 
-        // Buscamos al usuario por su email
         const user = await UserModel.findOne({ email: credentials.email }).select("+password")
 
         if (!user || !user.password) {
           throw new Error("Usuario no encontrado")
         }
 
-        // Comparamos la contraseña del formulario con la encriptada en la DB
         const isPasswordCorrect = await bcrypt.compare(
           credentials.password,
           user.password
@@ -41,7 +38,6 @@ export const authOptions = {
           throw new Error("Contraseña incorrecta")
         }
 
-        // Si todo es correcto, devolvemos el usuario (sin la contraseña)
         return {
           id: user._id.toString(),
           name: user.name,
@@ -51,20 +47,18 @@ export const authOptions = {
       },
     }),
   ],
-  // Usamos JWT para las sesiones
   session: {
-    strategy: "jwt" as const,
+    strategy: "jwt",
   },
-  // Callbacks para añadir información extra (como el rol) al token de sesión
   callbacks: {
-    async jwt({ token, user }: { token: JWT; user?: User }) {
+    async jwt({ token, user }) {
       if (user) {
         token.id = user.id
         token.rol = user.rol
       }
       return token
     },
-    async session({ session, token }: { session: Session; token: JWT }) {
+    async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id
         session.user.rol = token.rol
@@ -73,9 +67,9 @@ export const authOptions = {
     },
   },
   pages: {
-    signIn: "/login", // Le decimos a NextAuth dónde está nuestra página de login
+    signIn: "/login",
   },
-  secret: process.env.NEXTAUTH_SECRET, // Una clave secreta para firmar los tokens
+  secret: process.env.NEXTAUTH_SECRET,
 }
 
 const handler = NextAuth(authOptions)
