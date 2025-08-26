@@ -1,4 +1,4 @@
-import NextAuth, { NextAuthOptions } from "next-auth" // <-- 1. Importar NextAuthOptions
+import NextAuth, { NextAuthOptions } from "next-auth"
 import { MongoDBAdapter } from "@next-auth/mongodb-adapter"
 import clientPromise from "@/lib/mongodb"
 import CredentialsProvider from "next-auth/providers/credentials"
@@ -6,8 +6,8 @@ import dbConnect from "@/lib/dbConnect"
 import UserModel from "@/models/User"
 import bcrypt from "bcrypt"
 
-// --- 2. AÑADIMOS EL TIPO A LA CONFIGURACIÓN ---
-export const authOptions: NextAuthOptions = {
+// --- ESTE ES EL CAMBIO: Quitamos la palabra "export" ---
+const authOptions: NextAuthOptions = {
   adapter: MongoDBAdapter(clientPromise),
   providers: [
     CredentialsProvider({
