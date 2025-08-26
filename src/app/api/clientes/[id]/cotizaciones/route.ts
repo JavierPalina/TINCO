@@ -1,16 +1,18 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from "@/lib/authOptions";
 import dbConnect from '@/lib/dbConnect';
 import Cotizacion from '@/models/Cotizacion';
 
-// --- GET: Obtener todas las cotizaciones de un cliente ---
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+// --- GET: Obtener TODAS las cotizaciones de un cliente ---
+// CAMBIO: La función ahora espera 'id' en lugar de 'clienteId'
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse('No autorizado', { status: 401 });
 
   await dbConnect();
   try {
+    // Usamos params.id para la búsqueda
     const cotizaciones = await Cotizacion.find({ cliente: params.id })
       .populate('vendedor', 'name')
       .sort({ createdAt: -1 });
@@ -20,8 +22,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-// --- POST: Crear una nueva cotización para un cliente ---
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+// --- POST: Crear una NUEVA cotización para un cliente ---
+// CAMBIO: La función ahora espera 'id' en lugar de 'clienteId'
+export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return new NextResponse('No autorizado', { status: 401 });
@@ -31,7 +34,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
   try {
     const body = await request.json();
 
-    // Lógica para generar un código de cotización único (ej: COT-001, COT-002)
     const ultimaCotizacion = await Cotizacion.findOne().sort({ createdAt: -1 });
     let nuevoCodigo = 'COT-001';
     if (ultimaCotizacion && ultimaCotizacion.codigo) {
@@ -41,7 +43,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     const nuevaCotizacion = await Cotizacion.create({
       ...body,
-      cliente: params.id,
+      cliente: params.id, // Usamos params.id para asociar el cliente
       vendedor: session.user.id,
       codigo: nuevoCodigo,
     });
