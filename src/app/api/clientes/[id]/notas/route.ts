@@ -6,15 +6,19 @@ import Nota from '@/models/Nota';
 import User from '@/models/User';
 
 // --- GET: Obtener todas las notas de un cliente ---
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  request: NextRequest, 
+  { params }: { params: Promise<{ id: string }> }
+) {
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse('No autorizado', { status: 401 });
 
+  const { id } = await params; // Se aplica el await aquí
   await dbConnect();
   try {
     void User; // asegura que el modelo esté cargado, sin warning
 
-    const notas = await Nota.find({ cliente: params.id })
+    const notas = await Nota.find({ cliente: id }) // Se usa el 'id' resuelto
       .populate('usuario', 'name')
       .sort({ createdAt: -1 });
       
@@ -25,7 +29,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+// --- POST: Crear una nueva nota para un cliente ---
+export async function POST(
+  request: NextRequest, 
+  { params }: { params: Promise<{ id: string }> }
+) {
   console.log("--- INICIANDO POST /api/notas ---");
 
   const session = await getServerSession(authOptions);
@@ -38,7 +46,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   await dbConnect();
 
   try {
-    const { id } = params;
+    const { id } = await params; // Se aplica el await aquí
     console.log("1. ID de Cliente recibido de la URL:", id);
     if (!id) {
       return NextResponse.json({ success: false, error: 'El ID del cliente es requerido en la URL' }, { status: 400 });
