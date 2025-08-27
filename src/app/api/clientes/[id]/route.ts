@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Cliente from '@/models/Cliente';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } } // Corrected: Removed Promise wrapper
-) {
-  const { id } = params; // Corrected: Removed await
+// The context parameter contains the route's dynamic parameters.
+// We define a type for it for better type safety.
+type RouteContext = {
+  params: {
+    id: string;
+  };
+};
+
+export async function GET(request: NextRequest, context: RouteContext) {
+  const { id } = context.params; // Destructure params from the context object
   await dbConnect();
 
   try {
@@ -32,12 +37,8 @@ export async function GET(
 }
 
 // --- FUNCIÓN PUT ---
-// This function was already correct.
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const { id } = params;
+export async function PUT(request: NextRequest, context: RouteContext) {
+  const { id } = context.params; // Destructure params from the context object
   await dbConnect();
 
   try {
@@ -67,12 +68,8 @@ export async function PUT(
 }
 
 // --- FUNCIÓN DELETE ---
-// This function was already correct.
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const { id } = params;
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  const { id } = context.params; // Destructure params from the context object
   await dbConnect();
 
   try {
