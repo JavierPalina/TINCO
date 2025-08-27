@@ -3,7 +3,10 @@ import dbConnect from '@/lib/dbConnect';
 import Cliente from '@/models/Cliente';
 
 // --- FUNCIÓN GET (por ID) ---
-export async function GET(request: NextRequest, { params }: any) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   const { id } = params;
   await dbConnect();
 
@@ -29,11 +32,10 @@ export async function GET(request: NextRequest, { params }: any) {
   }
 }
 
-
-// --- FUNCIÓN PUT: Para actualizar un cliente ---
+// --- FUNCIÓN PUT ---
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } } // ✅ inline
+  { params }: { params: { id: string } }
 ) {
   const { id } = params;
   await dbConnect();
@@ -64,10 +66,10 @@ export async function PUT(
   }
 }
 
-// --- FUNCIÓN DELETE: Para eliminar un cliente ---
+// --- FUNCIÓN DELETE ---
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } } // ✅ inline
+  { params }: { params: { id: string } }
 ) {
   const { id } = params;
   await dbConnect();
