@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Cliente from '@/models/Cliente';
 
-export async function GET(request: NextRequest, 
-  { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } } // Corrected: Removed Promise wrapper
+) {
+  const { id } = params; // Corrected: Removed await
   await dbConnect();
 
   try {
@@ -30,6 +32,7 @@ export async function GET(request: NextRequest,
 }
 
 // --- FUNCIÓN PUT ---
+// This function was already correct.
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -64,6 +67,7 @@ export async function PUT(
 }
 
 // --- FUNCIÓN DELETE ---
+// This function was already correct.
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
