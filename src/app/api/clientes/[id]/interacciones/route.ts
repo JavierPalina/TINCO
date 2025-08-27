@@ -24,9 +24,12 @@ export async function GET(
   }
 }
 
-// --- POST: AÑADIR una nueva interacción a un cliente específico ---
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function POST(
+  request: NextRequest, 
+  { params }: { params: Promise<{ id: string }> } // Apply the same fix here
+) {
+  // Await params to get the id, just like in the GET function
+  const { id } = await params; 
   await dbConnect();
 
   try {
