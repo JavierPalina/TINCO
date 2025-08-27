@@ -2,11 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Cliente from '@/models/Cliente';
 
-// --- FUNCIÓN GET (por ID): Para obtener un solo cliente ---
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } } // ✅ inline
-) {
+// --- FUNCIÓN GET (por ID) ---
+export async function GET(request: NextRequest, { params }: any) {
   const { id } = params;
   await dbConnect();
 
@@ -15,12 +12,14 @@ export async function GET(
       'vendedorAsignado',
       'name email'
     );
+
     if (!cliente) {
       return NextResponse.json(
         { success: false, error: 'Cliente no encontrado' },
         { status: 404 }
       );
     }
+
     return NextResponse.json({ success: true, data: cliente });
   } catch {
     return NextResponse.json(
@@ -29,6 +28,7 @@ export async function GET(
     );
   }
 }
+
 
 // --- FUNCIÓN PUT: Para actualizar un cliente ---
 export async function PUT(
