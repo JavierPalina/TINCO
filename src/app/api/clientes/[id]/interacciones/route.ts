@@ -31,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   try {
     const { id } = params;
     const body = await request.json();
-    const { tipo, nota } = body; // El 'usuario' se toma de la sesión
+    const { tipo, nota } = body;
 
     if (!id || !tipo || !nota) {
       return NextResponse.json({ success: false, error: "Faltan datos requeridos (cliente, tipo o nota)." }, { status: 400 });
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const nuevaInteraccion = await Interaccion.create({
       cliente: id,
-      usuario: session.user.id, // Usamos el ID del usuario de la sesión
+      usuario: session.user.id,
       tipo: tipo,
       nota: nota,
     });
@@ -50,7 +50,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     let errorMessage = "Error desconocido al guardar en la base de datos.";
     if (error instanceof mongoose.Error.ValidationError) {
-      errorMessage = Object.values(error.errors).map((e: any) => e.message).join(", ");
+      // --- ESTE ES EL CAMBIO ---
+      // Reemplazamos 'any' por un tipo específico
+      errorMessage = Object.values(error.errors).map((e: { message: string }) => e.message).join(", ");
     } else if (error instanceof Error) {
       errorMessage = error.message;
     }
