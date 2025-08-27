@@ -15,6 +15,14 @@ interface RouteContext {
   };
 }
 
+/**
+ * Defines the expected shape of a Mongoose validation error value.
+ * This helps avoid using the 'any' type.
+ */
+interface MongooseErrorValue {
+  message: string;
+}
+
 // --- GET: Obtener todas las interacciones de un cliente ---
 export async function GET(request: NextRequest, context: RouteContext) {
   // Destructure the id from the context's params object
@@ -68,7 +76,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     // Handle Mongoose validation errors specifically
     if (error instanceof mongoose.Error.ValidationError) {
       errorMessage = Object.values(error.errors)
-        .map((e: any) => e.message)
+        .map((e: MongooseErrorValue) => e.message)
         .join(", ");
     } else if (error instanceof Error) {
       errorMessage = error.message;
