@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Cliente from '@/models/Cliente';
 
+// The GET function was missing the 'request: NextRequest' as its first parameter.
+// All route handlers must accept 'request' as the first argument.
 export async function GET(
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const { id } = params;
