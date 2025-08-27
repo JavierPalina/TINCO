@@ -5,7 +5,7 @@ import dbConnect from '@/lib/dbConnect';
 import Interaccion from '@/models/Interaccion';
 import mongoose from 'mongoose';
 
-// --- La función GET no necesita cambios ---
+// --- GET: Obtener todas las interacciones de un cliente ---
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   const { id } = params;
   await dbConnect();
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-// --- POST con validación y manejo de errores mejorado ---
+// --- POST: Añadir una nueva interacción ---
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
@@ -31,16 +31,15 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   try {
     const { id } = params;
     const body = await request.json();
-    const { tipo, nota, usuario } = body;
+    const { tipo, nota } = body; // El 'usuario' se toma de la sesión
 
-    // 1. Verificaciones explícitas de los datos requeridos
-    if (!id || !usuario || !tipo || !nota) {
-      return NextResponse.json({ success: false, error: "Faltan datos requeridos (cliente, usuario, tipo o nota)." }, { status: 400 });
+    if (!id || !tipo || !nota) {
+      return NextResponse.json({ success: false, error: "Faltan datos requeridos (cliente, tipo o nota)." }, { status: 400 });
     }
 
     const nuevaInteraccion = await Interaccion.create({
       cliente: id,
-      usuario: usuario,
+      usuario: session.user.id, // Usamos el ID del usuario de la sesión
       tipo: tipo,
       nota: nota,
     });
@@ -50,11 +49,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     console.error("Error al crear interacción:", error);
 
     let errorMessage = "Error desconocido al guardar en la base de datos.";
-
     if (error instanceof mongoose.Error.ValidationError) {
-      errorMessage = Object.values(error.errors)
-        .map((e) => e.message)
-        .join(", ");
+      errorMessage = Object.values(error.errors).map((e: any) => e.message).join(", ");
     } else if (error instanceof Error) {
       errorMessage = error.message;
     }
