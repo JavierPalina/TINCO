@@ -1,32 +1,43 @@
-import { NextRequest, NextResponse } from 'next/server'; // Importar NextRequest
+import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Cliente from '@/models/Cliente';
 
+type RouteParams = { params: { id: string } };
+
 // --- FUNCIÓN GET (por ID): Para obtener un solo cliente ---
 export async function GET(
-  request: NextRequest, 
-  { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  { params }: RouteParams
 ) {
-  const { id } = await params; // Se aplica el await aquí
+  const { id } = params; // 👈 sin await
   await dbConnect();
 
   try {
-    const cliente = await Cliente.findById(id).populate('vendedorAsignado', 'name email');
+    const cliente = await Cliente.findById(id).populate(
+      'vendedorAsignado',
+      'name email'
+    );
     if (!cliente) {
-      return NextResponse.json({ success: false, error: "Cliente no encontrado" }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: 'Cliente no encontrado' },
+        { status: 404 }
+      );
     }
     return NextResponse.json({ success: true, data: cliente });
   } catch (error) {
-    return NextResponse.json({ success: false, error: 'ID de cliente inválido' }, { status: 400 });
+    return NextResponse.json(
+      { success: false, error: 'ID de cliente inválido' },
+      { status: 400 }
+    );
   }
 }
 
 // --- FUNCIÓN PUT: Para actualizar un cliente ---
 export async function PUT(
   request: NextRequest,
-  { params }: { params: any } // 👈 ya no uses RouteHandlerContext ni Promise
+  { params }: RouteParams
 ) {
-  const { id } = params; // ✅ funciona en runtime
+  const { id } = params;
   await dbConnect();
 
   try {
@@ -39,7 +50,7 @@ export async function PUT(
 
     if (!clienteActualizado) {
       return NextResponse.json(
-        { success: false, error: "Cliente no encontrado" },
+        { success: false, error: 'Cliente no encontrado' },
         { status: 404 }
       );
     }
@@ -47,7 +58,7 @@ export async function PUT(
     return NextResponse.json({ success: true, data: clienteActualizado });
   } catch (error) {
     const errorMessage =
-      error instanceof Error ? error.message : "Error desconocido";
+      error instanceof Error ? error.message : 'Error desconocido';
     return NextResponse.json(
       { success: false, error: errorMessage },
       { status: 400 }
@@ -57,20 +68,30 @@ export async function PUT(
 
 // --- FUNCIÓN DELETE: Para eliminar un cliente ---
 export async function DELETE(
-  request: NextRequest, 
-  { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  { params }: RouteParams
 ) {
-  const { id } = await params; // Se aplica el await aquí
+  const { id } = params;
   await dbConnect();
 
   try {
     const clienteEliminado = await Cliente.findByIdAndDelete(id);
     if (!clienteEliminado) {
-      return NextResponse.json({ success: false, error: "Cliente no encontrado" }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: 'Cliente no encontrado' },
+        { status: 404 }
+      );
     }
-    return NextResponse.json({ success: true, data: { message: "Cliente eliminado correctamente" } });
+    return NextResponse.json({
+      success: true,
+      data: { message: 'Cliente eliminado correctamente' },
+    });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-    return NextResponse.json({ success: false, error: errorMessage }, { status: 400 });
+    const errorMessage =
+      error instanceof Error ? error.message : 'Error desconocido';
+    return NextResponse.json(
+      { success: false, error: errorMessage },
+      { status: 400 }
+    );
   }
 }
