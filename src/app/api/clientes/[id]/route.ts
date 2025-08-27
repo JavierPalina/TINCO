@@ -2,12 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Cliente from '@/models/Cliente';
 
-// --- FUNCIÓN GET (por ID) ---
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const { id } = params;
+export async function GET(request: NextRequest, 
+  { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   await dbConnect();
 
   try {
