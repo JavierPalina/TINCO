@@ -23,26 +23,35 @@ export async function GET(
 
 // --- FUNCIÓN PUT: Para actualizar un cliente ---
 export async function PUT(
-  request: NextRequest, 
-  { params }: { params: Promise<{ id: string }> } // Corregido para ser consistente
+  request: NextRequest,
+  { params }: { params: { id: string } } // 👈 síncrono en Next.js 15
 ) {
-  const { id } = await params; // Corregido para usar await
+  const { id } = params; // 👈 sin await
   await dbConnect();
 
   try {
     const body = await request.json();
+
     const clienteActualizado = await Cliente.findByIdAndUpdate(id, body, {
       new: true,
       runValidators: true,
     });
 
     if (!clienteActualizado) {
-      return NextResponse.json({ success: false, error: "Cliente no encontrado" }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: "Cliente no encontrado" },
+        { status: 404 }
+      );
     }
+
     return NextResponse.json({ success: true, data: clienteActualizado });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-    return NextResponse.json({ success: false, error: errorMessage }, { status: 400 });
+    const errorMessage =
+      error instanceof Error ? error.message : "Error desconocido";
+    return NextResponse.json(
+      { success: false, error: errorMessage },
+      { status: 400 }
+    );
   }
 }
 
