@@ -21,11 +21,12 @@ export async function GET(
   }
 }
 
+// --- FUNCIÓN PUT: Para actualizar un cliente ---
 export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  request: NextRequest, 
+  { params }: { params: Promise<{ id: string }> } // Corregido para ser consistente
 ) {
-  const { id } = params; // ✅ sin await
+  const { id } = await params; // Corregido para usar await
   await dbConnect();
 
   try {
