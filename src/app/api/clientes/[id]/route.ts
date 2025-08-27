@@ -1,20 +1,13 @@
-// @ts-nocheck
-
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Cliente from '@/models/Cliente';
 
-// --- NUEVO ENFOQUE ---
-// 1. Usamos el tipo `Request` nativo en lugar de `NextRequest`.
-// 2. No desestructuramos el segundo argumento en la firma de la función.
-//    Recibimos el objeto `context` completo y accedemos a `context.params` adentro.
-// Esto presenta una estructura más simple para el compilador de TypeScript.
-
+// --- GET ---
 export async function GET(
-  request: Request,
-  context: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: { id: string } }
 ) {
-  const { id } = context.params;
+  const { id } = params;
   await dbConnect();
 
   try {
@@ -32,7 +25,6 @@ export async function GET(
 
     return NextResponse.json({ success: true, data: cliente });
   } catch (error) {
-    // Agregamos un console.error para ver el error real en la consola del servidor
     console.error('Error en GET /api/clientes/[id]:', error);
     return NextResponse.json(
       { success: false, error: 'Error del servidor' },
@@ -41,16 +33,16 @@ export async function GET(
   }
 }
 
-// --- FUNCIÓN PUT (con el mismo nuevo enfoque) ---
+// --- PUT ---
 export async function PUT(
-  request: Request,
-  context: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: { id: string } }
 ) {
-  const { id } = context.params;
+  const { id } = params;
   await dbConnect();
 
   try {
-    const body = await request.json();
+    const body = await req.json();
 
     const clienteActualizado = await Cliente.findByIdAndUpdate(id, body, {
       new: true,
@@ -69,17 +61,17 @@ export async function PUT(
     console.error('Error en PUT /api/clientes/[id]:', error);
     return NextResponse.json(
       { success: false, error: 'Error del servidor o datos inválidos' },
-      { status: 400 } // Cambiado a 400 para errores de validación
+      { status: 400 }
     );
   }
 }
 
-// --- FUNCIÓN DELETE (con el mismo nuevo enfoque) ---
+// --- DELETE ---
 export async function DELETE(
-  request: Request,
-  context: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: { id: string } }
 ) {
-  const { id } = context.params;
+  const { id } = params;
   await dbConnect();
 
   try {
