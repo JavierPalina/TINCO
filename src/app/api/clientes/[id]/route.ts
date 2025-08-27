@@ -5,9 +5,9 @@ import Cliente from '@/models/Cliente';
 // --- GET ---
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // 👈 IMPORTANTE
 ) {
-  const { id } = params;
+  const { id } = await params; // 👈 hay que hacer await
   await dbConnect();
 
   try {
