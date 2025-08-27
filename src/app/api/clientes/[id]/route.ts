@@ -1,14 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Cliente from '@/models/Cliente';
 
-// The GET function was missing the 'request: NextRequest' as its first parameter.
-// All route handlers must accept 'request' as the first argument.
+// --- NUEVO ENFOQUE ---
+// 1. Usamos el tipo `Request` nativo en lugar de `NextRequest`.
+// 2. No desestructuramos el segundo argumento en la firma de la función.
+//    Recibimos el objeto `context` completo y accedemos a `context.params` adentro.
+// Esto presenta una estructura más simple para el compilador de TypeScript.
+
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  request: Request,
+  context: { params: { id: string } }
 ) {
-  const { id } = params;
+  const { id } = context.params;
   await dbConnect();
 
   try {
@@ -25,20 +29,22 @@ export async function GET(
     }
 
     return NextResponse.json({ success: true, data: cliente });
-  } catch {
+  } catch (error) {
+    // Agregamos un console.error para ver el error real en la consola del servidor
+    console.error('Error en GET /api/clientes/[id]:', error);
     return NextResponse.json(
-      { success: false, error: 'ID de cliente inválido' },
-      { status: 400 }
+      { success: false, error: 'Error del servidor' },
+      { status: 500 }
     );
   }
 }
 
-// --- FUNCIÓN PUT ---
+// --- FUNCIÓN PUT (con el mismo nuevo enfoque) ---
 export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  request: Request,
+  context: { params: { id: string } }
 ) {
-  const { id } = params;
+  const { id } = context.params;
   await dbConnect();
 
   try {
@@ -58,21 +64,20 @@ export async function PUT(
 
     return NextResponse.json({ success: true, data: clienteActualizado });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'Error desconocido';
+    console.error('Error en PUT /api/clientes/[id]:', error);
     return NextResponse.json(
-      { success: false, error: errorMessage },
-      { status: 400 }
+      { success: false, error: 'Error del servidor o datos inválidos' },
+      { status: 400 } // Cambiado a 400 para errores de validación
     );
   }
 }
 
-// --- FUNCIÓN DELETE ---
+// --- FUNCIÓN DELETE (con el mismo nuevo enfoque) ---
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  request: Request,
+  context: { params: { id: string } }
 ) {
-  const { id } = params;
+  const { id } = context.params;
   await dbConnect();
 
   try {
@@ -88,11 +93,10 @@ export async function DELETE(
       data: { message: 'Cliente eliminado correctamente' },
     });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'Error desconocido';
+    console.error('Error en DELETE /api/clientes/[id]:', error);
     return NextResponse.json(
-      { success: false, error: errorMessage },
-      { status: 400 }
+      { success: false, error: 'Error del servidor' },
+      { status: 500 }
     );
   }
 }
