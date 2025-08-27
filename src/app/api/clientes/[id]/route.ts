@@ -2,13 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Cliente from '@/models/Cliente';
 
-// We are now defining the type for the second argument directly in each function's signature,
-// as the build process was rejecting the 'RouteContext' type alias.
 export async function GET(
-  request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
-  const { id } = context.params;
+  const { id } = params;
   await dbConnect();
 
   try {
