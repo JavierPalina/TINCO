@@ -5,9 +5,9 @@ import Cliente from '@/models/Cliente';
 // --- GET ---
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> } // 👈 IMPORTANTE
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params; // 👈 hay que hacer await
+  const { id } = await params;
   await dbConnect();
 
   try {
@@ -36,9 +36,9 @@ export async function GET(
 // --- PUT ---
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await params;
   await dbConnect();
 
   try {
@@ -69,9 +69,9 @@ export async function PUT(
 // --- DELETE ---
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await params;
   await dbConnect();
 
   try {
