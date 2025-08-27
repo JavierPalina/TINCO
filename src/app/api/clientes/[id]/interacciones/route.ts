@@ -6,16 +6,6 @@ import Interaccion from '@/models/Interaccion';
 import mongoose from 'mongoose';
 
 /**
- * Defines the expected shape of the context object passed to the route handler.
- * This object contains the dynamic route parameters.
- */
-interface RouteContext {
-  params: {
-    id: string;
-  };
-}
-
-/**
  * Defines the expected shape of a Mongoose validation error value.
  * This helps avoid using the 'any' type.
  */
@@ -24,9 +14,12 @@ interface MongooseErrorValue {
 }
 
 // --- GET: Obtener todas las interacciones de un cliente ---
-export async function GET(request: NextRequest, context: RouteContext) {
-  // Destructure the id from the context's params object
-  const { id } = context.params;
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  // Destructure the id from the params object
+  const { id } = params;
   
   await dbConnect();
 
@@ -42,7 +35,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
 }
 
 // --- POST: Añadir una nueva interacción ---
-export async function POST(request: NextRequest, context: RouteContext) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return new NextResponse('No autorizado', { status: 401 });
@@ -51,8 +47,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
   await dbConnect();
 
   try {
-    // Destructure the id from the context's params object
-    const { id } = context.params;
+    // Destructure the id from the params object
+    const { id } = params;
     const body = await request.json();
     const { tipo, nota } = body;
 
