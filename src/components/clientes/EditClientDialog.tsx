@@ -61,13 +61,6 @@ export function EditClientDialog({ client, isOpen, onOpenChange, prioridadesOpti
 
   return (
     <>
-      <CompanyDataDialog 
-        client={client}
-        isOpen={isCompanyDialogOpen}
-        onOpenChange={setCompanyDialogOpen}
-        getValues={getValues}
-        setValue={setValue}
-      />
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <form onSubmit={handleSubmit(onSubmit)}>
@@ -97,22 +90,9 @@ export function EditClientDialog({ client, isOpen, onOpenChange, prioridadesOpti
                 />
               </div>
               <div className="space-y-2"><Label>Origen de Contacto</Label><Input {...register("origenContacto")} /></div>
-              <div className="space-y-2"><Label>Dirección Personal</Label><Input {...register("direccion")} /></div>
-              <div className="space-y-2"><Label>Ciudad Personal</Label><Input {...register("ciudad")} /></div>
-              <div className="space-y-2"><Label>País Personal</Label><Input {...register("pais")} /></div>
-              
-              <h3 className="md:col-span-2 font-semibold text-lg border-b pb-2 mt-4">Información de la Empresa</h3>
-              <div className="space-y-2">
-                <Label>Nombre Empresa</Label>
-                <div className="flex items-center gap-2">
-                  <Input {...register("empresa")} />
-                  <Button type="button" variant="outline" size="icon" onClick={() => setCompanyDialogOpen(true)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="md:col-span-2 space-y-2 mt-4"><Label>Notas Generales</Label><Textarea {...register("notas")} /></div>
+              <div className="space-y-2"><Label>Dirección</Label><Input {...register("direccion")} /></div>
+              <div className="space-y-2"><Label>Ciudad</Label><Input {...register("ciudad")} /></div>
+              <div className="space-y-2"><Label>País</Label><Input {...register("pais")} /></div>
             </div>
             <DialogFooter>
               <Button type="submit" disabled={mutation.isPending}>
