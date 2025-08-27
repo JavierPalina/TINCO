@@ -17,9 +17,14 @@ import { cn } from '@/lib/utils';
 
 type Columns = Record<string, ClientCardProps[]>;
 interface MovingClientInfo {
-    clientId: string;
-    targetStage: string;
+  clientId: string;
+  targetStage: string;
 }
+
+// --- SOLUCIÓN ---
+// Se mueve columnOrder fuera del componente.
+// Ahora es una constante estable y no causará que el useEffect se ejecute infinitamente.
+const columnOrder: string[] = ['Nuevo', 'Contactado', 'Cotizado', 'Negociación', 'Ganado', 'Perdido'];
 
 export function KanbanBoard() {
   const queryClient = useQueryClient();
@@ -51,11 +56,10 @@ export function KanbanBoard() {
     placeholderData: keepPreviousData,
   });
 
-  const columnOrder: string[] = ['Nuevo', 'Contactado', 'Cotizado', 'Negociación', 'Ganado', 'Perdido'];
-
   useEffect(() => {
     if (clientes) {
       const initialColumns: Columns = {};
+      // Usamos la constante definida afuera
       columnOrder.forEach(stage => initialColumns[stage] = []);
       clientes.forEach(client => {
           if(initialColumns[client.etapa]) {
@@ -64,7 +68,8 @@ export function KanbanBoard() {
       });
       setColumns(initialColumns);
     }
-  }, [clientes, columnOrder]);
+    // Ahora, como 'columnOrder' es estable, este useEffect solo se ejecutará cuando 'clientes' cambie.
+  }, [clientes]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 10 } }));
 
@@ -121,7 +126,7 @@ export function KanbanBoard() {
             return prev;
         }
 
-        const overIndex = over.data.current?.type === 'Client' 
+        const overIndex = over.data.current?.type === 'ClientCard' 
         ? overItems.findIndex(item => item._id === overId)
         : overItems.length;
 
