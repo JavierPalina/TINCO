@@ -6,8 +6,10 @@ import Interaccion from '@/models/Interaccion';
 import mongoose from 'mongoose';
 
 // --- GET: Obtener todas las interacciones de un cliente ---
-// CAMBIO: El parámetro ahora es 'id' para coincidir con la carpeta [id]
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } } // ✅ firma válida
+) {
   const { id } = params;
   await dbConnect();
   try {
@@ -22,8 +24,10 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 }
 
 // --- POST: Añadir una nueva interacción ---
-// CAMBIO: El parámetro ahora es 'id' para coincidir con la carpeta [id]
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } } // ✅ firma válida
+) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return new NextResponse('No autorizado', { status: 401 });
@@ -36,21 +40,26 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const { tipo, nota } = body;
 
     if (!id || !tipo || !nota) {
-      return NextResponse.json({ success: false, error: "Faltan datos requeridos (cliente, tipo o nota)." }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "Faltan datos requeridos (cliente, tipo o nota)." },
+        { status: 400 }
+      );
     }
 
     const nuevaInteraccion = await Interaccion.create({
       cliente: id,
       usuario: session.user.id,
-      tipo: tipo,
-      nota: nota,
+      tipo,
+      nota,
     });
 
     return NextResponse.json({ success: true, data: nuevaInteraccion }, { status: 201 });
   } catch (error: unknown) {
     let errorMessage = "Error al guardar en la base de datos.";
     if (error instanceof mongoose.Error.ValidationError) {
-      errorMessage = Object.values(error.errors).map((e: { message: string }) => e.message).join(", ");
+      errorMessage = Object.values(error.errors)
+        .map((e: { message: string }) => e.message)
+        .join(", ");
     } else if (error instanceof Error) {
       errorMessage = error.message;
     }
