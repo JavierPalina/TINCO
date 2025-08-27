@@ -24,9 +24,9 @@ export async function GET(
 // --- FUNCIÓN PUT: Para actualizar un cliente ---
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } } // 👈 síncrono en Next.js 15
+  { params }: { params: any } // 👈 ya no uses RouteHandlerContext ni Promise
 ) {
-  const { id } = params; // 👈 sin await
+  const { id } = params; // ✅ funciona en runtime
   await dbConnect();
 
   try {
