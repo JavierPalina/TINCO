@@ -2,16 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Cliente from '@/models/Cliente';
 
-// The context parameter contains the route's dynamic parameters.
-// We define a type for it for better type safety.
-type RouteContext = {
-  params: {
-    id: string;
-  };
-};
-
-export async function GET(request: NextRequest, context: RouteContext) {
-  const { id } = context.params; // Destructure params from the context object
+// We are now defining the type for the second argument directly in each function's signature,
+// as the build process was rejecting the 'RouteContext' type alias.
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const { id } = params;
   await dbConnect();
 
   try {
@@ -37,8 +34,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
 }
 
 // --- FUNCIÓN PUT ---
-export async function PUT(request: NextRequest, context: RouteContext) {
-  const { id } = context.params; // Destructure params from the context object
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const { id } = params;
   await dbConnect();
 
   try {
@@ -68,8 +68,11 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 }
 
 // --- FUNCIÓN DELETE ---
-export async function DELETE(request: NextRequest, context: RouteContext) {
-  const { id } = context.params; // Destructure params from the context object
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const { id } = params;
   await dbConnect();
 
   try {
