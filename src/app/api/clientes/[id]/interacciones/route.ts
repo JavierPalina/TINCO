@@ -6,6 +6,7 @@ import Interaccion from '@/models/Interaccion';
 import mongoose from 'mongoose';
 
 // --- GET: Obtener todas las interacciones de un cliente ---
+// CAMBIO: El parámetro ahora es 'id' para coincidir con la carpeta [id]
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   const { id } = params;
   await dbConnect();
@@ -21,6 +22,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 }
 
 // --- POST: Añadir una nueva interacción ---
+// CAMBIO: El parámetro ahora es 'id' para coincidir con la carpeta [id]
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
@@ -46,17 +48,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     return NextResponse.json({ success: true, data: nuevaInteraccion }, { status: 201 });
   } catch (error: unknown) {
-    console.error("Error al crear interacción:", error);
-
-    let errorMessage = "Error desconocido al guardar en la base de datos.";
+    let errorMessage = "Error al guardar en la base de datos.";
     if (error instanceof mongoose.Error.ValidationError) {
-      // --- ESTE ES EL CAMBIO ---
-      // Reemplazamos 'any' por un tipo específico
       errorMessage = Object.values(error.errors).map((e: { message: string }) => e.message).join(", ");
     } else if (error instanceof Error) {
       errorMessage = error.message;
     }
-
     return NextResponse.json({ success: false, error: errorMessage }, { status: 400 });
   }
 }
