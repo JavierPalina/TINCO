@@ -2,14 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Cliente from '@/models/Cliente';
 
-type RouteParams = { params: { id: string } };
-
 // --- FUNCIÓN GET (por ID): Para obtener un solo cliente ---
 export async function GET(
   request: NextRequest,
-  { params }: RouteParams
+  { params }: { params: { id: string } } // ✅ inline
 ) {
-  const { id } = params; // 👈 sin await
+  const { id } = params;
   await dbConnect();
 
   try {
@@ -24,7 +22,7 @@ export async function GET(
       );
     }
     return NextResponse.json({ success: true, data: cliente });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: 'ID de cliente inválido' },
       { status: 400 }
@@ -35,7 +33,7 @@ export async function GET(
 // --- FUNCIÓN PUT: Para actualizar un cliente ---
 export async function PUT(
   request: NextRequest,
-  { params }: RouteParams
+  { params }: { params: { id: string } } // ✅ inline
 ) {
   const { id } = params;
   await dbConnect();
@@ -69,7 +67,7 @@ export async function PUT(
 // --- FUNCIÓN DELETE: Para eliminar un cliente ---
 export async function DELETE(
   request: NextRequest,
-  { params }: RouteParams
+  { params }: { params: { id: string } } // ✅ inline
 ) {
   const { id } = params;
   await dbConnect();
