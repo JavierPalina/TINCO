@@ -6,9 +6,9 @@ import Cliente from '@/models/Cliente';
 // as the build process was rejecting the 'RouteContext' type alias.
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
-  const { id } = params;
+  const { id } = context.params;
   await dbConnect();
 
   try {
