@@ -3,9 +3,11 @@ import dbConnect from '@/lib/dbConnect';
 import Cliente from '@/models/Cliente';
 
 // --- FUNCIÓN GET (por ID): Para obtener un solo cliente ---
-// CAMBIO: La forma de recibir 'params' ha sido actualizada
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params; // Ahora 'params' se desestructura directamente
+export async function GET(
+  request: NextRequest, 
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params; // Se aplica el await aquí
   await dbConnect();
 
   try {
@@ -20,9 +22,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 }
 
 // --- FUNCIÓN PUT: Para actualizar un cliente ---
-// CAMBIO: Actualizamos también esta función
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function PUT(
+  request: NextRequest, 
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params; // Se aplica el await aquí
   await dbConnect();
 
   try {
@@ -43,9 +47,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 // --- FUNCIÓN DELETE: Para eliminar un cliente ---
-// CAMBIO: Y también esta, para mantener la consistencia
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function DELETE(
+  request: NextRequest, 
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params; // Se aplica el await aquí
   await dbConnect();
 
   try {
