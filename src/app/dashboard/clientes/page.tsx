@@ -135,10 +135,10 @@ export default function ClientesPage() {
   };
 
   return (
-    <div className="container mx-auto py-10 px-2 md:px-0">
-      <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4">
+    <div className="mx-auto py-4 px-4 md:px-4">
+      <div className="flex flex-col md:flex-row justify-between md:items-start gap-4 border-b mb-4">
         <h1 className="text-3xl font-bold">Listado de Clientes</h1>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap pb-4">
             <DropdownMenu>
               <DropdownMenuTrigger asChild><Button variant="outline">Ver Columnas</Button></DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
