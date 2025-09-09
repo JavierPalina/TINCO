@@ -164,6 +164,11 @@ export function KanbanBoard() {
   if (isLoading) return <div className="p-10 text-center flex justify-center items-center h-[calc(100vh-80px)]"><Loader2 className="animate-spin h-8 w-8" /></div>;
 
   return (
+    <>
+      <div className="p-4 border-b">
+        <h1 className="text-3xl font-bold">Pipeline de Ventas</h1>
+      </div>
+    
     <div className="flex flex-col h-[calc(100vh-80px)] pt-2">
       <PipelineFilters
         filters={filters}
@@ -210,5 +215,6 @@ export function KanbanBoard() {
         </Tabs>
       </div>
     </div>
+    </>
   );
 }

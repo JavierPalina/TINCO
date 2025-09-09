@@ -1,42 +1,47 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { ICliente } from './Cliente';
-import { IUser } from './User';
 
-interface IProductoCotizado {
-  descripcion: string;
-  cantidad: number;
-  precioUnitario: number;
-}
+const HistorialEtapaSchema: Schema = new Schema({
+  etapa: {
+    type: Schema.Types.ObjectId,
+    ref: 'EtapaCotizacion',
+    required: true,
+  },
+  fecha: {
+    type: Date,
+    default: Date.now,
+  },
+}, { _id: false });
 
 export interface ICotizacion extends Document {
-  cliente: ICliente['_id'];
-  vendedor: IUser['_id'];
-  // Un identificador único para la cotización, ej: "COT-001"
-  codigo: string; 
-  productos: IProductoCotizado[];
+  codigo: string;
+  cliente: mongoose.Schema.Types.ObjectId;
+  vendedor: mongoose.Schema.Types.ObjectId;
+  etapa: mongoose.Schema.Types.ObjectId; // <-- CAMBIO
   montoTotal: number;
-  estado: 'Enviada' | 'Aceptada' | 'Rechazada' | 'Borrador';
+  detalle?: string;
+  productos: { descripcion: string; cantidad: number; precioUnitario: number }[];
+  historialEtapas: { etapa: mongoose.Schema.Types.ObjectId; fecha: Date }[];
+  archivos: string[];
 }
 
 const CotizacionSchema: Schema = new Schema({
+  codigo: { type: String, required: true, unique: true },
   cliente: { type: Schema.Types.ObjectId, ref: 'Cliente', required: true },
   vendedor: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  codigo: { type: String, required: true, unique: true },
+  etapa: { // <-- CAMBIO
+    type: Schema.Types.ObjectId,
+    ref: 'EtapaCotizacion',
+    required: true,
+  },
+  montoTotal: { type: Number, required: true },
+  detalle: { type: String, trim: true },
   productos: [{
     descripcion: { type: String, required: true },
     cantidad: { type: Number, required: true },
     precioUnitario: { type: Number, required: true },
   }],
-  montoTotal: {
-    type: Number,
-    required: true,
-  },
-  estado: {
-    type: String,
-    required: true,
-    enum: ['Enviada', 'Aceptada', 'Rechazada', 'Borrador'],
-    default: 'Borrador',
-  }
+  historialEtapas: [HistorialEtapaSchema],
+  archivos: { type: [String], default: [] },
 }, {
   timestamps: true
 });
