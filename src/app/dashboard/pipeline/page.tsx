@@ -43,10 +43,13 @@ import {
     AlertDialogTitle
 } from "@/components/ui/alert-dialog";
 import { toast } from 'sonner';
+import { FaWhatsapp } from 'react-icons/fa';
+import { Mail } from 'lucide-react';
 
 // --- Tipos de Datos ---
 interface Etapa { _id: string; nombre: string; color: string; }
-interface Cotizacion { 
+interface Cotizacion {
+    historialEtapas: any; 
     _id: string; 
     codigo: string; 
     montoTotal: number;
@@ -85,6 +88,19 @@ function QuoteCard({ quote, onDelete }: { quote: Cotizacion, onDelete: (quoteId:
         Baja: "bg-blue-500/20 text-blue-700 border-blue-500/50",
     };
 
+    // CTA handlers
+    const handleEmail = () => {
+        if (quote.cliente?.nombreCompleto) {
+            window.location.href = `mailto:?subject=Cotización ${quote.codigo}&body=Hola ${quote.cliente.nombreCompleto}, ...`;
+        }
+    };
+
+    const handleWhatsApp = () => {
+        const phone = "5491111111111"; // <- reemplazar con el teléfono real del cliente si lo guardás en BD
+        const message = encodeURIComponent(`Hola ${quote.cliente?.nombreCompleto}, te escribo por la cotización ${quote.codigo}`);
+        window.open(`https://wa.me/${phone}?text=${message}`, "_blank");
+    };
+
     return (
         <>
             <ViewNotesDialog client={quote.cliente as any} isOpen={isNotesOpen} onOpenChange={setNotesOpen} />
@@ -94,15 +110,34 @@ function QuoteCard({ quote, onDelete }: { quote: Cotizacion, onDelete: (quoteId:
             <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
                 <Card className="mb-2 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-grab active:cursor-grabbing">
                     <CardContent className="space-y-2">
+
+                        {/* --- Historial de etapas --- */}
+                        {quote?.historialEtapas && (
+                            <div className="flex gap-1 mb-1">
+                                {quote?.historialEtapas.map((h: any, i: number) => (
+                                    <div
+                                        key={i}
+                                        className="w-3 h-3 rounded-full border"
+                                        style={{ backgroundColor: h.etapa?.color || "#ccc" }}
+                                        title={`${h.etapa?.nombre} - ${new Date(h.fecha).toLocaleDateString("es-AR")}`}
+                                    />
+                                ))}
+                            </div>
+                        )}
+
                         <div className="flex justify-between items-start">
                             <div>
-                                <p className="text-sm font-bold">{quote.codigo}</p>
-                                <Badge variant="outline" className={`mt-1 text-xs ${prioridadStyles[quote.cliente.prioridad] || ''}`}>
+                                <p className="text-sm font-bold">{quote.codigo} <Badge variant="outline" className={`mt-1 text-xs ml-1 ${prioridadStyles[quote.cliente.prioridad] || ''}`}>
                                     {quote.cliente.prioridad}
-                                </Badge>
+                                </Badge></p>
+                                
                             </div>
                             <DropdownMenu>
-                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0">
+                                        <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                     <DropdownMenuItem className="text-red-600 focus:text-red-600" onSelect={() => onDelete(quote._id)}>
                                         <Trash2 className="mr-2 h-4 w-4" /> Eliminar
@@ -110,17 +145,31 @@ function QuoteCard({ quote, onDelete }: { quote: Cotizacion, onDelete: (quoteId:
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </div>
+
                         <div>
                             <p className="text-sm font-semibold">{quote.cliente.nombreCompleto}</p>
                             <p className="text-xs text-muted-foreground italic truncate">"{quote.detalle || 'Sin detalle'}"</p>
                         </div>
+
                         <div className="flex items-center justify-between border-t pt-2 mt-2">
                             <div className="flex items-center gap-3">
                                 <button onClick={() => setFilesOpen(true)} title="Ver Archivos" className="flex items-center gap-1 text-muted-foreground hover:text-primary">
                                     <Paperclip className="h-4 w-4" /><span className="text-xs font-semibold">{quote.archivos?.length || 0}</span>
                                 </button>
-                                <button onClick={() => setNotesOpen(true)} title="Ver Notas" className="text-muted-foreground hover:text-primary"><FileText className="h-4 w-4" /></button>
-                                <button onClick={() => setInteractionsOpen(true)} title="Ver Interacciones" className="text-muted-foreground hover:text-primary"><MessageSquare className="h-4 w-4" /></button>
+                                <button onClick={() => setNotesOpen(true)} title="Ver Notas" className="text-muted-foreground hover:text-primary">
+                                    <FileText className="h-4 w-4" />
+                                </button>
+                                <button onClick={() => setInteractionsOpen(true)} title="Ver Interacciones" className="text-muted-foreground hover:text-primary">
+                                    <MessageSquare className="h-4 w-4" />
+                                </button>
+
+                                {/* --- CTA Email y WhatsApp --- */}
+                                <button onClick={handleEmail} title="Enviar Email" className="text-muted-foreground hover:text-primary">
+                                    <Mail className="h-4 w-4" />
+                                </button>
+                                <button onClick={handleWhatsApp} title="Enviar WhatsApp" className="text-muted-foreground hover:text-primary">
+                                    <FaWhatsapp className="h-4 w-4" />
+                                </button>
                             </div>
                             <div className="flex items-center gap-1 font-semibold text-base">
                                 <DollarSign className="h-4 w-4" />
@@ -321,8 +370,8 @@ export default function PipelinePage() {
     }
     
     return (
-        <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
-            <div className="p-4 border-b flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-card shadow-sm">
+        <div className="h-screen flex flex-col">
+            <div className="p-4 border-b flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-card">
                 <h1 className="text-3xl font-bold">Pipeline de Cotizaciones</h1>
                 <CreateQuoteDialog />
             </div>
