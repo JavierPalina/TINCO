@@ -236,8 +236,8 @@ export default function ClientesPage() {
                 {columnVisibility['Prioridad'] && <TableCell className="text-center">{cliente.prioridad || '-'}</TableCell>}
                 {columnVisibility['Etapa'] && <TableCell className="text-center">{cliente.etapa || '-'}</TableCell>}
                 {columnVisibility['Origen de Contacto'] && <TableCell className="text-center">{cliente.origenContacto || '-'}</TableCell>}
-                {columnVisibility['Empresa'] && <TableCell><div className="flex items-center text-center justify-center">{cliente.empresa || '-'}<CompanyDataPopover client={cliente} /></div></TableCell>}
-                {columnVisibility['Último Contacto'] && <TableCell className="text-center">{cliente.ultimoContacto ? format(new Date(cliente.ultimoContacto), 'dd MMM yyyy', { locale: es }) : '-'}</TableCell>}
+                {columnVisibility['Empresa'] && <TableCell><div className="flex items-center text-center justify-center">{cliente.empresa || 'Sin Asignar'}<CompanyDataPopover client={cliente} /></div></TableCell>}
+                {columnVisibility['Último Contacto'] && <TableCell className="text-center">{cliente.ultimoContacto ? format(new Date(cliente.ultimoContacto), 'dd MMM yyyy', { locale: es }) : 'Sin Contactar'}</TableCell>}
                 {columnVisibility['Fecha de Creación'] && <TableCell className="text-center">{format(new Date(cliente.createdAt), 'dd MMM yyyy', { locale: es })}</TableCell>}
                 {columnVisibility['Notas'] && <TableCell className="text-center"><TableCellActions client={cliente} actionType="notas" /></TableCell>}
                 {columnVisibility['Interacciones'] && <TableCell className="text-center"><TableCellActions client={cliente} actionType="interacciones" /></TableCell>}

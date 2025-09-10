@@ -1,74 +1,109 @@
 "use client";
 
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { isToday, isPast, isThisWeek, parseISO } from 'date-fns';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { DateRange } from "react-day-picker";
+
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CalendarIcon, Loader2 } from 'lucide-react';
+import { AddTaskDialog } from '@/components/tareas/AddTaskDialog';
+import { TasksTimeline } from '@/components/tareas/TasksTimeline';
+import { TaskItem } from '@/components/tareas/TaskItem'; // Reutilizamos el TaskItem anterior
+import { ITarea } from '@/models/Tarea';
+import { Card, CardContent } from '@/components/ui/card';
 import { Task } from '@/components/tareas/types';
-import { TaskItem } from '@/components/tareas/TaskItem';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-// Función para obtener las tareas
-const getMyTasks = async (): Promise<Task[]> => {
-  const { data } = await axios.get('/api/tareas');
-  return data.data;
-};
-
-// Componente para renderizar una sección de tareas
-const TaskSection = ({ title, tasks, emptyText }: { title: string, tasks: Task[], emptyText: string }) => {
-  if (tasks.length === 0) return null; // No renderiza la sección si no hay tareas
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-            {tasks.map((task) => <TaskItem key={task._id} task={task} />)}
-        </div>
-      </CardContent>
-    </Card>
-  )
-};
-
+interface TasksData {
+  hoy: Task[];
+  vencidas: Task[];
+  proximas: Task[];
+  completadas: Task[];
+}
 
 export default function MisTareasPage() {
-  const { data: tasks, isLoading } = useQuery<Task[]>({
-    queryKey: ['tasks'], // Usamos una clave genérica para poder invalidarla fácilmente
-    queryFn: getMyTasks,
+  const [date, setDate] = useState<Date>(new Date());
+
+  const { data, isLoading } = useQuery<TasksData>({
+    queryKey: ['tasks', format(date, 'yyyy-MM-dd')],
+    queryFn: async () => {
+      const { data } = await axios.get('/api/tareas', { params: { date: format(date, 'yyyy-MM-dd') } });
+      return data.data;
+    },
   });
 
-  if (isLoading) {
-    return <div className="p-10 text-center">Cargando tus tareas...</div>;
-  }
-
-  // Lógica para categorizar las tareas
-  const now = new Date();
-  const tasksNoCompletadas = tasks?.filter(t => !t.completada) || [];
-  
-  const vencidas = tasksNoCompletadas.filter(t => isPast(parseISO(t.fechaVencimiento)) && !isToday(parseISO(t.fechaVencimiento)));
-  const paraHoy = tasksNoCompletadas.filter(t => isToday(parseISO(t.fechaVencimiento)));
-  const estaSemana = tasksNoCompletadas.filter(t => isThisWeek(parseISO(t.fechaVencimiento), { weekStartsOn: 1 }) && !isToday(parseISO(t.fechaVencimiento)) && !isPast(parseISO(t.fechaVencimiento)));
-  const proximamente = tasksNoCompletadas.filter(t => !isThisWeek(parseISO(t.fechaVencimiento), { weekStartsOn: 1 }) && !isToday(parseISO(t.fechaVencimiento)) && !isPast(parseISO(t.fechaVencimiento)));
-  const completadas = tasks?.filter(t => t.completada) || [];
-
   return (
-    <div className="container mx-auto py-10">
-      <h1 className="text-3xl font-bold mb-6">Mis Tareas</h1>
-      
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <div className="space-y-6">
-          <TaskSection title="Vencidas 🥵" tasks={vencidas} emptyText="Ninguna tarea vencida." />
-          <TaskSection title="Para Hoy 🔥" tasks={paraHoy} emptyText="Nada para hoy." />
-        </div>
-        <div className="space-y-6">
-          <TaskSection title="Esta Semana 🗓️" tasks={estaSemana} emptyText="Semana libre." />
-          <TaskSection title="Próximamente ✨" tasks={proximamente} emptyText="Ninguna tarea futura." />
-        </div>
-        <div className="space-y-6">
-           <TaskSection title="Completadas ✅" tasks={completadas} emptyText="Aún no has completado tareas." />
+    <div className="h-screen mx-auto flex flex-col">
+      <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6 p-4 border-b">
+        <h1 className="text-3xl font-bold">Mis Tareas</h1>
+        <div className="flex items-center gap-2 ">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant={"outline"} className="w-[280px] justify-start text-left font-normal">
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {date ? format(date, "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar mode="single" selected={date} onSelect={(d) => setDate(d || new Date())} initialFocus />
+            </PopoverContent>
+          </Popover>
+          <AddTaskDialog />
         </div>
       </div>
+      
+      <Tabs defaultValue="hoy" className="w-full p-4 pt-0">
+        <TabsList>
+          <TabsTrigger value="hoy">Hoy ({data?.hoy.length || 0})</TabsTrigger>
+          <TabsTrigger value="vencidas">Vencidas ({data?.vencidas.length || 0})</TabsTrigger>
+          <TabsTrigger value="proximas">Próximas ({data?.proximas.length || 0})</TabsTrigger>
+          <TabsTrigger value="completadas">Completadas</TabsTrigger>
+        </TabsList>
+        
+        {isLoading ? (
+          <div className="flex justify-center items-center p-20"><Loader2 className="h-8 w-8 animate-spin" /></div>
+        ) : (
+          <>
+            <TabsContent value="hoy">
+              <TasksTimeline tasks={data?.hoy || []} />
+            </TabsContent>
+            <TabsContent value="vencidas">
+              <Card>
+                <CardContent className="p-4 space-y-2">
+                  {data?.vencidas.length ? (
+                    data.vencidas.map((task) => <TaskItem key={task._id} task={task} />)
+                  ) : (
+                    <p className="text-center text-muted-foreground py-6">No hay tareas vencidas</p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="proximas">
+              <Card><CardContent className="p-4 space-y-2">
+                {data?.proximas.length ? (
+                    data.proximas.map((task) => <TaskItem key={task._id} task={task} />)
+                ) : (
+                  <p className="text-center text-muted-foreground py-6">No hay tareas proximas</p>
+                )}
+                </CardContent></Card>
+            </TabsContent>
+            <TabsContent value="completadas">
+              <Card><CardContent className="p-4 space-y-2">
+                {data?.completadas.length ? (
+                    data.completadas.map((task) => <TaskItem key={task._id} task={task} />)
+                ) : (
+                  <p className="text-center text-muted-foreground py-6">No hay tareas completadas</p>
+                )}
+                </CardContent></Card>
+            </TabsContent>
+          </>
+        )}
+      </Tabs>
     </div>
   );
 }

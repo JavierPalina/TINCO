@@ -8,55 +8,70 @@ import { es } from 'date-fns/locale';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { Task } from './types';
+import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export function TaskItem({ task }: { task: Task }) {
   const queryClient = useQueryClient();
 
   const updateTaskMutation = useMutation({
-    mutationFn: ({ taskId, completada }: { taskId: string; completada: boolean }) => {
-      return axios.put(`/api/tareas/${taskId}`, { completada });
-    },
-    // Al tener éxito, invalidamos la query principal de tareas para que toda la página se refresque
-    onSuccess: () => {
+    mutationFn: ({ taskId, completada }: { taskId: string; completada: boolean }) =>
+      axios.put(`/api/tareas/${taskId}`, { completada }),
+    onSuccess: (_, variables) => {
+      toast.success(
+        variables.completada ? "Tarea marcada como completada ✅" : "Tarea marcada como pendiente 🔄"
+      );
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
     },
+    onError: () => toast.error("Error al actualizar la tarea ❌"),
   });
 
   return (
-    <div className="flex items-center gap-4 p-2 rounded-md hover:bg-muted/50">
-      <Checkbox
-        id={task._id}
-        checked={task.completada}
-        onCheckedChange={(checked) => {
-          updateTaskMutation.mutate({ taskId: task._id, completada: !!checked });
-        }}
-        aria-label="Marcar tarea como completada"
-      />
-      <div className="flex-grow">
-        <label
-          htmlFor={task._id}
-          className={cn(
-            "font-medium cursor-pointer",
-            task.completada && "line-through text-muted-foreground"
-          )}
-        >
-          {task.titulo}
-        </label>
-        {task.cliente && (
-          <p className="text-xs text-muted-foreground">
-            Cliente:{" "}
-            <Link href={`/dashboard/clientes/${task.cliente._id}`} className="hover:underline text-primary">
-              {task.cliente.nombreCompleto}
-            </Link>
-          </p>
+    <div
+  className={cn(
+    "flex items-center justify-between p-4 rounded-xl border shadow-sm transition hover:shadow-md",
+    task.prioridad === "Alta" && "bg-red-50",
+    task.prioridad === "Media" && "bg-yellow-50",
+    task.prioridad === "Baja" && "bg-blue-50"
+  )}
+>
+  <div className="flex items-start gap-3 flex-1">
+    <Checkbox
+      id={task._id}
+      checked={task.completada}
+      onCheckedChange={(checked) =>
+        updateTaskMutation.mutate({ taskId: task._id, completada: !!checked })
+      }
+    />
+    <div>
+      <label
+        htmlFor={task._id}
+        className={cn(
+          "font-semibold text-base cursor-pointer",
+          task.completada && "line-through text-muted-foreground"
         )}
-      </div>
-      <div className={cn(
-        "text-sm font-semibold",
-        task.completada ? "text-muted-foreground" : "text-primary"
-      )}>
-        {format(new Date(task.fechaVencimiento), 'd MMM', { locale: es })}
-      </div>
+      >
+        {task.titulo}
+      </label>
+      {task.cliente && (
+        <p className="text-sm text-muted-foreground">
+          Cliente:{" "}
+          <Link
+            href={`/dashboard/clientes/${task.cliente._id}`}
+            className="hover:underline text-primary"
+          >
+            {task.cliente.nombreCompleto}
+          </Link>
+        </p>
+      )}
+      <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+        Prioridad: {task.prioridad}
+      </span>
     </div>
+  </div>
+  <span className="text-sm font-bold text-primary">
+    {format(new Date(task.fechaVencimiento), "d MMM", { locale: es })}
+  </span>
+</div>
   );
 }

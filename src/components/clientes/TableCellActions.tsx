@@ -23,20 +23,20 @@ export function TableCellActions({ client, actionType }: Props) {
       <div className="flex items-center justify-center gap-2">
         {actionType === 'notas' && (
           <>
-            <Button onClick={() => setViewNotesOpen(true)} title="Ver Notas" className="h-7 w-7 bg-primary hover:bg-primary/90 text-primary-foreground" >
+            <Button onClick={() => setViewNotesOpen(true)} title="Ver Notas" className="h-7 w-7 bg-primary/10 hover:bg-primary/40 text-primary" >
               <Eye className="h-4 w-4" />
             </Button>
-            <Button onClick={() => setAddNoteOpen(true)} title="Añadir Nota" className="h-7 w-7 bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Button onClick={() => setAddNoteOpen(true)} title="Añadir Nota" className="h-7 w-7 bg-primary/10 hover:bg-primary/40 text-primary">
               <PlusCircle className="h-4 w-4" />
             </Button>
           </>
         )}
         {actionType === 'interacciones' && (
           <>
-            <Button onClick={() => setViewInteractionsOpen(true)} title="Ver Interacciones" className="h-7 w-7 bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Button onClick={() => setViewInteractionsOpen(true)} title="Ver Interacciones" className="h-7 w-7 bg-primary/10 hover:bg-primary/40 text-primary">
               <Eye className="h-4 w-4" />
             </Button>
-            <Button onClick={() => setAddInteractionOpen(true)} title="Añadir Interacción" className="h-7 w-7 bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Button onClick={() => setAddInteractionOpen(true)} title="Añadir Interacción" className="h-7 w-7 bg-primary/10 hover:bg-primary/40 text-primary">
               <MessageSquarePlus className="h-4 w-4" />
             </Button>
           </>

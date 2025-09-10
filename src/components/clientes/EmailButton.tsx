@@ -9,7 +9,7 @@ export function EmailButton({ email }: { email: string }) {
     return (
         <Button 
             size="icon"
-            className="h-7 w-7 bg-primary hover:bg-primary/90 text-primary-foreground" 
+            className="h-7 w-7 bg-primary/10 hover:bg-primary/40 text-primary" 
             onClick={handleEmailClick} 
             title={`Enviar email a ${email}`}
         >

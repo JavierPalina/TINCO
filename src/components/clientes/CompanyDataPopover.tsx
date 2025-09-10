@@ -58,7 +58,7 @@ export function CompanyDataPopover({ client }: { client: Client }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button size="icon" className="h-7 w-7 bg-primary hover:bg-primary/90 text-primary-foreground" style={{marginLeft: "4px"}}>
+        <Button size="icon" className="h-7 w-7 bg-primary/10 hover:bg-primary/40 text-primary" style={{marginLeft: "4px"}}>
           <Building2 className="h-4 w-4" />
         </Button>
       </PopoverTrigger>

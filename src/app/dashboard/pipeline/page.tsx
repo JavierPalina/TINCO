@@ -189,7 +189,7 @@ function QuoteColumn({ id, etapa, quotes, onDelete }: { id: string; etapa: Etapa
     const totalAmount = useMemo(() => quotes.reduce((sum, quote) => sum + quote.montoTotal, 0), [quotes]);
     const { setNodeRef, isOver } = useSortable({ id, data: { type: 'Column' } });
     return (
-        <div ref={setNodeRef} className={cn("w-80 h-full flex flex-col flex-shrink-0 rounded-lg bg-card shadow-sm transition-colors duration-300", isOver ? "bg-primary/10" : "border border-transparent")}>
+        <div ref={setNodeRef} className={cn("w-80 h-full flex flex-col flex-shrink-0 rounded-lg bg-card shadow-sm transition-colors duration-300", isOver ? "bg-primary/10" : "border")}>
             <div className="p-3 pb-1 sticky top-0 bg-card/80 backdrop-blur-sm z-10 rounded-t-lg">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">

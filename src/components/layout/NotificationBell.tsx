@@ -3,34 +3,39 @@
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import Link from 'next/link';
-import { isPast, isToday, parseISO } from 'date-fns';
 import { Bell } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Task } from '@/components/tareas/types'; // Reutilizamos los tipos que ya creamos
+import { Task } from '@/components/tareas/types';
 
-// La misma función que usamos en la página de Tareas
-const getMyTasks = async (): Promise<Task[]> => {
+// This interface now matches the object returned by the API
+interface TasksData {
+  hoy: Task[];
+  vencidas: Task[];
+  proximas: Task[];
+  completadas: Task[];
+}
+
+// The query function remains the same, but we expect a TasksData object
+const getMyTasks = async (): Promise<TasksData> => {
   const { data } = await axios.get('/api/tareas');
   return data.data;
 };
 
 export function NotificationBell() {
-  // 1. Obtenemos las tareas en segundo plano.
-  // TanStack Query es lo suficientemente inteligente como para usar el caché
-  // si los datos ya fueron pedidos en la página de "Mis Tareas".
-  const { data: tasks } = useQuery<Task[]>({
-    queryKey: ['tasks'],
+  // Update the type parameter for useQuery
+  const { data: tasksData } = useQuery<TasksData>({
+    queryKey: ['tasks'], // Using a generic key is fine for the bell
     queryFn: getMyTasks,
   });
 
-  // 2. Filtramos para encontrar solo las tareas urgentes (no completadas y vencidas/para hoy)
-  const urgentTasks = tasks?.filter(task => {
-    if (task.completada) return false;
-    const dueDate = parseISO(task.fechaVencimiento);
-    return isToday(dueDate) || isPast(dueDate);
-  }) || [];
+  // --- THIS IS THE FIX ---
+  // Combine the 'vencidas' and 'hoy' arrays to get all urgent tasks
+  const urgentTasks = [
+    ...(tasksData?.vencidas || []),
+    ...(tasksData?.hoy || []),
+  ];
 
   const urgentTasksCount = urgentTasks.length;
 
@@ -39,7 +44,6 @@ export function NotificationBell() {
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
-          {/* 3. Mostramos el punto rojo solo si hay tareas urgentes */}
           {urgentTasksCount > 0 && (
             <span className="absolute top-1 right-1 flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -58,7 +62,7 @@ export function NotificationBell() {
           </div>
           <div className="grid gap-2">
             {urgentTasks.length > 0 ? (
-              urgentTasks.slice(0, 4).map(task => ( // Mostramos hasta 4 tareas
+              urgentTasks.slice(0, 4).map(task => (
                 <div key={task._id} className="text-sm">
                   <Link href={`/dashboard/clientes/${task.cliente?._id}`} className="font-semibold hover:underline">
                     {task.titulo}
