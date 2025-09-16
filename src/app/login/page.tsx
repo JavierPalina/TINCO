@@ -71,7 +71,7 @@ function AuthComponent() {
                 priority
                 className="mx-auto"
             />
-            <h1 className="text-3xl font-bold mt-4">Acceso al CRM</h1>
+            <h1 className="text-3xl font-bold mt-4">Acceso</h1>
             <p className="text-balance text-muted-foreground">
               Ingresa tus credenciales para continuar
             </p>

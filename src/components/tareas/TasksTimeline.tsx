@@ -111,7 +111,7 @@ export function TasksTimeline({ tasks }: Props) {
                       <div className="space-y-1 text-sm">
                         <p className="font-bold">{task.titulo}</p>
                         {task.descripcion && (
-                          <p className="text-muted-foreground">{task.descripcion}</p>
+                          <p className="">{task.descripcion}</p>
                         )}
                         <p className="text-xs">
                           Cliente:{" "}

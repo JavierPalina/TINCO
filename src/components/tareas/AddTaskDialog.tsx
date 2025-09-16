@@ -65,6 +65,7 @@ const mutation = useMutation({
 });
 
 const onSubmit: SubmitHandler<FormInputs> = (data) => {
+  console.log("Submitting data:", data);
   mutation.mutate(data);
 };
 
@@ -99,17 +100,35 @@ const onSubmit: SubmitHandler<FormInputs> = (data) => {
             </div>
             <div className="space-y-2">
               <Label>Fecha *</Label>
-              <Controller name="fechaVencimiento" control={control} render={({ field }) => (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start font-normal">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {field.value ? format(field.value, 'PPP', { locale: es }) : <span>Selecciona fecha</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} /></PopoverContent>
-                </Popover>
-              )} />
+              <Controller
+                name="fechaVencimiento"
+                control={control}
+                // PASO 2: Añade una regla de validación para que el campo sea requerido
+                rules={{ required: "La fecha es obligatoria" }}
+                render={({ field, fieldState: { error } }) => (
+                  <>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start font-normal">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {field.value ? format(field.value, 'PPP', { locale: es }) : <span>Selecciona fecha</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          // PASO 1: Añade la propiedad 'required' para evitar la deselección
+                          required
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    {/* Opcional pero recomendado: Muestra el mensaje de error de validación */}
+                    {error && <p className="text-sm font-medium text-red-500">{error.message}</p>}
+                  </>
+                )}
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
