@@ -46,6 +46,7 @@ import { FaWhatsapp } from 'react-icons/fa';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Skeleton } from "@/components/ui/skeleton"; // Importamos el Skeleton
+import { Client } from '@/types/client';
 
 // --- Tipos de Datos ---
 interface Etapa { _id: string; nombre: string; color: string; }
@@ -160,16 +161,16 @@ function QuoteCard({ quote, onDelete, stageColors }: { quote: Cotizacion, onDele
                         </div>
                         <div>
                             <p className="text-sm font-semibold">{quote.cliente.nombreCompleto}</p>
-                            <p className="text-xs text-muted-foreground italic truncate">"{quote.detalle || 'Sin detalle'}"</p>
+                            <p className="text-xs text-muted-foreground italic truncate">&quot;{quote.detalle || 'Sin detalle'}&quot;</p>
                         </div>
                         <div className="flex items-center justify-between border-t pt-2 mt-2">
                             <div className="flex items-center gap-3">
                                 <button onClick={() => setFilesOpen(true)} title="Ver Archivos" className="flex items-center gap-1 text-muted-foreground hover:text-primary">
                                     <Paperclip className="h-4 w-4" /><span className="text-xs font-semibold">{quote.archivos?.length || 0}</span>
                                 </button>
-                                <TableCellActions client={quote?.cliente as any} actionType="notas" />
+                                <TableCellActions client={quote?.cliente as Client} actionType="notas" />
                                 <div style={{marginLeft: -6}}>
-                                    <TableCellActions client={quote?.cliente as any} actionType="interacciones" />
+                                    <TableCellActions client={quote?.cliente as Client} actionType="interacciones" />
                                 </div>
                                 <button onClick={handleEmail} title="Enviar Email" className="text-muted-foreground hover:text-primary"> <Mail className="h-4 w-4" /> </button>
                                 <button onClick={handleWhatsApp} title="Enviar WhatsApp" className="text-muted-foreground hover:text-primary"> <FaWhatsapp className="h-4 w-4" /> </button>

@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const fechaHasta = searchParams.get('fechaHasta');
     const searchTerm = searchParams.get('searchTerm');
 
-    const matchFilter: any = {};
+    const matchFilter: Record<string, unknown> = {};
     if (vendedorId) {
       matchFilter.vendedor = new mongoose.Types.ObjectId(vendedorId);
     }
