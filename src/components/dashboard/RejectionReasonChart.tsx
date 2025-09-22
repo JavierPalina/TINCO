@@ -2,10 +2,12 @@
 
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PieLabelRenderProps } from 'recharts';
 
 interface ChartData {
     name: string;
     value: number;
+    [key: string]: any;
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
@@ -29,16 +31,20 @@ export function RejectionReasonChart({ data }: { data: ChartData[] }) {
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                         <Pie
-                            data={data}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            outerRadius={100}
-                            fill="#8884d8"
-                            dataKey="value"
-                            nameKey="name"
-                            label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
-                        >
+  data={data}
+  cx="50%"
+  cy="50%"
+  labelLine={false}
+  outerRadius={100}
+  fill="#8884d8"
+  dataKey="value"
+  nameKey="name"
+  label={(props: PieLabelRenderProps) => {
+  const name = props.name ?? 'Desconocido';
+  const percent = Number(props.percent ?? 0); // <-- cast to number
+  return `${name} ${(percent * 100).toFixed(0)}%`;
+}}
+>
                             {data.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
