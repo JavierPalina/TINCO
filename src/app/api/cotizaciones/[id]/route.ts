@@ -5,7 +5,11 @@ import dbConnect from '@/lib/dbConnect';
 import Cotizacion from '@/models/Cotizacion';
 
 // --- GET: Obtener una cotización específica por su ID ---
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  request: NextRequest,
+  context: { params: { id: string } }
+) {
+  const { params } = context;
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse('No autorizado', { status: 401 });
 
@@ -19,13 +23,17 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ success: false, error: 'Cotización no encontrada' }, { status: 404 });
     }
     return NextResponse.json({ success: true, data: cotizacion });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ success: false, error: 'ID inválido' }, { status: 400 });
   }
 }
 
-// --- PUT: Actualizar una cotización (ej: cambiar su etapa) ---
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+// --- PUT: Actualizar una cotización ---
+export async function PUT(
+  request: NextRequest,
+  context: { params: { id: string } }
+) {
+  const { params } = context;
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse('No autorizado', { status: 401 });
 
@@ -54,7 +62,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 // --- DELETE: Eliminar una cotización ---
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(
+  request: NextRequest,
+  context: { params: { id: string } }
+) {
+  const { params } = context;
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse('No autorizado', { status: 401 });
 
@@ -65,7 +77,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       return NextResponse.json({ success: false, error: 'Cotización no encontrada' }, { status: 404 });
     }
     return new NextResponse(null, { status: 204 });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ success: false, error: 'Error del servidor' }, { status: 500 });
   }
 }
