@@ -7,7 +7,7 @@ import { PieLabelRenderProps } from 'recharts';
 interface ChartData {
     name: string;
     value: number;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
