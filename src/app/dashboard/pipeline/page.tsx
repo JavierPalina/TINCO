@@ -66,6 +66,17 @@ interface Cotizacion {
     }; 
     vendedor: { name: string };
 }
+interface PipelineViewProps {
+  etapas: Etapa[];
+  columns: Columns;
+  onDelete: (quoteId: string) => void;
+  sensors: ReturnType<typeof useSensors>;
+  onDragStart: (event: DragStartEvent) => void;
+  onDragEnd: (event: DragEndEvent) => void;
+  activeQuote: Cotizacion | null;
+  stageColors: StageColorMap;
+  isFetching: boolean;
+}
 type Columns = Record<string, Cotizacion[]>;
 type ViewMode = 'pipeline' | 'table';
 type StageColorMap = { [key: string]: string };
@@ -296,7 +307,7 @@ function QuotesTableView({ quotes, onDelete, stageColors }: { quotes: Cotizacion
 }
 
 // --- Componente para la Vista de Pipeline ---
-function PipelineView({ etapas, columns, onDelete, sensors, onDragStart, onDragEnd, activeQuote, stageColors, isFetching }: any) {
+function PipelineView({ etapas, columns, onDelete, sensors, onDragStart, onDragEnd, activeQuote, stageColors, isFetching }: PipelineViewProps) {
     return (
         <>
             <div className="hidden md:flex h-full">
@@ -545,8 +556,8 @@ export default function PipelinePage() {
                 </AlertDialog>
                 
                 {viewMode === 'pipeline' ? (
-                    <PipelineView 
-                        etapas={etapas}
+                    <PipelineView
+                        etapas={etapas || []}
                         columns={columns}
                         onDelete={setQuoteToDelete}
                         sensors={sensors}

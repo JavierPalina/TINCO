@@ -35,7 +35,10 @@ export function QuotesPipelineFilters({ filters, setFilters }: Props) {
         queryFn: async () => (await axios.get('/api/users')).data.data,
     });
 
-    const handleFilterChange = (name: keyof Filters, value: any) => {
+    const handleFilterChange = <K extends keyof Filters>(
+        name: K,
+        value: Filters[K]
+    ) => {
         setFilters(prev => ({ ...prev, [name]: value }));
     };
 
