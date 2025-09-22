@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useTheme } from "next-themes"; // Importante para el cambio de tema
 import { Menu, X, Search, User, Settings, LogOut, Moon, Sun } from 'lucide-react';
-
+import { useSession, signOut } from "next-auth/react";
 // Componentes de shadcn/ui
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,8 @@ export function Header() {
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
   };
+
+  const { data: session } = useSession();
 
   return (
     <header className="p-4 border-b bg-background sticky top-0 z-50">
@@ -78,10 +80,8 @@ export function Header() {
             <DropdownMenuContent className="w-56" align="end" forceMount>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">Usuario</p>
-                  <p className="text-xs leading-none text-muted-foreground">
-                    usuario@ejemplo.com
-                  </p>
+                  <p className="text-sm font-medium leading-none">{session?.user?.name || "Usuario"}</p>
+                  <p className="text-xs leading-none text-muted-foreground">{session?.user?.email || "usuario@ejemplo.com"}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -102,10 +102,11 @@ export function Header() {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => signOut({ callbackUrl: "/login" })}
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Cerrar sesión</span>
-                {/* Aquí iría la lógica para cerrar sesión (ej: onClick={() => signOut()}) */}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

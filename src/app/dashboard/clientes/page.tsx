@@ -27,6 +27,28 @@ import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ClientMobileCard } from '@/components/clientes/ClientMobileCard';
 
+const formatAndTruncate = (text: string | null | undefined, maxLength: number): string => {
+  // Si el texto no existe, devuelve un guion.
+  if (!text || typeof text !== 'string') {
+    return '-';
+  }
+
+  // 1. Pone en mayúscula la inicial de cada palabra (Title Case)
+  const formattedText = text
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+
+  // 2. Si es más largo que maxLength, lo corta y añade "..."
+  if (formattedText.length > maxLength) {
+    return formattedText.substring(0, maxLength).trim() + '...';
+  }
+
+  // Si no, devuelve el texto formateado
+  return formattedText;
+};
+
 type ColumnVisibility = {
     'Nombre Completo': boolean;
     'Teléfono': boolean;
@@ -183,7 +205,7 @@ export default function ClientesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              {columnVisibility['Nombre Completo'] && <TableHead className="text-center">Nombre Completo</TableHead>}
+              {columnVisibility['Nombre Completo'] && <TableHead className="text-left">Nombre Completo</TableHead>}
               {columnVisibility['Teléfono'] && <TableHead className="text-center">Teléfono</TableHead>}
               {columnVisibility['Email'] && <TableHead className="text-center">Email</TableHead>}
               {columnVisibility['DNI'] && <TableHead className="text-center">DNI</TableHead>}
@@ -204,7 +226,13 @@ export default function ClientesPage() {
           <TableBody>
             {clientes?.map((cliente) => (
               <TableRow key={cliente._id}>
-                {columnVisibility['Nombre Completo'] && <TableCell className="font-medium text-center"><Link href={`/dashboard/clientes/${cliente._id}`} className="hover:underline">{cliente.nombreCompleto}</Link></TableCell>}
+                {columnVisibility['Nombre Completo'] && 
+              <TableCell className="font-medium text-left">
+                <Link href={`/dashboard/clientes/${cliente._id}`} className="hover:underline">
+                  {formatAndTruncate(cliente.nombreCompleto, 25)}
+                </Link>
+              </TableCell>
+            }
                 {columnVisibility['Teléfono'] && 
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-2 group">
@@ -230,9 +258,21 @@ export default function ClientesPage() {
                   </TableCell>
                 }
                 {columnVisibility['DNI'] && <TableCell className="text-center">{cliente.dni || '-'}</TableCell>}
-                {columnVisibility['Dirección'] && <TableCell className="text-center">{cliente.direccion || '-'}</TableCell>}
-                {columnVisibility['Ciudad'] && <TableCell className="text-center">{cliente.ciudad || '-'}</TableCell>}
-                {columnVisibility['País'] && <TableCell className="text-center">{cliente.pais || '-'}</TableCell>}
+                {columnVisibility['Dirección'] && 
+                  <TableCell className="text-center">
+                    {formatAndTruncate(cliente.direccion, 30)}
+                  </TableCell>
+                }
+                {columnVisibility['Ciudad'] && 
+                  <TableCell className="text-center">
+                    {formatAndTruncate(cliente.ciudad, 20)}
+                  </TableCell>
+                }
+                {columnVisibility['País'] && 
+                  <TableCell className="text-center">
+                    {formatAndTruncate(cliente.pais, 20)}
+                  </TableCell>
+                }
                 {columnVisibility['Prioridad'] && <TableCell className="text-center">{cliente.prioridad || '-'}</TableCell>}
                 {columnVisibility['Etapa'] && <TableCell className="text-center">{cliente.etapa || '-'}</TableCell>}
                 {columnVisibility['Origen de Contacto'] && <TableCell className="text-center">{cliente.origenContacto || '-'}</TableCell>}

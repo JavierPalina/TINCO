@@ -116,7 +116,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// --- POST: Crear una nueva cotización y su tarea de seguimiento ---
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return new NextResponse('No autorizado', { status: 401 });

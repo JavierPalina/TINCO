@@ -4,7 +4,18 @@ import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { PlusCircle } from 'lucide-react'; // <-- 1. Importar el ícono
+
+// 2. Importar DialogFooter y Button
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription,
+  DialogFooter
+} from "@/components/ui/dialog";
+import { Button } from '@/components/ui/button';
 import { Client } from '@/types/client';
 
 interface InteractionData {
@@ -15,9 +26,15 @@ interface InteractionData {
   usuario: { name: string; };
 }
 
-type Props = { client: Client; isOpen: boolean; onOpenChange: (open: boolean) => void; }
+// 3. Agregar la nueva prop 'onAddNew'
+type Props = {
+  client: Client;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  onAddNew: () => void; // <-- La función para abrir el diálogo de añadir
+}
 
-export function ViewInteractionsDialog({ client, isOpen, onOpenChange }: Props) {
+export function ViewInteractionsDialog({ client, isOpen, onOpenChange, onAddNew }: Props) {
   const { data: interacciones, isLoading } = useQuery<InteractionData[]>({
     queryKey: ['interacciones', client._id],
     queryFn: async () => {
@@ -54,6 +71,15 @@ export function ViewInteractionsDialog({ client, isOpen, onOpenChange }: Props) 
             )}
           </div>
         </div>
+        
+        {/* 4. Añadir el footer con el botón que usa 'onAddNew' */}
+        <DialogFooter className="pt-4 border-t">
+            <Button onClick={onAddNew} variant="outline">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Añadir Interacción
+            </Button>
+        </DialogFooter>
+
       </DialogContent>
     </Dialog>
   );
