@@ -4,10 +4,10 @@ import Cotizacion, { ICotizacion } from '@/models/Cotizacion';
 import mongoose from 'mongoose';
 import { ObjectId } from 'mongodb';
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     await dbConnect();
 
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const { etapa, historial } = body || {};
 
