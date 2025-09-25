@@ -4,10 +4,10 @@ import User from '@/models/User';
 import { ObjectId } from 'mongodb'; // Importar ObjectId para validación
 
 // Endpoint para obtener un usuario por ID
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     await dbConnect();
     try {
-        const { id } = params;
+        const { id } = await params;
         if (!ObjectId.isValid(id)) {
             return NextResponse.json({ success: false, error: 'ID de usuario inválido.' }, { status: 400 });
         }
@@ -23,10 +23,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 // Endpoint para actualizar un usuario por ID
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     await dbConnect();
     try {
-        const { id } = params;
+        const { id } = await params;
         if (!ObjectId.isValid(id)) {
             return NextResponse.json({ success: false, error: 'ID de usuario inválido.' }, { status: 400 });
         }
@@ -43,10 +43,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 // Endpoint para eliminar un usuario por ID
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     await dbConnect();
     try {
-        const { id } = params;
+        const { id } = await params;
         if (!ObjectId.isValid(id)) {
             return NextResponse.json({ success: false, error: 'ID de usuario inválido.' }, { status: 400 });
         }
