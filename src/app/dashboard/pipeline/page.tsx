@@ -47,6 +47,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Skeleton } from "@/components/ui/skeleton"; // Importamos el Skeleton
 import { Client } from '@/types/client';
+import { StageFormModal } from '@/components/cotizaciones/StageFormModal';
 
 // --- Tipos de Datos ---
 interface Etapa { _id: string; nombre: string; color: string; }
@@ -374,6 +375,10 @@ function PipelineView({ etapas, columns, onDelete, sensors, onDragStart, onDragE
 
 // --- Componente Principal de la Página ---
 export default function PipelinePage() {
+    const [isStageFormModalOpen, setIsStageFormModalOpen] = useState(false);
+    const [formFieldsForStage, setFormFieldsForStage] = useState<any[]>([]); // Almacena los campos del formulario
+    const [quoteToMove, setQuoteToMove] = useState<Cotizacion | null>(null); // Cotización que se va a mover
+    const [newStageId, setNewStageId] = useState<string | null>(null); // Nueva etapa de destino
     const { data: session } = useSession();
     const queryClient = useQueryClient();
     const [columns, setColumns] = useState<Columns>({});
@@ -469,6 +474,20 @@ export default function PipelinePage() {
         mutationFn: (data: { quoteId: string; newStageId: string }) => axios.put(`/api/cotizaciones/${data.quoteId}`, { etapa: data.newStageId }),
         onError: () => { toast.error(`Error al cambiar la etapa.`); queryClient.invalidateQueries({ queryKey }); },
     });
+    const updateQuoteWithFormData = useMutation({
+        mutationFn: (data: { quoteId: string; newStageId: string; formData: any }) =>
+            axios.put(`/api/cotizaciones/${data.quoteId}/move`, {
+                etapa: data.newStageId,
+                historial: data.formData,
+            }),
+        onSuccess: () => {
+            toast.success("Cotización movida y actualizada con éxito.");
+            queryClient.invalidateQueries({ queryKey: ['cotizacionesPipeline'] });
+        },
+        onError: () => {
+            toast.error("Error al mover la cotización.");
+        }
+    });
     const reorderQuotesMutation = useMutation({
         mutationFn: (data: { stageId: string; orderedQuoteIds: string[] }) => axios.put(`/api/cotizaciones/reorder`, data),
         onError: () => { toast.error(`Error al guardar el nuevo orden.`); queryClient.invalidateQueries({ queryKey }); },
@@ -490,37 +509,63 @@ export default function PipelinePage() {
         if (quote) setActiveQuote(quote);
     }
 
-    function handleDragEnd(event: DragEndEvent) {
-        setActiveQuote(null);
-        const { active, over } = event;
-        if (!over || active.id === over.id) return;
-        const activeId = active.id.toString();
-        const overId = over.id.toString();
-        const activeContainer = findContainer(activeId);
-        const overContainer = findContainer(overId);
-        if (!activeContainer || !overContainer) return;
-        const activeIndex = columns[activeContainer].findIndex(q => q._id === activeId);
-        const overSortable = over.data.current?.type === 'Quote' || over.data.current?.type === 'Column';
-        const overIndex = overSortable ? (columns[overContainer].findIndex(q => q._id === overId) !== -1 ? columns[overContainer].findIndex(q => q._id === overId) : columns[overContainer].length) : 0;
-        
-        if (activeContainer !== overContainer) {
-            const newSourceItems = [...columns[activeContainer]];
-            const newDestItems = [...columns[overContainer]];
-            const [movedItem] = newSourceItems.splice(activeIndex, 1);
-            newDestItems.splice(overIndex, 0, movedItem);
-            setColumns(prev => ({ ...prev, [activeContainer]: newSourceItems, [overContainer]: newDestItems, }));
-            updateQuoteStage.mutate({ quoteId: activeId, newStageId: overContainer });
-            reorderQuotesMutation.mutate({ stageId: activeContainer, orderedQuoteIds: newSourceItems.map(q => q._id) });
-            reorderQuotesMutation.mutate({ stageId: overContainer, orderedQuoteIds: newDestItems.map(q => q._id) });
-        } else {
-            if (activeIndex !== overIndex) {
-                const newOrderedQuotes = arrayMove(columns[overContainer], activeIndex, overIndex);
-                setColumns(prev => ({ ...prev, [overContainer]: newOrderedQuotes }));
-                const orderedQuoteIds = newOrderedQuotes.map(q => q._id);
-                reorderQuotesMutation.mutate({ stageId: overContainer, orderedQuoteIds });
-            }
-        }
-    }
+    async function handleDragEnd(event: DragEndEvent) {
+    setActiveQuote(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const activeId = active.id.toString();
+    const overId = over.id.toString();
+    const activeContainer = findContainer(activeId);
+    const overContainer = findContainer(overId);
+
+    if (!activeContainer || !overContainer) return;
+
+    // Solo si se mueve entre etapas diferentes
+    if (activeContainer !== overContainer) {
+        // Obtenemos los datos de la cotización que se va a mover
+        const quote = columns[activeContainer].find(q => q._id === activeId);
+        
+        // 1. Buscamos la estructura del formulario de la nueva etapa
+        try {
+            const { data } = await axios.get(`/api/formularios-etapa/${overContainer}`);
+            const camposFormulario = data.data?.campos || [];
+            
+            if (camposFormulario.length > 0) {
+                // 2. Si hay campos, guardamos los datos y abrimos el modal
+                setQuoteToMove(quote!);
+                setNewStageId(overContainer);
+                setFormFieldsForStage(camposFormulario);
+                setIsStageFormModalOpen(true);
+            } else {
+                // 3. Si no hay campos, movemos la cotización directamente
+                updateQuoteStage.mutate({ quoteId: activeId, newStageId: overContainer });
+                // Lógica de reordenamiento visual
+                const newSourceItems = [...columns[activeContainer]];
+                const newDestItems = [...columns[overContainer]];
+                const [movedItem] = newSourceItems.splice(columns[activeContainer].findIndex(q => q._id === activeId), 1);
+                newDestItems.splice(0, 0, movedItem); // O al inicio de la columna
+                setColumns(prev => ({
+                    ...prev,
+                    [activeContainer]: newSourceItems,
+                    [overContainer]: newDestItems,
+                }));
+            }
+        } catch (err) {
+            toast.error('Error al cargar el formulario de la etapa.');
+            console.error(err);
+        }
+    } else {
+        // Lógica de reordenamiento dentro de la misma columna (sin cambios)
+        const activeIndex = columns[activeContainer].findIndex(q => q._id === activeId);
+        const overIndex = columns[overContainer].findIndex(q => q._id === overId);
+        if (activeIndex !== overIndex) {
+            const newOrderedQuotes = arrayMove(columns[overContainer], activeIndex, overIndex);
+            setColumns(prev => ({ ...prev, [overContainer]: newOrderedQuotes }));
+            reorderQuotesMutation.mutate({ stageId: overContainer, orderedQuoteIds: newOrderedQuotes.map(q => q._id) });
+        }
+    }
+}
     
     if (isLoadingEtapas) {
         return <div className="p-10 text-center flex justify-center items-center h-screen"><Loader2 className="animate-spin h-8 w-8" /></div>;
@@ -531,6 +576,23 @@ export default function PipelinePage() {
             <div className="p-4 border-b flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-card">
                 <h1 className="text-3xl font-bold">Pipeline de Cotizaciones</h1>
                 <CreateQuoteDialog />
+                <StageFormModal
+                    isOpen={isStageFormModalOpen}
+                    onOpenChange={setIsStageFormModalOpen}
+                    title="Completa los datos para esta etapa"
+                    description="Agrega la información requerida antes de mover la cotización."
+                    formFields={formFieldsForStage}
+                    quoteId={quoteToMove?._id || ''}
+                    onSave={async (formData) => {
+                        if (quoteToMove && newStageId) {
+                            await updateQuoteWithFormData.mutateAsync({
+                                quoteId: quoteToMove._id,
+                                newStageId: newStageId,
+                                formData
+                            });
+                        }
+                    }}
+                />
             </div>
             
             <div className="bg-card flex flex-col md:flex-row md:items-center pr-4">

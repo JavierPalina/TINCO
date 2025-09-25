@@ -10,10 +10,11 @@ export async function GET() {
 
   await dbConnect();
   try {
-    // Buscamos todos los usuarios y seleccionamos solo su ID y nombre
-    const users = await User.find({}).select('_id name');
+    // Buscamos todos los usuarios y seleccionamos todos los campos relevantes
+    const users = await User.find({}).select('_id name email rol activo');
     return NextResponse.json({ success: true, data: users });
   } catch (error) {
-    return NextResponse.json({ success: false, error: 'Error del servidor' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Error del servidor';
+    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   }
 }

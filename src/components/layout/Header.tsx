@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from "next/link";
 import Image from "next/image";
 import { useTheme } from "next-themes"; // Importante para el cambio de tema
-import { Menu, X, Search, User, Settings, LogOut, Moon, Sun } from 'lucide-react';
+import { Menu, X, Search, User, Settings, LogOut, Moon, Sun, UsersRound } from 'lucide-react';
 import { useSession, signOut } from "next-auth/react";
 // Componentes de shadcn/ui
 import { Button } from '@/components/ui/button';
@@ -101,6 +101,12 @@ export function Header() {
                   <span>Configuración</span>
                 </Link>
               </DropdownMenuItem>
+              {session?.user?.rol === "admin" ? <DropdownMenuItem asChild>
+                <Link href="/dashboard/users">
+                  <UsersRound className="mr-2 h-4 w-4" />
+                  <span>Usuarios</span>
+                </Link>
+              </DropdownMenuItem> : null}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => signOut({ callbackUrl: "/login" })}
