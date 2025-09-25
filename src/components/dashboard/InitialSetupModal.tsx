@@ -1,3 +1,5 @@
+// src/components/dashboard/InitialSetupModal.tsx
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -8,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, Mail, Lock, User, Plus, X } from "lucide-react";
+import { Loader2, Plus, X } from "lucide-react";
 import { toast } from 'sonner';
 
 // Tipos para los formularios
@@ -46,8 +48,8 @@ export function InitialSetupModal() {
                 if (response.data.isFirstAdmin) {
                     setIsOpen(true);
                 }
-            } catch (err) {
-                console.error("Error al verificar el primer administrador:", err);
+            } catch (error) { // Corrección 1: Captura el error sin 'any'
+                console.error("Error al verificar el primer administrador:", error);
             } finally {
                 setIsLoading(false);
             }
@@ -64,8 +66,12 @@ export function InitialSetupModal() {
             });
             toast.success('Usuario creado con éxito.');
             userForm.reset();
-        } catch (err: any) {
-            toast.error(err.response?.data?.error || 'Error al crear el usuario.');
+        } catch (error) { // Corrección 2: Captura el error sin 'any'
+            if (axios.isAxiosError(error) && error.response) { // Verificación para errores de Axios
+                toast.error(error.response.data.error || 'Error al crear el usuario.');
+            } else {
+                toast.error('Error al crear el usuario.');
+            }
         } finally {
             setIsSubmitting(false);
         }
@@ -87,15 +93,18 @@ export function InitialSetupModal() {
             toast.success('Etapa y formulario creados con éxito.');
             stageForm.reset();
             setFormFields([]);
-        } catch (err: any) {
-            toast.error(err.response?.data?.error || 'Error al crear la etapa.');
+        } catch (error) { // Corrección 3: Captura el error sin 'any'
+            if (axios.isAxiosError(error) && error.response) { // Verificación para errores de Axios
+                toast.error(error.response.data.error || 'Error al crear la etapa.');
+            } else {
+                toast.error('Error al crear la etapa.');
+            }
         } finally {
             setIsSubmitting(false);
         }
     };
 
     const addFormField = () => {
-        // CORRECCIÓN: Inicializa 'opciones' con un string vacío para evitar el error.
         setFormFields([...formFields, { titulo: '', tipo: 'texto', opciones: '' }]);
     };
 
@@ -175,7 +184,7 @@ export function InitialSetupModal() {
                                         <div className="grid gap-2 flex-grow">
                                             <Label>Opciones (separar con comas)</Label>
                                             <Input
-                                                value={field.opciones || ''} // Usamos un fallback para evitar el error
+                                                value={field.opciones || ''}
                                                 onChange={(e) => {
                                                     const newFields = [...formFields];
                                                     newFields[index].opciones = e.target.value;
