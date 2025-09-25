@@ -7,21 +7,22 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import { IFormField } from '@/types/IFormField';
 
 interface StageFormModalProps {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     title: string;
     description: string;
-    formFields: any[];
-    onSave: (formData: any) => Promise<void>;
+    formFields: IFormField[];
+    onSave: (formData: Record<string, unknown>) => Promise<void>;
     quoteId: string;
 }
 
 export function StageFormModal({ isOpen, onOpenChange, title, description, formFields, onSave }: StageFormModalProps) {
     const { register, handleSubmit, formState: { isSubmitting }, reset } = useForm();
 
-    const onSubmit: SubmitHandler<any> = async (data) => {
+    const onSubmit: SubmitHandler<Record<string, unknown>> = async (data) => {
         try {
             await onSave(data);
             reset();
@@ -48,7 +49,7 @@ export function StageFormModal({ isOpen, onOpenChange, title, description, formF
                             {field.tipo === 'seleccion' && (
                                 <select id={field.titulo} {...register(field.titulo, { required: true })} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                                     <option value="">Selecciona una opción</option>
-                                    {field.opciones.map((option: string) => (
+                                    {field.opciones?.map((option: string) => (
                                         <option key={option} value={option}>{option}</option>
                                     ))}
                                 </select>

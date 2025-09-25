@@ -48,6 +48,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Skeleton } from "@/components/ui/skeleton"; // Importamos el Skeleton
 import { Client } from '@/types/client';
 import { StageFormModal } from '@/components/cotizaciones/StageFormModal';
+import { IFormField } from '@/types/IFormField';
 
 // --- Tipos de Datos ---
 interface Etapa { _id: string; nombre: string; color: string; }
@@ -68,16 +69,17 @@ interface Cotizacion {
     vendedor: { name: string };
 }
 interface PipelineViewProps {
-  etapas: Etapa[];
-  columns: Columns;
-  onDelete: (quoteId: string) => void;
-  sensors: ReturnType<typeof useSensors>;
-  onDragStart: (event: DragStartEvent) => void;
-  onDragEnd: (event: DragEndEvent) => void;
-  activeQuote: Cotizacion | null;
-  stageColors: StageColorMap;
-  isFetching: boolean;
+    etapas: Etapa[];
+    columns: Columns;
+    onDelete: (quoteId: string) => void;
+    sensors: ReturnType<typeof useSensors>;
+    onDragStart: (event: DragStartEvent) => void;
+    onDragEnd: (event: DragEndEvent) => void;
+    activeQuote: Cotizacion | null;
+    stageColors: StageColorMap;
+    isFetching: boolean;
 }
+
 type Columns = Record<string, Cotizacion[]>;
 type ViewMode = 'pipeline' | 'table';
 type StageColorMap = { [key: string]: string };
@@ -352,6 +354,7 @@ function PipelineView({ etapas, columns, onDelete, sensors, onDragStart, onDragE
                                     <div className="space-y-2 p-2">
                                         <QuoteCardSkeleton />
                                         <QuoteCardSkeleton />
+                                        <QuoteCardSkeleton />
                                     </div>
                                 ) : (
                                     (columns[etapa._id] || []).length > 0 ? (
@@ -376,7 +379,7 @@ function PipelineView({ etapas, columns, onDelete, sensors, onDragStart, onDragE
 // --- Componente Principal de la Página ---
 export default function PipelinePage() {
     const [isStageFormModalOpen, setIsStageFormModalOpen] = useState(false);
-    const [formFieldsForStage, setFormFieldsForStage] = useState<any[]>([]); // Almacena los campos del formulario
+    const [formFieldsForStage, setFormFieldsForStage] = useState<IFormField[]>([]); // Almacena los campos del formulario
     const [quoteToMove, setQuoteToMove] = useState<Cotizacion | null>(null); // Cotización que se va a mover
     const [newStageId, setNewStageId] = useState<string | null>(null); // Nueva etapa de destino
     const { data: session } = useSession();
@@ -475,7 +478,7 @@ export default function PipelinePage() {
         onError: () => { toast.error(`Error al cambiar la etapa.`); queryClient.invalidateQueries({ queryKey }); },
     });
     const updateQuoteWithFormData = useMutation({
-        mutationFn: (data: { quoteId: string; newStageId: string; formData: any }) =>
+        mutationFn: (data: { quoteId: string; newStageId: string; formData: Record<string, unknown> }) =>
             axios.put(`/api/cotizaciones/${data.quoteId}/move`, {
                 etapa: data.newStageId,
                 historial: data.formData,
@@ -510,61 +513,61 @@ export default function PipelinePage() {
     }
 
     async function handleDragEnd(event: DragEndEvent) {
-    setActiveQuote(null);
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
+    setActiveQuote(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
-    const activeId = active.id.toString();
-    const overId = over.id.toString();
-    const activeContainer = findContainer(activeId);
-    const overContainer = findContainer(overId);
+    const activeId = active.id.toString();
+    const overId = over.id.toString();
+    const activeContainer = findContainer(activeId);
+    const overContainer = findContainer(overId);
 
-    if (!activeContainer || !overContainer) return;
+    if (!activeContainer || !overContainer) return;
 
-    // Solo si se mueve entre etapas diferentes
-    if (activeContainer !== overContainer) {
-        // Obtenemos los datos de la cotización que se va a mover
-        const quote = columns[activeContainer].find(q => q._id === activeId);
-        
-        // 1. Buscamos la estructura del formulario de la nueva etapa
-        try {
-            const { data } = await axios.get(`/api/formularios-etapa/${overContainer}`);
-            const camposFormulario = data.data?.campos || [];
-            
-            if (camposFormulario.length > 0) {
-                // 2. Si hay campos, guardamos los datos y abrimos el modal
-                setQuoteToMove(quote!);
-                setNewStageId(overContainer);
-                setFormFieldsForStage(camposFormulario);
-                setIsStageFormModalOpen(true);
-            } else {
-                // 3. Si no hay campos, movemos la cotización directamente
-                updateQuoteStage.mutate({ quoteId: activeId, newStageId: overContainer });
-                // Lógica de reordenamiento visual
-                const newSourceItems = [...columns[activeContainer]];
-                const newDestItems = [...columns[overContainer]];
-                const [movedItem] = newSourceItems.splice(columns[activeContainer].findIndex(q => q._id === activeId), 1);
-                newDestItems.splice(0, 0, movedItem); // O al inicio de la columna
-                setColumns(prev => ({
-                    ...prev,
-                    [activeContainer]: newSourceItems,
-                    [overContainer]: newDestItems,
-                }));
-            }
-        } catch (err) {
-            toast.error('Error al cargar el formulario de la etapa.');
-            console.error(err);
-        }
-    } else {
-        // Lógica de reordenamiento dentro de la misma columna (sin cambios)
-        const activeIndex = columns[activeContainer].findIndex(q => q._id === activeId);
-        const overIndex = columns[overContainer].findIndex(q => q._id === overId);
-        if (activeIndex !== overIndex) {
-            const newOrderedQuotes = arrayMove(columns[overContainer], activeIndex, overIndex);
-            setColumns(prev => ({ ...prev, [overContainer]: newOrderedQuotes }));
-            reorderQuotesMutation.mutate({ stageId: overContainer, orderedQuoteIds: newOrderedQuotes.map(q => q._id) });
-        }
-    }
+    // Solo si se mueve entre etapas diferentes
+    if (activeContainer !== overContainer) {
+        // Obtenemos los datos de la cotización que se va a mover
+        const quote = columns[activeContainer].find(q => q._id === activeId);
+        
+        // 1. Buscamos la estructura del formulario de la nueva etapa
+        try {
+            const { data } = await axios.get(`/api/formularios-etapa/${overContainer}`);
+            const camposFormulario = data.data?.campos || [];
+            
+            if (camposFormulario.length > 0) {
+                // 2. Si hay campos, guardamos los datos y abrimos el modal
+                setQuoteToMove(quote!);
+                setNewStageId(overContainer);
+                setFormFieldsForStage(camposFormulario);
+                setIsStageFormModalOpen(true);
+            } else {
+                // 3. Si no hay campos, movemos la cotización directamente
+                updateQuoteStage.mutate({ quoteId: activeId, newStageId: overContainer });
+                // Lógica de reordenamiento visual
+                const newSourceItems = [...columns[activeContainer]];
+                const newDestItems = [...columns[overContainer]];
+                const [movedItem] = newSourceItems.splice(columns[activeContainer].findIndex(q => q._id === activeId), 1);
+                newDestItems.splice(0, 0, movedItem); // O al inicio de la columna
+                setColumns(prev => ({
+                    ...prev,
+                    [activeContainer]: newSourceItems,
+                    [overContainer]: newDestItems,
+                }));
+            }
+        } catch (err) {
+            toast.error('Error al cargar el formulario de la etapa.');
+            console.error(err);
+        }
+    } else {
+        // Lógica de reordenamiento dentro de la misma columna (sin cambios)
+        const activeIndex = columns[activeContainer].findIndex(q => q._id === activeId);
+        const overIndex = columns[overContainer].findIndex(q => q._id === overId);
+        if (activeIndex !== overIndex) {
+            const newOrderedQuotes = arrayMove(columns[overContainer], activeIndex, overIndex);
+            setColumns(prev => ({ ...prev, [overContainer]: newOrderedQuotes }));
+            reorderQuotesMutation.mutate({ stageId: overContainer, orderedQuoteIds: newOrderedQuotes.map(q => q._id) });
+        }
+    }
 }
     
     if (isLoadingEtapas) {

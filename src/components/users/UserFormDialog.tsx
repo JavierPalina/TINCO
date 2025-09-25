@@ -1,26 +1,41 @@
 "use client";
 
-import { useForm } from 'react-hook-form';
+import { useForm, SubmitHandler } from 'react-hook-form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { useEffect } from 'react';
 
+interface IUser {
+  _id: string;
+  name: string;
+  email: string;
+  rol: 'vendedor' | 'admin';
+  activo: boolean;
+}
+
+interface IUserFormData {
+  name: string;
+  email: string;
+  rol: string;
+  password?: string;
+}
+
 interface UserFormDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  user?: any; // Para el modo de edición
+  user?: IUser; // Para el modo de edición
 }
 
 export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogProps) {
   const queryClient = useQueryClient();
-  const { register, handleSubmit, reset, setValue } = useForm();
+  const { register, handleSubmit, reset, setValue } = useForm<IUserFormData>();
   
   useEffect(() => {
     if (user) {
@@ -29,40 +44,42 @@ export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogPro
         name: user.name,
         email: user.email,
         rol: user.rol,
-        activo: user.activo,
         password: '', // No pre-poblamos la contraseña por seguridad
       });
+      setValue('rol', user.rol);
     } else {
       // Modo creación: Limpia el formulario
       reset();
     }
-  }, [user, reset]);
+  }, [user, reset, setValue]);
 
-  const createMutation = useMutation({
-    mutationFn: (data: any) => axios.post('/api/create-user', data),
+  const createMutation = useMutation<unknown, AxiosError, IUserFormData>({
+    mutationFn: (data) => axios.post('/api/create-user', data),
     onSuccess: () => {
       toast.success('Usuario creado con éxito!');
       queryClient.invalidateQueries({ queryKey: ['users'] });
       onOpenChange(false);
     },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.error || 'Error al crear el usuario.');
+    onError: (error) => {
+      const errorMessage = (error?.response?.data as { error: string })?.error || 'Error al crear el usuario.';
+      toast.error(errorMessage);
     },
   });
 
-  const updateMutation = useMutation({
-    mutationFn: (data: any) => axios.put(`/api/users/${user._id}`, data),
+  const updateMutation = useMutation<unknown, AxiosError, IUserFormData>({
+    mutationFn: (data) => axios.put(`/api/users/${user!._id}`, data),
     onSuccess: () => {
       toast.success('Usuario actualizado con éxito!');
       queryClient.invalidateQueries({ queryKey: ['users'] });
       onOpenChange(false);
     },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.error || 'Error al actualizar el usuario.');
+    onError: (error) => {
+      const errorMessage = (error?.response?.data as { error: string })?.error || 'Error al actualizar el usuario.';
+      toast.error(errorMessage);
     },
   });
 
-  const onSubmit = (data: any) => {
+  const onSubmit: SubmitHandler<IUserFormData> = (data) => {
     if (user) {
       updateMutation.mutate(data);
     } else {
