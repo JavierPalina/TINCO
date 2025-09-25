@@ -19,6 +19,7 @@ import {
     Pie,
     Cell
 } from 'recharts';
+import { InitialSetupModal } from '@/components/dashboard/InitialSetupModal';
 
 // --- PALETA DE COLORES PERSONALIZADA ---
 const COLORS = {
@@ -236,6 +237,7 @@ export default function DashboardPage() {
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-4 sm:p-6 lg:p-8">
+            <InitialSetupModal />
             <div className="max-w-7xl mx-auto">
                 <h1 className="text-3xl font-bold mb-6 text-slate-800 dark:text-slate-100">Panel de Control</h1>
                 
