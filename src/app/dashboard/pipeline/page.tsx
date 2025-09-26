@@ -313,7 +313,7 @@ function QuotesTableView({ quotes, onDelete, stageColors }: { quotes: Cotizacion
 function PipelineView({ etapas, columns, onDelete, sensors, onDragStart, onDragEnd, activeQuote, stageColors, isFetching }: PipelineViewProps) {
     return (
         <>
-            <div className="hidden md:flex h-full">
+            <div className="hidden md:flex" style={{height: "calc(100vh - 206px)"}}>
                 <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>
                     <div className="flex gap-4 h-full items-start overflow-x-auto w-full">
                         <SortableContext items={etapas?.map((e: Etapa) => e._id) || []}>
@@ -575,7 +575,7 @@ export default function PipelinePage() {
     }
     
     return (
-        <div className="h-screen flex flex-col bg-muted/20">
+        <div className="flex flex-col bg-muted/20 pd-1">
             <div className="p-4 border-b flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-card">
                 <h1 className="text-3xl font-bold">Pipeline de Cotizaciones</h1>
                 <CreateQuoteDialog />
@@ -612,7 +612,7 @@ export default function PipelinePage() {
                 </ToggleGroup>
             </div>
 
-            <div className="flex-grow overflow-auto pl-4 pr-4">
+            <div className="flex-grow overflow-auto pl-4 pr-4" >
                 <AlertDialog open={!!quoteToDelete} onOpenChange={() => setQuoteToDelete(null)}>
                     <AlertDialogContent>
                         <AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará la cotización permanentemente.</AlertDialogDescription></AlertDialogHeader>
