@@ -580,7 +580,7 @@ export default function PipelinePage() {
                 
                 const [movedItem] = newSourceItems.splice(quoteIndex, 1);
                 
-                movedItem.etapa = etapas?.find(e => e._id === overContainer)!;
+                movedItem.etapa = etapas?.find(e => e._id === overContainer) || movedItem.etapa;
                 newDestItems.unshift(movedItem); 
                 
                 setColumns(prev => ({
@@ -633,7 +633,11 @@ export default function PipelinePage() {
             const activeContainer = quoteToMove.etapa._id;
             const overContainer = newStageId;
             const quoteId = quoteToMove._id;
-            const movedQuote = {...quoteToMove, etapa: etapas?.find(e => e._id === overContainer)!};
+            const newEtapa = etapas?.find(e => e._id === overContainer);
+            const movedQuote = {
+                ...quoteToMove, 
+                etapa: newEtapa || quoteToMove.etapa // Usa la nueva etapa o la etapa original como fallback
+            };
             
             setColumns(prev => {
                 const newPrev = {...prev};

@@ -7,41 +7,50 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import { IFormField } from '@/types/IFormField'; // Asumiendo que esta es tu interfaz de campos
+
+// ✅ CORRECCIÓN: Tipo para los datos del formulario
+type IFormularioData = Record<string, string | number | string[]>;
 
 interface StageFormModalProps {
-    isOpen: boolean;
-    onOpenChange: (open: boolean) => void;
-    title: string;
-    description: string;
-    formFields: any[];
-    onSave: (formData: any) => Promise<void>;
-    quoteId: string;
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    title: string;
+    description: string;
+    // ✅ CORRECCIÓN: Usamos la interfaz de campos para tipar el array
+    formFields: IFormField[]; 
+    // ✅ CORRECCIÓN: Usamos el nuevo tipo para los datos del formulario
+    onSave: (formData: IFormularioData) => Promise<void>; 
+    quoteId: string;
 }
 
 export function StageFormModal({ isOpen, onOpenChange, title, description, formFields, onSave }: StageFormModalProps) {
-    const { 
-        register, 
-        handleSubmit, 
-        formState: { isSubmitting, errors },    
-        reset 
-    } = useForm();
+    const { 
+        register, 
+        handleSubmit, 
+        formState: { isSubmitting, errors },    
+        reset 
+    } = useForm<IFormularioData>(); // ✅ CORRECCIÓN: Tipamos useForm
 
-    const onSubmit: SubmitHandler<any> = async (data) => {
-        try {
-            await onSave(data);
-            reset();
-            onOpenChange(false);
-        } catch (error) {
-            toast.error("Error al guardar los datos del formulario.");
-        }
-    };
+    // ✅ CORRECCIÓN: Usamos el tipo específico para los datos
+    const onSubmit: SubmitHandler<IFormularioData> = async (data) => {
+        try {
+            await onSave(data);
+            reset();
+            onOpenChange(false);
+        } catch (error) {
+            // ✅ CORRECCIÓN: Usamos la variable 'error'
+            const errorMessage = (error instanceof Error) ? error.message : "Error desconocido.";
+            toast.error(`Error al guardar los datos del formulario: ${errorMessage}`);
+        }
+    };
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{title}</DialogTitle>
-                    <DialogDescription>{description}</DialogDescription>
+                    <DialogTitle>{title}</DialogTitle>
+                    <DialogDescription>{description}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                     {formFields.map((field, index) => (
@@ -70,9 +79,8 @@ export function StageFormModal({ isOpen, onOpenChange, title, description, formF
                                         {...register(field.titulo, { required: true })} 
                                         className={`flex h-10 w-full rounded-md border ${errors[field.titulo] ? 'border-red-500' : 'border-input'} bg-background px-3 py-2 text-sm`}
                                     >
-                                        {/* ✅ CORRECCIÓN CLAVE: disabled y hidden en la opción por defecto */}
                                         <option value="" disabled hidden>Selecciona una opción</option>
-                                        {field.opciones.map((option: string) => (
+                                        {field?.opciones?.map((option: string) => (
                                             <option key={option} value={option}>{option}</option>
                                         ))}
                                     </select>
