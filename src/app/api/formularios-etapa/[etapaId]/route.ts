@@ -4,16 +4,11 @@ import dbConnect from '@/lib/dbConnect';
 import FormularioEtapa from '@/models/FormularioEtapa';
 import mongoose from 'mongoose';
 
-export async function GET(
-  req: NextRequest,
-  context: { params: { etapaId: string } }
-) {
+export async function GET(req: NextRequest, context: any) {
   await dbConnect();
 
   try {
     const { etapaId } = context.params;
-
-    console.log(`API DEBUG: Recibida etapaId: ${etapaId}`);
 
     if (!mongoose.Types.ObjectId.isValid(etapaId)) {
       return NextResponse.json(
@@ -31,10 +26,8 @@ export async function GET(
     return NextResponse.json({ success: true, data: formulario });
   } catch (error: unknown) {
     console.error('Error en GET /api/formularios-etapa/[etapaId]:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Error interno del servidor.';
     return NextResponse.json(
-      { success: false, error: errorMessage },
+      { success: false, error: error instanceof Error ? error.message : 'Error interno del servidor.' },
       { status: 500 }
     );
   }
