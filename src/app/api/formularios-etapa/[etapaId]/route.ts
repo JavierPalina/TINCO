@@ -1,23 +1,21 @@
 // /src/app/api/formularios-etapa/[etapaId]/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import FormularioEtapa from '@/models/FormularioEtapa'; 
-import mongoose from 'mongoose'; // Usamos Mongoose para la validación y el query
+import mongoose from 'mongoose';
 
 // Endpoint para obtener un formulario por ID de etapa
 export async function GET(
     req: NextRequest,
-    // Dejamos la firma de tipo para Next.js App Router
+    // ✅ CORRECCIÓN CLAVE: Firma de tipo estándar para el App Router
     { params }: { params: { etapaId: string } } 
 ) {
     await dbConnect();
 
     try {
-        // 🚨 CORRECCIÓN CRÍTICA: Usamos await para resolver los parámetros
-        // Esto es necesario debido al error "params should be awaited" en tu entorno.
-        // Si la desestructuración directa falla, Next.js podría estar envolviendo 'params' en una Promise.
-        // @ts-ignore: Omitimos el chequeo de TS aquí ya que el error de Next.js es una advertencia de runtime
-        const { etapaId } = await params;
+        // ✅ CORRECCIÓN: Acceso directo a 'etapaId' sin 'await'
+        const { etapaId } = params;
         
         console.log(`API DEBUG: Recibida etapaId: ${etapaId}`);
 
@@ -31,12 +29,10 @@ export async function GET(
         }
 
         // 2. Buscar el formulario
-        // Mongoose lo convierte a ObjectId automáticamente en el query
         const formulario = await FormularioEtapa.findOne({ etapaId: etapaId });
 
         if (!formulario) {
             console.log(`API LOG: No se encontró formulario asociado a la etapa ${etapaId}.`);
-            // Devolvemos data: null para indicar al frontend que no se necesita formulario
             return NextResponse.json({ success: true, data: null });
         }
 
