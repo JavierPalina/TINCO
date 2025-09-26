@@ -19,7 +19,12 @@ interface StageFormModalProps {
 }
 
 export function StageFormModal({ isOpen, onOpenChange, title, description, formFields, onSave }: StageFormModalProps) {
-    const { register, handleSubmit, formState: { isSubmitting }, reset } = useForm();
+    const { 
+        register, 
+        handleSubmit, 
+        formState: { isSubmitting, errors },    
+        reset 
+    } = useForm();
 
     const onSubmit: SubmitHandler<any> = async (data) => {
         try {
@@ -42,16 +47,41 @@ export function StageFormModal({ isOpen, onOpenChange, title, description, formF
                     {formFields.map((field, index) => (
                         <div key={index} className="grid gap-2">
                             <Label htmlFor={field.titulo}>{field.titulo}</Label>
+                            
                             {field.tipo === 'texto' && (
-                                <Input id={field.titulo} {...register(field.titulo, { required: true })} />
+                                <>
+                                    <Input 
+                                        id={field.titulo} 
+                                        {...register(field.titulo, { required: true })} 
+                                        className={errors[field.titulo] ? "border-red-500" : ""}
+                                    />
+                                    {errors[field.titulo] && (
+                                        <p className="text-sm font-medium text-red-500">
+                                            Este campo es requerido.
+                                        </p>
+                                    )}
+                                </>
                             )}
+                            
                             {field.tipo === 'seleccion' && (
-                                <select id={field.titulo} {...register(field.titulo, { required: true })} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                                    <option value="">Selecciona una opción</option>
-                                    {field.opciones.map((option: string) => (
-                                        <option key={option} value={option}>{option}</option>
-                                    ))}
-                                </select>
+                                <>
+                                    <select 
+                                        id={field.titulo} 
+                                        {...register(field.titulo, { required: true })} 
+                                        className={`flex h-10 w-full rounded-md border ${errors[field.titulo] ? 'border-red-500' : 'border-input'} bg-background px-3 py-2 text-sm`}
+                                    >
+                                        {/* ✅ CORRECCIÓN CLAVE: disabled y hidden en la opción por defecto */}
+                                        <option value="" disabled hidden>Selecciona una opción</option>
+                                        {field.opciones.map((option: string) => (
+                                            <option key={option} value={option}>{option}</option>
+                                        ))}
+                                    </select>
+                                    {errors[field.titulo] && (
+                                        <p className="text-sm font-medium text-red-500">
+                                            Debes seleccionar una opción.
+                                        </p>
+                                    )}
+                                </>
                             )}
                         </div>
                     ))}
