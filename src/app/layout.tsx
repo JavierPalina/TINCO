@@ -7,8 +7,8 @@ import { Toaster } from '@/components/ui/sonner';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'CRM Aberturas',
-  description: 'El mejor CRM del mercado',
+  title: 'TINCO',
+  description: "Conectamos mejor, crecemos más rápido",
 };
 
 export default function RootLayout({

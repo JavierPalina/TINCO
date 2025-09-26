@@ -4,7 +4,14 @@ import dbConnect from '@/lib/dbConnect';
 import FormularioEtapa from '@/models/FormularioEtapa';
 import mongoose from 'mongoose';
 
-export async function GET(req: NextRequest, context: any) {
+// ✅ Tipo explícito para el contexto de la ruta dinámica
+interface RouteContext {
+  params: {
+    etapaId: string;
+  };
+}
+
+export async function GET(req: NextRequest, context: RouteContext) {
   await dbConnect();
 
   try {
