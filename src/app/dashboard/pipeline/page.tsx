@@ -515,39 +515,74 @@ export default function PipelinePage() {
     async function handleDragEnd(event: DragEndEvent) {
     setActiveQuote(null);
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
+    if (!over || active.id === over.id) {
+        console.log("DND LOG: Arrastre cancelado o soltado en el mismo lugar.");
+        return;
+    }
 
     const activeId = active.id.toString();
     const overId = over.id.toString();
     const activeContainer = findContainer(activeId);
     const overContainer = findContainer(overId);
 
-    if (!activeContainer || !overContainer) return;
+    console.log(`DND LOG: Moviendo Cotización ${activeId} de Etapa ${activeContainer} a Etapa ${overContainer}`);
+
+    if (!activeContainer || !overContainer) {
+        console.error("DND LOG: Contenedor activo o destino no encontrado.");
+        return;
+    }
 
     // Solo si se mueve entre etapas diferentes
     if (activeContainer !== overContainer) {
-        // Obtenemos los datos de la cotización que se va a mover
+        console.log("DND LOG: Intento de movimiento de Etapa a Etapa. Buscando cotización...");
+        
         const quote = columns[activeContainer].find(q => q._id === activeId);
         
+        if (!quote) {
+            console.error(`DND LOG: ¡ERROR! Cotización ${activeId} no encontrada en la columna ${activeContainer}.`);
+            return; 
+        }
+
         // 1. Buscamos la estructura del formulario de la nueva etapa
         try {
-            const { data } = await axios.get(`/api/formularios-etapa/${overContainer}`);
-            const camposFormulario = data.data?.campos || [];
+            console.log(`DND LOG: Buscando formulario para la nueva etapa: /api/formularios-etapa/${overContainer}`);
             
+            const { data } = await axios.get(`/api/formularios-etapa/${overContainer}`);
+            
+            // Verificamos si la API devolvió datos esperados.
+            console.log("DND LOG: Respuesta de API de formulario (data.data):", data.data);
+            
+            // Intentamos acceder a los campos.
+            const camposFormulario = data.data?.campos || []; 
+            
+            console.log(`DND LOG: Campos del formulario encontrados:`, camposFormulario);
+            console.log(`DND LOG: ¿Hay formulario? (camposFormulario.length > 0): ${camposFormulario.length > 0}`);
+
+
             if (camposFormulario.length > 0) {
-                // 2. Si hay campos, guardamos los datos y abrimos el modal
-                setQuoteToMove(quote!);
+                // 2. Si hay campos, abrimos el modal.
+                console.log("DND LOG: ✅ ¡FORMULARIO ENCONTRADO! Abriendo modal...");
+                setQuoteToMove(quote);
                 setNewStageId(overContainer);
                 setFormFieldsForStage(camposFormulario);
-                setIsStageFormModalOpen(true);
+                setIsStageFormModalOpen(true); 
             } else {
                 // 3. Si no hay campos, movemos la cotización directamente
+                console.log("DND LOG: ❌ No hay formulario. Moviendo directamente sin modal.");
                 updateQuoteStage.mutate({ quoteId: activeId, newStageId: overContainer });
-                // Lógica de reordenamiento visual
+                
+                // Lógica de reordenamiento visual inmediato (frontend)
                 const newSourceItems = [...columns[activeContainer]];
                 const newDestItems = [...columns[overContainer]];
-                const [movedItem] = newSourceItems.splice(columns[activeContainer].findIndex(q => q._id === activeId), 1);
-                newDestItems.splice(0, 0, movedItem); // O al inicio de la columna
+                
+                const quoteIndex = newSourceItems.findIndex(q => q._id === activeId);
+                if (quoteIndex === -1) return;
+                
+                const [movedItem] = newSourceItems.splice(quoteIndex, 1);
+                
+                movedItem.etapa = etapas?.find(e => e._id === overContainer)!;
+                newDestItems.unshift(movedItem); 
+                
                 setColumns(prev => ({
                     ...prev,
                     [activeContainer]: newSourceItems,
@@ -555,16 +590,21 @@ export default function PipelinePage() {
                 }));
             }
         } catch (err) {
-            toast.error('Error al cargar el formulario de la etapa.');
-            console.error(err);
+            console.error('DND LOG: ¡ERROR CRÍTICO! Fallo en la llamada API a formularios-etapa:', err);
+            toast.error('Error al cargar el formulario de la etapa o al mover la cotización.');
+            queryClient.invalidateQueries({ queryKey: ['cotizacionesPipeline'] });
         }
     } else {
-        // Lógica de reordenamiento dentro de la misma columna (sin cambios)
+        // Lógica de reordenamiento DENTRO de la misma columna
         const activeIndex = columns[activeContainer].findIndex(q => q._id === activeId);
         const overIndex = columns[overContainer].findIndex(q => q._id === overId);
+        
         if (activeIndex !== overIndex) {
+            console.log("DND LOG: Reordenando dentro de la misma columna.");
             const newOrderedQuotes = arrayMove(columns[overContainer], activeIndex, overIndex);
+            
             setColumns(prev => ({ ...prev, [overContainer]: newOrderedQuotes }));
+            
             reorderQuotesMutation.mutate({ stageId: overContainer, orderedQuoteIds: newOrderedQuotes.map(q => q._id) });
         }
     }
@@ -587,14 +627,37 @@ export default function PipelinePage() {
                     formFields={formFieldsForStage}
                     quoteId={quoteToMove?._id || ''}
                     onSave={async (formData) => {
-                        if (quoteToMove && newStageId) {
-                            await updateQuoteWithFormData.mutateAsync({
-                                quoteId: quoteToMove._id,
-                                newStageId: newStageId,
-                                formData
-                            });
-                        }
-                    }}
+        if (quoteToMove && newStageId) {
+            
+            // --- CÓDIGO CRÍTICO PARA EL MOVIMIENTO VISUAL FLUÍDO ---
+            const activeContainer = quoteToMove.etapa._id;
+            const overContainer = newStageId;
+            const quoteId = quoteToMove._id;
+            const movedQuote = {...quoteToMove, etapa: etapas?.find(e => e._id === overContainer)!};
+            
+            setColumns(prev => {
+                const newPrev = {...prev};
+                const newSourceItems = newPrev[activeContainer].filter(q => q._id !== quoteId);
+                const newDestItems = [movedQuote, ...newPrev[overContainer]]; // Mover al inicio
+                
+                return {
+                    ...newPrev,
+                    [activeContainer]: newSourceItems,
+                    [overContainer]: newDestItems,
+                };
+            });
+            // --------------------------------------------------------
+            
+            await updateQuoteWithFormData.mutateAsync({
+                quoteId: quoteToMove._id,
+                newStageId: newStageId,
+                formData
+            });
+            
+            setQuoteToMove(null);
+            setNewStageId(null);
+        }
+    }}
                 />
             </div>
             
