@@ -1,21 +1,16 @@
-// /src/app/api/formularios-etapa/[etapaId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import FormularioEtapa from '@/models/FormularioEtapa';
 import mongoose from 'mongoose';
 
-// ✅ Tipo explícito para el contexto de la ruta dinámica
-interface RouteContext {
-  params: {
-    etapaId: string;
-  };
-}
-
-export async function GET(req: NextRequest, context: RouteContext) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { etapaId: string } }
+) {
   await dbConnect();
 
   try {
-    const { etapaId } = context.params;
+    const { etapaId } = params;
 
     if (!mongoose.Types.ObjectId.isValid(etapaId)) {
       return NextResponse.json(
