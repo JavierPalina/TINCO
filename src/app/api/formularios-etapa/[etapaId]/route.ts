@@ -8,15 +8,18 @@ import mongoose from 'mongoose';
 // Endpoint para obtener un formulario por ID de etapa
 export async function GET(
   req: NextRequest,
-  // ✅ CORRECCIÓN: Usamos 'context' (o cualquier nombre) para el segundo argumento
-  context: { params: { etapaId: string } } 
+  // ✅ SINTAXIS CORREGIDA: Utilizamos Promise<{ etapaId: string }> para satisfacer el compilador/runtime
+  // Nota: La clave del parámetro debe coincidir con el nombre de la carpeta dinámica ([etapaId])
+  { params }: { params: Promise<{ etapaId: string }> } 
 ) {
   await dbConnect();
 
   try {
-    // Acceso al parámetro a través del contexto
-    const { etapaId } = context.params;
+    // ✅ MODIFICACIÓN CLAVE: Esperamos la resolución del objeto 'params'
+    const { etapaId } = await params;
 
+    // 1. Validar que la ID es un ObjectId válido
+    // (Usamos 'etapaId' ya resuelto)
     if (!mongoose.Types.ObjectId.isValid(etapaId)) {
       return NextResponse.json(
         { success: false, error: 'ID de etapa de formulario inválido.' },
@@ -24,7 +27,7 @@ export async function GET(
       );
     }
 
-    // 🚨 Importante: Aquí debes usar 'etapaId' si ese es el nombre del campo en tu modelo FormularioEtapa.
+    // 2. Buscar el formulario (Usamos 'etapaId' como clave de búsqueda, ya verificado que es el campo correcto)
     const formulario = await FormularioEtapa.findOne({ etapaId: etapaId });
 
     if (!formulario) {
