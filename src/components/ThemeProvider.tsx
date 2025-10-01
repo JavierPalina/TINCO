@@ -14,7 +14,7 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("system");
+  const [theme, setThemeState] = useState<Theme>("light");
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
 
   // Aplica la clase .dark en documentElement
@@ -41,8 +41,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         setThemeState(saved);
         apply(saved);
       } else {
-        setThemeState("system");
-        apply("system");
+        setThemeState("light");
+        apply("light");
       }
     } catch {
       setThemeState("system");
