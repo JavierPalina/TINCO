@@ -616,7 +616,7 @@ export default function PipelinePage() {
     
     return (
         <div className="flex flex-col bg-muted/20 pd-1">
-            <div className="p-4 border-b flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-card">
+            <div className="p-4 border-b flex flex-col sm:flex-row justify-between sm:items-center gap-4 ">
                 <h1 className="text-3xl font-bold">Pipeline de Cotizaciones</h1>
                 <CreateQuoteDialog />
                 <StageFormModal
@@ -665,7 +665,7 @@ export default function PipelinePage() {
                 />
             </div>
             
-            <div className="bg-card flex flex-col md:flex-row md:items-center pr-4">
+            <div className="flex flex-col md:flex-row md:items-center pr-4">
                 <div className="flex-grow">
                     <QuotesPipelineFilters filters={filters} setFilters={setFilters} />
                 </div>

@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import Link from "next/link";
 import Image from "next/image";
-import { useTheme } from "next-themes"; // Importante para el cambio de tema
+import { useTheme } from "@/components/ThemeProvider"; // ✅ usar tu propio hook
 import { Menu, X, Search, User, Settings, LogOut, Moon, Sun, UsersRound } from 'lucide-react';
 import { useSession, signOut } from "next-auth/react";
-// Componentes de shadcn/ui
+
+// shadcn/ui
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -18,31 +19,28 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
 import { NotificationBell } from "./NotificationBell";
 
 export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { theme, setTheme } = useTheme();
-
-  const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
-  };
-
+  const { theme, setTheme, resolvedTheme } = useTheme(); // ahora accede al hook custom
   const { data: session } = useSession();
 
   return (
-    <header className="p-4 border-b bg-background sticky top-0 z-50">
+    <header className="p-4 border-b bg-background sticky top-0 z-50 bg-card">
       <nav className="container mx-auto flex justify-between items-center gap-4">
-        {/* --- Lado Izquierdo: Logo y Navegación de Escritorio --- */}
+        
+        {/* --- IZQUIERDA: Logo + Nav Desktop --- */}
         <div className="flex gap-6 items-center">
           <Link href="/dashboard">
             <Image
-                src="/logo.png"
-                alt="Logo de la Empresa"
-                width={80}
-                height={80}
-                priority
-                className="w-auto h-8"
+              src={resolvedTheme === "dark" ? "/logo-dark.png" : "/logo.png"}
+              alt="Logo de la Empresa"
+              width={80}
+              height={80}
+              priority
+              className="w-auto h-8"
             />
           </Link>
           <div className="hidden md:flex items-center gap-6">
@@ -52,28 +50,27 @@ export function Header() {
           </div>
         </div>
 
-        {/* --- Centro: Barra de Búsqueda (Visible en escritorio) --- */}
+        {/* --- CENTRO: Searchbar (desktop) --- */}
         <div className="flex-1 max-w-sm hidden md:flex items-center relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-                type="search"
-                placeholder="Buscar secciones..."
-                className="pl-9 w-full"
-            />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Buscar secciones..."
+            className="pl-9 w-full"
+          />
         </div>
 
-        {/* --- Lado Derecho: Iconos y Menús --- */}
+        {/* --- DERECHA: Notificaciones + Menús --- */}
         <div className="flex items-center gap-2">
           <NotificationBell />
 
-          {/* --- NUEVO Menú de Perfil con Avatar --- */}
+          {/* --- Menú de usuario --- */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                 <Avatar className="h-8 w-8">
-                  {/* Cambia src a la URL del avatar del usuario */}
-                  <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
-                  <AvatarFallback>SC</AvatarFallback>
+                  <AvatarImage src={session?.user?.image || "https://github.com/shadcn.png"} alt="avatar" />
+                  <AvatarFallback>{session?.user?.name?.[0] || "U"}</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
@@ -85,39 +82,54 @@ export function Header() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+
               <DropdownMenuItem asChild>
                 <Link href="/dashboard/perfil">
                   <User className="mr-2 h-4 w-4" />
                   <span>Perfil</span>
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={toggleTheme}>
-                  {theme === 'dark' ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
-                  <span>{theme === 'dark' ? 'Tema Claro' : 'Tema Oscuro'}</span>
+
+              {/* --- Toggle Theme --- */}
+              <DropdownMenuItem onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>
+                {resolvedTheme === "dark" ? (
+                  <>
+                    <Sun className="mr-2 h-4 w-4" />
+                    <span>Tema Claro</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon className="mr-2 h-4 w-4" />
+                    <span>Tema Oscuro</span>
+                  </>
+                )}
               </DropdownMenuItem>
+
               <DropdownMenuItem asChild>
                 <Link href="/dashboard/configuracion">
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Configuración</span>
                 </Link>
               </DropdownMenuItem>
-              {session?.user?.rol === "admin" ? <DropdownMenuItem asChild>
-                <Link href="/dashboard/users">
-                  <UsersRound className="mr-2 h-4 w-4" />
-                  <span>Usuarios</span>
-                </Link>
-              </DropdownMenuItem> : null}
+
+              {session?.user?.rol === "admin" && (
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard/users">
+                    <UsersRound className="mr-2 h-4 w-4" />
+                    <span>Usuarios</span>
+                  </Link>
+                </DropdownMenuItem>
+              )}
+
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => signOut({ callbackUrl: "/login" })}
-              >
+              <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/login" })}>
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Cerrar sesión</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Menú de Hamburguesa para pantallas pequeñas */}
+          {/* --- Menú hamburguesa (mobile) --- */}
           <div className="md:hidden">
             <DropdownMenu onOpenChange={setIsMobileMenuOpen}>
               <DropdownMenuTrigger asChild>
@@ -127,7 +139,6 @@ export function Header() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {/* Podrías agregar aquí un input de búsqueda para móvil si lo deseas */}
                 <DropdownMenuItem asChild><Link href="/dashboard/pipeline">Pipeline</Link></DropdownMenuItem>
                 <DropdownMenuItem asChild><Link href="/dashboard/clientes">Clientes</Link></DropdownMenuItem>
                 <DropdownMenuItem asChild><Link href="/dashboard/tareas">Mis Tareas</Link></DropdownMenuItem>

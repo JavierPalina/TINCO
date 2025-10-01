@@ -30,9 +30,9 @@ export function TaskItem({ task }: { task: Task }) {
     <div
   className={cn(
     "flex items-center justify-between p-4 rounded-xl border shadow-sm transition hover:shadow-md",
-    task.prioridad === "Alta" && "bg-red-50",
-    task.prioridad === "Media" && "bg-yellow-50",
-    task.prioridad === "Baja" && "bg-blue-50"
+    task.prioridad === "Alta" && "bg-muted",
+    task.prioridad === "Media" && "bg-muted-foreground",
+    task.prioridad === "Baja" && "bg-background"
   )}
 >
   <div className="flex items-start gap-3 flex-1">
