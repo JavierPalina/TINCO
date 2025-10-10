@@ -77,11 +77,11 @@ export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogPro
     const queryClient = useQueryClient();
     const { register, handleSubmit, reset, setValue } = useForm<IUserFormData>();
     
-    const formatDateForInput = (date: any) => {
+    const formatDateForInput = (date?: string | Date) => {
         if (!date) return '';
         try {
             return new Date(date).toISOString().split('T')[0];
-        } catch (e) {
+        } catch {
             return '';
         }
     };
@@ -188,7 +188,6 @@ export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogPro
                     </div>
 
                     <Accordion type="multiple" className="w-full mt-4">
-                        {/* --- SECCIÓN 1: INFORMACIÓN PERSONAL --- */}
                         <AccordionItem value="personal">
                             <AccordionTrigger>Información Personal</AccordionTrigger>
                             <AccordionContent className="p-1 space-y-6">
@@ -197,11 +196,18 @@ export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogPro
                                     <div className="space-y-2"><Label>Fecha de Nacimiento</Label><Input type="date" {...register('personalData.fechaNacimiento')} /></div>
                                     <div className="space-y-2"><Label>Nacionalidad</Label><Input {...register('personalData.nacionalidad')} /></div>
                                     <div className="space-y-2"><Label>Estado Civil</Label>
-                                        <Select onValueChange={(v) => setValue('personalData.estadoCivil', v as any)} defaultValue={user?.personalData?.estadoCivil}>
+                                        <Select
+                                            onValueChange={(v) =>
+                                                setValue('personalData.estadoCivil', v as IPersonalData['estadoCivil'])
+                                            }
+                                            defaultValue={user?.personalData?.estadoCivil}
+                                        >
                                             <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="soltero">Soltero/a</SelectItem><SelectItem value="casado">Casado/a</SelectItem>
-                                                <SelectItem value="divorciado">Divorciado/a</SelectItem><SelectItem value="viudo">Viudo/a</SelectItem>
+                                                <SelectItem value="soltero">Soltero/a</SelectItem>
+                                                <SelectItem value="casado">Casado/a</SelectItem>
+                                                <SelectItem value="divorciado">Divorciado/a</SelectItem>
+                                                <SelectItem value="viudo">Viudo/a</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -221,7 +227,6 @@ export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogPro
                             </AccordionContent>
                         </AccordionItem>
 
-                        {/* --- SECCIÓN 2: INFORMACIÓN LABORAL Y DE CONTACTO --- */}
                         <AccordionItem value="laboral-contacto">
                             <AccordionTrigger>Información Laboral y de Contacto</AccordionTrigger>
                             <AccordionContent className="p-1 space-y-6">

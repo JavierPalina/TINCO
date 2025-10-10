@@ -66,7 +66,10 @@ export function CreateQuoteDialog() {
       setOpen(false);
       setClienteMode('seleccionar');
     },
-    onError: (error: any) => toast.error(error.message || "Error al crear el lead."),
+    onError: (error: unknown) => {
+      const err = error as { message?: string };
+      toast.error(err.message ?? "Error al crear el lead.");
+    },
   });
 
   const onSubmit: SubmitHandler<FormInputs> = (data) => mutation.mutate(data);
