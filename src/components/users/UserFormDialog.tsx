@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { IUser2 } from '@/app/dashboard/users/page';
 
 interface IPersonalData {
     cuil?: string;
@@ -54,18 +55,6 @@ interface IFinancieraLegalData {
     numeroAfiliado?: string;
 }
 
-interface IUser {
-    _id: string;
-    name: string;
-    email: string;
-    rol: 'vendedor' | 'admin';
-    activo: boolean;
-    personalData?: IPersonalData;
-    contactData?: IContactData;
-    laboralData?: ILaboralData;
-    financieraLegalData?: IFinancieraLegalData;
-}
-
 interface IUserFormData {
     name: string;
     email: string;
@@ -80,7 +69,7 @@ interface IUserFormData {
 interface UserFormDialogProps {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
-    user?: IUser;
+    user?: IUser2;
 }
 
 

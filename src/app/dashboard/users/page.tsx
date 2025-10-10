@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { IContactData, IFinancieraLegalData, ILaboralData, IPersonalData } from '@/models/User';
 
-interface IUser {
+export interface IUser2 {
     _id: string;
     name: string;
     email: string;
@@ -32,13 +32,14 @@ interface IUser {
     laboralData?: ILaboralData;
     financieraLegalData?: IFinancieraLegalData;
 }
+
 export default function UsersPage() {
     const queryClient = useQueryClient();
     const [isFormOpen, setIsFormOpen] = useState(false);
-    const [editingUser, setEditingUser] = useState<IUser | undefined>(undefined);
+    const [editingUser, setEditingUser] = useState<IUser2 | undefined>(undefined);
     const [userToDelete, setUserToDelete] = useState<string | null>(null);
 
-    const { data: users, isLoading, error } = useQuery<IUser[]>({
+    const { data: users, isLoading, error } = useQuery<IUser2[]>({
         queryKey: ['users'],
         queryFn: async () => {
             const { data } = await axios.get('/api/users');
@@ -68,7 +69,7 @@ export default function UsersPage() {
         }
     };
 
-    const handleEdit = async (userSummary: IUser) => {
+    const handleEdit = async (userSummary: IUser2) => {
         const promise = async () => {
             const { data } = await axios.get(`/api/users/${userSummary._id}`);
             if (!data.success) {
