@@ -18,7 +18,7 @@ import { Plus, Trash2 } from 'lucide-react';
 type Campo = {
   titulo: string;
   tipo: 'texto' | 'textarea' | 'numero' | 'fecha' | 'checkbox' | 'seleccion' | 'combobox' | 'archivo';
-  opciones?: string;
+  opciones?: string | string[];
   requerido: boolean;
 };
 
@@ -78,12 +78,17 @@ export function CreateStageDialog() {
       ...data,
       campos: data.campos.map(campo => ({
         ...campo,
-        opciones: (campo.tipo === 'seleccion' || campo.tipo === 'combobox') && campo.opciones
-          ? campo.opciones
-          : undefined,
+        opciones:
+          (campo.tipo === 'seleccion' || campo.tipo === 'combobox') && typeof campo.opciones === 'string'
+            ? campo.opciones
+                .split(',')
+                .map(opt => opt.trim()) // limpia espacios
+                .filter(opt => opt.length > 0) // evita vacíos
+            : undefined,
       })),
     };
-    mutation.mutate(processedData);
+  
+    mutation.mutate(processedData as FormInputs);
   };
 
   return (
@@ -91,90 +96,122 @@ export function CreateStageDialog() {
       <DialogTrigger asChild>
         <Button variant="outline">Crear Etapa</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Crear Nueva Etapa de Cotización</DialogTitle>
-          <DialogDescription>Define el nombre de la etapa y los campos del formulario que se requerirán al mover un lead aquí.</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div className="p-4 border rounded-lg space-y-4">
-            <h3 className="font-semibold text-lg">Datos de la Etapa</h3>
-            <div className="grid grid-cols-1">
-              <div className="space-y-2">
-                <Label htmlFor="nombre">Nombre de la Etapa*</Label>
-                <Input id="nombre" {...register('nombre', { required: true })} placeholder="Ej: Presupuesto Enviado" />
-              </div>
-            </div>
-          </div>
+      <DialogContent className="sm:max-w-5xl max-h-[90vh] flex flex-col">
+  <DialogHeader>
+    <DialogTitle>Crear Nueva Etapa de Cotización</DialogTitle>
+    <DialogDescription>
+      Define el nombre de la etapa y los campos del formulario que se requerirán al mover un lead aquí.
+    </DialogDescription>
+  </DialogHeader>
 
-          <div className="p-4 border rounded-lg space-y-4">
-            <h3 className="font-semibold text-lg">Campos del Formulario (Opcional)</h3>
-            <div className="space-y-4">
-              {fields.map((field, index) => (
-                <div key={field.id} className="p-4 border rounded-md relative bg-muted/30 space-y-4">
-                  <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7" onClick={() => remove(index)}>
+  <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
+    <div className="p-4 border rounded-lg mb-4">
+      <h3 className="font-semibold text-lg mb-2">Datos de la Etapa</h3>
+      <div className="space-y-2">
+        <Label htmlFor="nombre">Nombre de la Etapa*</Label>
+        <Input id="nombre" {...register('nombre', { required: true })} placeholder="Ej: Presupuesto Enviado" />
+      </div>
+    </div>
+
+    <div className="p-4 border rounded-lg flex flex-col flex-1 overflow-hidden">
+      <div className="flex justify-between items-center mb-3">
+        <h3 className="font-semibold text-lg">Campos del Formulario (Opcional)</h3>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => append({ titulo: '', tipo: 'texto', requerido: false })}
+        >
+          <Plus className="h-4 w-4 mr-1" /> Agregar Campo
+        </Button>
+      </div>
+
+      {/* Tabla scrollable */}
+      <div className="overflow-y-auto border rounded-md max-h-[45vh]">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50">
+            <tr>
+              <th className="text-left p-2 w-1/4">Título del Campo</th>
+              <th className="text-left p-2 w-1/5">Tipo</th>
+              <th className="text-left p-2 w-1/3">Opciones</th>
+              <th className="text-center p-2 w-[100px]">Oblig.</th>
+              <th className="w-[40px]"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {fields.map((field, index) => (
+              <tr key={field.id} className="border-b hover:bg-muted/30">
+                <td className="p-2 align-top">
+                  <Input
+                    {...register(`campos.${index}.titulo`, { required: true })}
+                    placeholder="Ej: Fecha de visita"
+                  />
+                </td>
+                <td className="p-2 align-top">
+                  <Controller
+                    name={`campos.${index}.tipo`}
+                    control={control}
+                    render={({ field: controllerField }) => (
+                      <Select onValueChange={controllerField.onChange} defaultValue={controllerField.value}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Seleccionar..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {tiposDeCampo.map(tipo => (
+                            <SelectItem key={tipo.value} value={tipo.value}>{tipo.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </td>
+                <td className="p-2 align-top">
+                  {(watchCampos[index]?.tipo === 'seleccion' || watchCampos[index]?.tipo === 'combobox') ? (
+                    <Input
+                      {...register(`campos.${index}.opciones`)}
+                      placeholder="Opción 1, Opción 2"
+                    />
+                  ) : (
+                    <div className="text-muted-foreground text-xs italic pt-2">—</div>
+                  )}
+                </td>
+                <td className="text-center p-2 align-top">
+                  <Controller
+                    name={`campos.${index}.requerido`}
+                    control={control}
+                    render={({ field: controllerField }) => (
+                      <Checkbox
+                        id={`req-${index}`}
+                        checked={controllerField.value}
+                        onCheckedChange={controllerField.onChange}
+                      />
+                    )}
+                  />
+                </td>
+                <td className="text-center p-2 align-top">
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => remove(index)}
+                  >
                     <Trash2 className="h-4 w-4 text-red-500" />
                   </Button>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                    <div className="space-y-2 md:col-span-5">
-                      <Label>Título del Campo</Label>
-                      <Input {...register(`campos.${index}.titulo`, { required: true })} placeholder="Ej: Fecha de visita a obra" />
-                    </div>
-                    <div className="space-y-2 md:col-span-4">
-                      <Label>Tipo de Campo</Label>
-                      <Controller
-                        name={`campos.${index}.tipo`}
-                        control={control}
-                        render={({ field: controllerField }) => (
-                          <Select onValueChange={controllerField.onChange} defaultValue={controllerField.value}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {tiposDeCampo.map(tipo => (
-                                <SelectItem key={tipo.value} value={tipo.value}>{tipo.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
-                    <div className="flex items-center space-x-2 md:col-span-3 pb-2">
-                       <Controller
-                          name={`campos.${index}.requerido`}
-                          control={control}
-                          render={({ field: controllerField }) => (
-                              <Checkbox 
-                                  id={`requerido-${index}`}
-                                  checked={controllerField.value}
-                                  onCheckedChange={controllerField.onChange}
-                              />
-                          )}
-                      />
-                      <Label htmlFor={`requerido-${index}`} className="whitespace-nowrap">Es obligatorio</Label>
-                    </div>
-                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
 
-                  {(watchCampos[index]?.tipo === 'seleccion' || watchCampos[index]?.tipo === 'combobox') && (
-                    <div className="space-y-2">
-                      <Label>Opciones (separadas por coma)</Label>
-                      <Textarea {...register(`campos.${index}.opciones`)} placeholder="Ej: Opción 1, Opción 2, Opción 3" />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-            <Button type="button" variant="outline" className="mt-4 w-full" onClick={() => append({ titulo: '', tipo: 'texto', requerido: false })}>
-              <Plus className="h-4 w-4 mr-2" /> Agregar Campo al Formulario
-            </Button>
-          </div>
-          
-          <DialogFooter>
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? "Guardando..." : "Guardar Etapa"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
+    <DialogFooter className="mt-4">
+      <Button type="submit" disabled={mutation.isPending}>
+        {mutation.isPending ? "Guardando..." : "Guardar Etapa"}
+      </Button>
+    </DialogFooter>
+  </form>
+</DialogContent>
     </Dialog>
   );
 }

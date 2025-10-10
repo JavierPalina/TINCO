@@ -17,7 +17,7 @@ import { createPortal } from 'react-dom';
 import { useDebounce } from 'use-debounce';
 import { useSession } from 'next-auth/react';
 import { TableCellActions } from '@/components/clientes/TableCellActions';
-import { Loader2, DollarSign, MoreVertical, Trash2, Paperclip, Mail, LayoutGrid, Columns } from 'lucide-react';
+import { Loader2, DollarSign, MoreVertical, Trash2, Paperclip, Mail, LayoutGrid, Columns, SkipBackIcon, StepBackIcon } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import { CreateQuoteDialog } from '@/components/cotizaciones/CreateQuoteDialog';
 import { SortableContext, useSortable, arrayMove } from '@dnd-kit/sortable';
@@ -40,7 +40,7 @@ import {
     AlertDialogTitle
 } from "@/components/ui/alert-dialog";
 import { toast } from 'sonner';
-import { FaWhatsapp } from 'react-icons/fa';
+import { FaStepBackward, FaWhatsapp } from 'react-icons/fa';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -70,6 +70,7 @@ interface PipelineViewProps {
     etapas: Etapa[];
     columns: Columns;
     onDelete: (quoteId: string) => void;
+    onUndo: (quoteId: string) => void;
     sensors: ReturnType<typeof useSensors>;
     onDragStart: (event: DragStartEvent) => void;
     onDragEnd: (event: DragEndEvent) => void;
@@ -102,7 +103,12 @@ function QuoteCardSkeleton() {
     );
 }
 
-function QuoteCard({ quote, onDelete, stageColors }: { quote: Cotizacion, onDelete: (quoteId: string) => void, stageColors: StageColorMap }) {
+function QuoteCard({ quote, onDelete, onUndo, stageColors }: {
+    quote: Cotizacion;
+    onDelete: (quoteId: string) => void;
+    onUndo: (quoteId: string) => void;
+    stageColors: StageColorMap;
+}) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
         id: quote._id, 
         data: { type: 'Quote', quote }
@@ -162,7 +168,16 @@ function QuoteCard({ quote, onDelete, stageColors }: { quote: Cotizacion, onDele
                                     <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0"> <MoreVertical className="h-4 w-4" /> </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                    <DropdownMenuItem className="text-red-600 focus:text-red-600" onSelect={() => onDelete(quote._id)}>
+                                    <DropdownMenuItem
+                                        className="text-red-600 focus:text-red-600"
+                                        onSelect={() => onUndo(quote._id)}
+                                    >
+                                        <StepBackIcon className="mr-2 h-4 w-4" /> Deshacer última acción
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        className="text-red-600 focus:text-red-600"
+                                        onSelect={() => onDelete(quote._id)}
+                                    >
                                         <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
@@ -196,11 +211,12 @@ function QuoteCard({ quote, onDelete, stageColors }: { quote: Cotizacion, onDele
     );
 }
 
-function QuoteColumn({ id, etapa, quotes, onDelete, stageColors, isFetching }: { 
+function QuoteColumn({ id, etapa, quotes, onDelete, stageColors, isFetching, onUndo }: { 
     id: string; 
     etapa: Etapa; 
     quotes: Cotizacion[], 
     onDelete: (quoteId: string) => void; 
+    onUndo: (quoteId: string) => void;
     stageColors: StageColorMap; 
     isFetching: boolean; 
 }) {
@@ -233,7 +249,7 @@ function QuoteColumn({ id, etapa, quotes, onDelete, stageColors, isFetching }: {
                 ) : (
                     <>
                         <SortableContext items={quoteIds}>
-                            {quotes.map(quote => <QuoteCard key={quote._id} quote={quote} onDelete={onDelete} stageColors={stageColors} />)}
+                            {quotes.map(quote => <QuoteCard key={quote._id} quote={quote} onDelete={onDelete} onUndo={onUndo} stageColors={stageColors} />)}
                         </SortableContext>
                         {quotes.length === 0 && (
                             <div className="flex items-center justify-center h-full">
@@ -302,20 +318,21 @@ function QuotesTableView({ quotes, onDelete, stageColors }: { quotes: Cotizacion
     );
 }
 
-function PipelineView({ etapas, columns, onDelete, sensors, onDragStart, onDragEnd, activeQuote, stageColors, isFetching }: PipelineViewProps) {
+function PipelineView({ etapas, columns, onDelete, onUndo, sensors, onDragStart, onDragEnd, activeQuote, stageColors, isFetching }: PipelineViewProps) {
     return (
         <>
             <div className="hidden md:flex" style={{height: "calc(100vh - 206px)"}}>
                 <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-                    <div className="flex gap-4 h-full items-start overflow-x-auto w-full">
+                    <div className="flex gap-4 h-full items-start overflow-x-auto w-full pb-2">
                         <SortableContext items={etapas?.map((e: Etapa) => e._id) || []}>
                             {etapas?.map((etapa: Etapa) => (
-                                <QuoteColumn 
-                                    key={etapa._id} 
-                                    id={etapa._id} 
-                                    etapa={etapa} 
-                                    quotes={columns[etapa._id] || []} 
-                                    onDelete={onDelete} 
+                                <QuoteColumn
+                                    key={etapa._id}
+                                    id={etapa._id}
+                                    etapa={etapa}
+                                    quotes={columns[etapa._id] || []}
+                                    onDelete={onDelete}
+                                    onUndo={onUndo}
                                     stageColors={stageColors}
                                     isFetching={isFetching}
                                 />
@@ -324,7 +341,7 @@ function PipelineView({ etapas, columns, onDelete, sensors, onDragStart, onDragE
                     </div>
                     {typeof document !== 'undefined' && createPortal(
                         <DragOverlay>
-                            {activeQuote ? <div className="w-80 scale-105 opacity-95 shadow-2xl"><QuoteCard quote={activeQuote} onDelete={() => { }} stageColors={stageColors} /></div> : null}
+                            {activeQuote ? <div className="w-80 scale-105 opacity-95 shadow-2xl"><QuoteCard quote={activeQuote} onDelete={() => { }} stageColors={stageColors} onUndo={onUndo} /></div> : null}
                         </DragOverlay>,
                         document.body
                     )}
@@ -352,7 +369,7 @@ function PipelineView({ etapas, columns, onDelete, sensors, onDragStart, onDragE
                                     (columns[etapa._id] || []).length > 0 ? (
                                         (columns[etapa._id] || []).map((quote: Cotizacion) =>
                                             <div key={quote._id}>
-                                                <QuoteCard quote={quote} onDelete={onDelete} stageColors={stageColors} />
+                                                <QuoteCard quote={quote} onDelete={onDelete} stageColors={stageColors} onUndo={onUndo} />
                                             </div>
                                         )
                                     ) : (
@@ -589,6 +606,17 @@ export default function PipelinePage() {
         }
     }
 }
+
+    const undoQuoteStage = useMutation({
+        mutationFn: (quoteId: string) => axios.patch(`/api/cotizaciones/${quoteId}/undo`),
+        onSuccess: () => {
+            toast.success('Se deshizo la última acción');
+            queryClient.invalidateQueries({ queryKey });
+        },
+        onError: () => toast.error('No se pudo deshacer la acción'),
+    });
+
+    const handleUndo = (quoteId: string) => undoQuoteStage.mutate(quoteId);
     
     if (isLoadingEtapas) {
         return <div className="p-10 text-center flex justify-center items-center h-screen"><Loader2 className="animate-spin h-8 w-8" /></div>;
@@ -672,6 +700,7 @@ export default function PipelinePage() {
                         etapas={etapas || []}
                         columns={columns}
                         onDelete={setQuoteToDelete}
+                        onUndo={handleUndo}
                         sensors={sensors}
                         onDragStart={handleDragStart}
                         onDragEnd={handleDragEnd}
