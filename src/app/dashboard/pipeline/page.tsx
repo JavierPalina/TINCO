@@ -47,6 +47,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Client } from '@/types/client';
 import { StageFormModal } from '@/components/cotizaciones/StageFormModal';
 import { IFormField } from '@/types/IFormField';
+import { CreateStageDialog } from '@/components/cotizaciones/CreateStageDialog';
 
 interface Etapa { _id: string; nombre: string; color: string; }
 interface Cotizacion {
@@ -597,7 +598,10 @@ export default function PipelinePage() {
         <div className="flex flex-col bg-muted/20 pd-1">
             <div className="p-4 border-b flex flex-col sm:flex-row justify-between sm:items-center gap-4 ">
                 <h1 className="text-3xl font-bold">Pipeline de Cotizaciones</h1>
-                <CreateQuoteDialog />
+                <div className="flex gap-2">
+                    <CreateStageDialog />
+                    <CreateQuoteDialog />
+                </div>
                 <StageFormModal
                     isOpen={isStageFormModalOpen}
                     onOpenChange={setIsStageFormModalOpen}
