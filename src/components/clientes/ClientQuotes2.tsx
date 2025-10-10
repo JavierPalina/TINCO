@@ -8,14 +8,14 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { DollarSign, FileText, History } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
-// Interfaces para tipar los datos
+// ... (Interfaces sin cambios)
 interface Etapa {
   _id: string;
   nombre: string;
 }
 
 interface HistorialEtapa {
-  etapa: Etapa;
+  etapa: Etapa | null; // <-- Técnicamente, puede ser null después del populate
   fecha: string;
   _id: string;
 }
@@ -29,13 +29,13 @@ interface Cotizacion {
   createdAt: string;
 }
 
+
 export function ClientQuotes2({ clientId }: { clientId: string }) {
   const { data: cotizaciones, isLoading } = useQuery<Cotizacion[]>({
     queryKey: ['cotizacionesCliente', clientId],
     queryFn: async () => {
-      // Usamos la nueva ruta de la API para filtrar por cliente
-        const { data } = await axios.get(`/api/clientes/${clientId}/cotizaciones`);
-        return data.data;
+      const { data } = await axios.get(`/api/clientes/${clientId}/cotizaciones`);
+      return data.data;
     },
     enabled: !!clientId,
   });
@@ -56,7 +56,7 @@ export function ClientQuotes2({ clientId }: { clientId: string }) {
                 <div className="flex justify-between items-center w-full pr-4">
                   <div className="flex items-center gap-3">
                     <span className="font-bold text-lg">{cotizacion.codigo}</span>
-                    <Badge variant="outline">{cotizacion.etapa.nombre}</Badge>
+                    <Badge variant="outline">{cotizacion.etapa?.nombre || 'N/A'}</Badge>
                   </div>
                   <div className="flex items-center gap-2 text-base font-semibold">
                     <DollarSign className="h-4 w-4"/>
@@ -71,10 +71,11 @@ export function ClientQuotes2({ clientId }: { clientId: string }) {
                     Historial de Etapas de la Cotización
                   </h4>
                   <div className="space-y-6 border-l-2 border-border pl-6 relative">
-                    {cotizacion.historialEtapas?.map((hist) => (
-                      <div key={hist._id} className="relative">
+                    {cotizacion.historialEtapas?.map((hist, index) => (
+                      <div key={index} className="relative">
                         <div className="absolute -left-[33px] top-1 h-4 w-4 rounded-full bg-blue-500" />
-                        <p className="font-semibold">{hist.etapa.nombre}</p>
+                        {/* ✅ SOLUCIÓN APLICADA AQUÍ */}
+                        <p className="font-semibold">{hist.etapa?.nombre || 'Etapa Eliminada'}</p>
                         <p className="text-sm text-muted-foreground">
                           {format(new Date(hist.fecha), "d MMM yyyy 'a las' HH:mm", { locale: es })}
                         </p>
