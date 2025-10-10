@@ -48,6 +48,7 @@ import { Client } from '@/types/client';
 import { StageFormModal } from '@/components/cotizaciones/StageFormModal';
 import { IFormField } from '@/types/IFormField';
 import { CreateStageDialog } from '@/components/cotizaciones/CreateStageDialog';
+import Link from 'next/link';
 
 interface Etapa { _id: string; nombre: string; color: string; }
 interface Cotizacion {
@@ -159,9 +160,11 @@ function QuoteCard({ quote, onDelete, onUndo, stageColors }: {
                         )}
                         <div className="flex justify-between items-start">
                             <div>
-                                <p className="text-sm font-bold">{quote.codigo} <Badge variant="outline" className={`mt-1 text-xs ml-1 ${prioridadStyles[quote.cliente.prioridad] || ''}`}>
-                                    {quote.cliente.prioridad}
-                                </Badge></p>
+                                <p className="text-sm font-bold">{quote.codigo} 
+                                    <Badge variant="outline" className={`mt-1 text-xs ml-1 ${prioridadStyles[quote.cliente.prioridad] || ''}`}>
+                                        {quote.cliente.prioridad}
+                                    </Badge>
+                                </p>
                             </div>
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -184,7 +187,11 @@ function QuoteCard({ quote, onDelete, onUndo, stageColors }: {
                             </DropdownMenu>
                         </div>
                         <div>
-                            <p className="text-sm font-semibold">{quote.cliente.nombreCompleto}</p>
+                            <Link href={`/dashboard/clientes/${quote.cliente._id}`}>
+                                <p className="text-sm font-semibold hover:underline hover:text-primary transition-colors">
+                                    {quote.cliente.nombreCompleto}
+                                </p>
+                            </Link>
                             <p className="text-xs text-muted-foreground italic truncate">&quot;{quote.detalle || 'Sin detalle'}&quot;</p>
                         </div>
                         <div className="flex items-center justify-between border-t pt-2 mt-2">
