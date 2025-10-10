@@ -12,14 +12,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Paperclip, X } from 'lucide-react';
-import { IFormField as OriginalFormField } from '@/types/IFormField'; // Asegúrate que esta ruta sea correcta
-import { Combobox } from '@/components/ui/combobox'; // Asumo que tienes este componente
+import { IFormField as OriginalFormField } from '@/types/IFormField';
+import { Combobox } from '@/components/ui/combobox';
 
 type IFormField = Omit<OriginalFormField, 'tipo'> & {
     tipo: 'texto' | 'textarea' | 'numero' | 'fecha' | 'checkbox' | 'seleccion' | 'combobox' | 'archivo';
 };
 
-type IFormularioData = Record<string, any>;
+// 🔧 CORREGIDO: Se reemplaza 'any' por un tipo más específico.
+type FormValue = string | number | boolean | string[] | undefined;
+type IFormularioData = Record<string, FormValue>;
 
 interface StageFormModalProps {
     isOpen: boolean;
@@ -31,7 +33,6 @@ interface StageFormModalProps {
     quoteId: string;
 }
 
-// Helper para convertir el título en un nombre de campo válido para react-hook-form
 const toFieldName = (title: string): string => {
     return title.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
 };
@@ -48,7 +49,6 @@ export function StageFormModal({ isOpen, onOpenChange, title, description, formF
 
     useEffect(() => {
         if (isOpen) {
-            // Resetea el formulario y los archivos cada vez que el modal se abre
             reset();
             setFilesToUpload({});
         }
@@ -72,7 +72,8 @@ export function StageFormModal({ isOpen, onOpenChange, title, description, formF
     };
 
     const onSubmit: SubmitHandler<IFormularioData> = async (data) => {
-        let finalFormData = { ...data };
+        // 🔧 CORREGIDO: Se cambia 'let' por 'const' ya que la variable no se reasigna.
+        const finalFormData = { ...data };
 
         try {
             const fileUploadPromises: Promise<void>[] = [];
@@ -85,7 +86,6 @@ export function StageFormModal({ isOpen, onOpenChange, title, description, formF
                         files.forEach(file => formData.append('files', file));
                         
                         const response = await axios.post('/api/upload', formData);
-                        // Guarda las rutas de los archivos en el objeto de datos final
                         finalFormData[fieldName] = response.data.paths;
                     };
                     const promise = uploadPromise();
@@ -98,13 +98,11 @@ export function StageFormModal({ isOpen, onOpenChange, title, description, formF
                 }
             }
 
-            // Espera a que todas las subidas de archivos terminen
             await Promise.all(fileUploadPromises);
             
-            // Llama a la función onSave con todos los datos (incluyendo las rutas de los archivos)
             await onSave(finalFormData);
             
-            onOpenChange(false); // Cierra el modal solo si todo fue exitoso
+            onOpenChange(false);
 
         } catch (error) {
             const errorMessage = (error instanceof Error) ? error.message : "Error desconocido.";
@@ -137,22 +135,22 @@ export function StageFormModal({ isOpen, onOpenChange, title, description, formF
                     <Controller
                         name={fieldName} control={control} rules={rules}
                         render={({ field: controllerField }) => (
-                            <Select onValueChange={controllerField.onChange} defaultValue={controllerField.value}>
+                            <Select onValueChange={controllerField.onChange} defaultValue={controllerField.value as string}>
                                 <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
                                 <SelectContent>
-                                    {field.opciones?.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                                    {Array.isArray(field.opciones) && field.opciones.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                         )}
                     />
                 );
             case 'combobox':
-                const comboboxOptions = field.opciones?.map(opt => ({ value: opt, label: opt })) || [];
+                const comboboxOptions = Array.isArray(field.opciones) ? field.opciones.map(opt => ({ value: opt, label: opt })) : [];
                 return (
                     <Controller
                         name={fieldName} control={control} rules={rules}
                         render={({ field: controllerField }) => (
-                            <Combobox options={comboboxOptions} value={controllerField.value} onChange={controllerField.onChange} placeholder="Buscar y seleccionar..." />
+                            <Combobox options={comboboxOptions} value={controllerField.value as string} onChange={controllerField.onChange} placeholder="Buscar y seleccionar..." />
                         )}
                     />
                 );
@@ -174,20 +172,20 @@ export function StageFormModal({ isOpen, onOpenChange, title, description, formF
                     </div>
                 );
             default:
-                return <p className='text-red-500 text-sm'>Tipo de campo no reconocido: {field.tipo}</p>;
+                const exhaustiveCheck: never = field.tipo;
+                return <p className='text-red-500 text-sm'>Tipo de campo no reconocido: {exhaustiveCheck}</p>;
         }
     };
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent className="max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>{title}</DialogTitle>
                     <DialogDescription>{description}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
                     {formFields.map((field) => (
-                        // El checkbox se renderiza con su propio label, así que lo excluimos de este div
                         field.tipo !== 'checkbox' ? (
                             <div key={field.titulo} className="space-y-2">
                                 <Label>{field.titulo} {field.requerido && <span className="text-red-500">*</span>}</Label>

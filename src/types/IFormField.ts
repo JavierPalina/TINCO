@@ -1,5 +1,5 @@
 export interface IFormField {
-    requerido: any;
+    requerido: boolean;
     titulo: string;
     tipo: 'texto' | 'seleccion';
     opciones?: string[];

@@ -2,7 +2,7 @@
 
 import { useForm, SubmitHandler, useFieldArray, Controller } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { toast } from 'sonner';
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,10 @@ type FormInputs = {
   nombre: string;
   // ✅ El campo 'color' se elimina de la interfaz del formulario
   campos: Campo[];
+};
+
+type ApiErrorResponse = {
+  error: string;
 };
 
 // Etiquetas claras y descriptivas para los usuarios
@@ -59,15 +63,14 @@ export function CreateStageDialog() {
   const watchCampos = watch('campos');
 
   const mutation = useMutation({
-    // El backend asignará el color, no necesitamos enviarlo
-    mutationFn: (data: Omit<FormInputs, 'color'>) => axios.post('/api/create-stage', data),
+    mutationFn: (data: FormInputs) => axios.post('/api/create-stage', data),
     onSuccess: () => {
       toast.success("Etapa y formulario creados con éxito.");
       queryClient.invalidateQueries({ queryKey: ['etapasCotizacion'] });
       reset();
       setOpen(false);
     },
-    onError: (error: any) => {
+    onError: (error: AxiosError<ApiErrorResponse>) => {
       const errorMessage = error.response?.data?.error || "Error al crear la etapa.";
       toast.error(errorMessage);
     },
