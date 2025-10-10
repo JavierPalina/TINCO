@@ -4,7 +4,6 @@ import { authOptions } from "@/lib/authOptions";
 import dbConnect from '@/lib/dbConnect';
 import Tarea from '@/models/Tarea';
 
-// --- PUT: Actualizar una tarea (ej. marcar como completada) ---
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -19,8 +18,6 @@ export async function PUT(
 
   try {
     const body = await req.json();
-
-    // Buscamos la tarea y nos aseguramos de que pertenezca al usuario logueado
     const tareaActualizada = await Tarea.findOneAndUpdate(
       { _id: id, vendedorAsignado: session.user.id },
       body,
@@ -45,7 +42,6 @@ export async function PUT(
   }
 }
 
-// --- DELETE: Eliminar una tarea ---
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

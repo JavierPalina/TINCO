@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises'; // <-- 1. Importar mkdir
+import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 
 export async function POST(request: NextRequest) {
@@ -11,12 +11,9 @@ export async function POST(request: NextRequest) {
   }
 
   const filePaths: string[] = [];
-  // 2. Definimos la ruta del directorio
   const cotizacionesDir = join(process.cwd(), 'public', 'cotizaciones');
 
   try {
-    // 3. Nos aseguramos de que el directorio exista. Si no, lo crea.
-    // { recursive: true } evita errores si la carpeta ya existe.
     await mkdir(cotizacionesDir, { recursive: true });
   } catch (error) {
     console.error("Error al crear el directorio:", error);

@@ -10,7 +10,6 @@ export async function GET() {
 
   await dbConnect();
   try {
-    // Buscamos todos los usuarios y seleccionamos todos los campos relevantes
     const users = await User.find({}).select('_id name email rol activo');
     return NextResponse.json({ success: true, data: users });
   } catch (error) {

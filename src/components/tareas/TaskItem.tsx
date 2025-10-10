@@ -8,7 +8,6 @@ import { es } from 'date-fns/locale';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { Task } from './types';
-import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function TaskItem({ task }: { task: Task }) {

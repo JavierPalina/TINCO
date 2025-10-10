@@ -37,7 +37,7 @@ export function AddTaskDialog({ client, isOpen, onOpenChange }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', client._id] });
-      queryClient.invalidateQueries({ queryKey: ['tasks'] }); // Invalidate general task list
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
       reset();
       onOpenChange(false);
     },

@@ -7,7 +7,6 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
@@ -47,10 +46,8 @@ export function AddTaskDialog() {
 
 const mutation = useMutation({
   mutationFn: (newTask: FormInputs) => {
-    // CORRECCIÓN: Simplificar la preparación del payload
     const payload = {
       ...newTask,
-      // Como la fecha siempre existe, la convertimos directamente a ISO string
       fechaVencimiento: newTask.fechaVencimiento.toISOString(),
     };
     return axios.post('/api/tareas', payload);
@@ -103,7 +100,6 @@ const onSubmit: SubmitHandler<FormInputs> = (data) => {
               <Controller
                 name="fechaVencimiento"
                 control={control}
-                // PASO 2: Añade una regla de validación para que el campo sea requerido
                 rules={{ required: "La fecha es obligatoria" }}
                 render={({ field, fieldState: { error } }) => (
                   <>
@@ -119,12 +115,10 @@ const onSubmit: SubmitHandler<FormInputs> = (data) => {
                           mode="single"
                           selected={field.value}
                           onSelect={field.onChange}
-                          // PASO 1: Añade la propiedad 'required' para evitar la deselección
                           required
                         />
                       </PopoverContent>
                     </Popover>
-                    {/* Opcional pero recomendado: Muestra el mensaje de error de validación */}
                     {error && <p className="text-sm font-medium text-red-500">{error.message}</p>}
                   </>
                 )}

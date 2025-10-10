@@ -22,7 +22,6 @@ type Props = {
 export function ClientFilters({ filters, onFilterChange, prioridadesUnicas }: Props) {
   return (
     <div className="flex items-center gap-4 mb-4">
-      {/* Barra de Búsqueda */}
       <div className="flex-grow">
         <Input 
             placeholder="Buscar por nombre, email, teléfono..."
@@ -32,7 +31,6 @@ export function ClientFilters({ filters, onFilterChange, prioridadesUnicas }: Pr
         />
       </div>
 
-      {/* Popover con Filtros Avanzados */}
       <Popover>
         <PopoverTrigger asChild>
           <Button variant="outline" className="gap-2">

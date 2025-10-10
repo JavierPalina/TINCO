@@ -1,5 +1,3 @@
-// src/components/dashboard/InitialSetupModal.tsx
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -13,7 +11,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Loader2, Plus, X } from "lucide-react";
 import { toast } from 'sonner';
 
-// Tipos para los formularios
 type UserFormInputs = {
     name: string;
     email: string;
@@ -48,7 +45,7 @@ export function InitialSetupModal() {
                 if (response.data.isFirstAdmin) {
                     setIsOpen(true);
                 }
-            } catch (error) { // Corrección 1: Captura el error sin 'any'
+            } catch (error) {
                 console.error("Error al verificar el primer administrador:", error);
             } finally {
                 setIsLoading(false);
@@ -66,8 +63,8 @@ export function InitialSetupModal() {
             });
             toast.success('Usuario creado con éxito.');
             userForm.reset();
-        } catch (error) { // Corrección 2: Captura el error sin 'any'
-            if (axios.isAxiosError(error) && error.response) { // Verificación para errores de Axios
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
                 toast.error(error.response.data.error || 'Error al crear el usuario.');
             } else {
                 toast.error('Error al crear el usuario.');
@@ -93,8 +90,8 @@ export function InitialSetupModal() {
             toast.success('Etapa y formulario creados con éxito.');
             stageForm.reset();
             setFormFields([]);
-        } catch (error) { // Corrección 3: Captura el error sin 'any'
-            if (axios.isAxiosError(error) && error.response) { // Verificación para errores de Axios
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
                 toast.error(error.response.data.error || 'Error al crear la etapa.');
             } else {
                 toast.error('Error al crear la etapa.');

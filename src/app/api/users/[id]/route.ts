@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import User from '@/models/User';
-import { ObjectId } from 'mongodb'; // Importar ObjectId para validación
+import { ObjectId } from 'mongodb';
 
-// Endpoint para obtener un usuario por ID
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     await dbConnect();
     try {
@@ -11,7 +10,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         if (!ObjectId.isValid(id)) {
             return NextResponse.json({ success: false, error: 'ID de usuario inválido.' }, { status: 400 });
         }
-        const user = await User.findById(id).select('-password'); // Excluimos el password por seguridad
+        const user = await User.findById(id).select('-password');
         if (!user) {
             return NextResponse.json({ success: false, error: 'Usuario no encontrado.' }, { status: 404 });
         }
@@ -22,7 +21,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 }
 
-// Endpoint para actualizar un usuario por ID
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     await dbConnect();
     try {
@@ -42,7 +40,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 }
 
-// Endpoint para eliminar un usuario por ID
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     await dbConnect();
     try {

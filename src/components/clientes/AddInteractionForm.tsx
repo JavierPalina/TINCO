@@ -21,7 +21,6 @@ export function AddInteractionForm({ clientId }: { clientId: string }) {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    // The object sent here MUST satisfy the Mongoose schema
     mutationFn: (newInteraction: FormInputs & { usuario: string }) => {
       return axios.post(`/api/clientes/${clientId}/interacciones`, newInteraction);
     },
@@ -31,7 +30,6 @@ export function AddInteractionForm({ clientId }: { clientId: string }) {
     },
     onError: (error) => {
       console.error("Error al añadir interacción:", error);
-      // You could add a user-facing error message here
     }
   });
 
@@ -41,7 +39,6 @@ export function AddInteractionForm({ clientId }: { clientId: string }) {
         return;
     }
     
-    // This object has { tipo, nota, usuario }
     const interactionData = {
       ...data,
       usuario: session.user.id,
@@ -49,7 +46,6 @@ export function AddInteractionForm({ clientId }: { clientId: string }) {
     mutation.mutate(interactionData);
   };
 
-  // The rest of the component is the same...
   return (
     <Card>
       <CardHeader><CardTitle>Registrar Nueva Interacción</CardTitle></CardHeader>

@@ -10,9 +10,7 @@ interface Props {
 
 export function ContactButtons({ telefono, email }: Props) {
   const handleWhatsAppClick = () => {
-    // Limpiamos el número de teléfono: quitamos espacios, paréntesis, guiones
     const cleanedPhone = telefono?.replace(/[\s()-]+/g, '');
-    // Asumimos un código de país (ej. 54 para Argentina) si no está presente
     const whatsappUrl = `https://wa.me/${cleanedPhone?.startsWith('54') ? cleanedPhone : '54' + cleanedPhone}`;
     window.open(whatsappUrl, '_blank');
   };

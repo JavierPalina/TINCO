@@ -8,10 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { GripVertical, FileText, DollarSign, CalendarDays, MapPin, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ViewNotesDialog } from '../clientes/ViewNotesDialog';
-import { WhatsAppButton } from '../clientes/WhatsAppButton';
-import { EmailButton } from '../clientes/EmailButton';
-import Cliente from '@/models/Cliente';
 
 export interface ClientCardProps {
     _id: string;
@@ -47,7 +43,6 @@ export function ClientCard({ client }: { client: ClientCardProps }) {
 
     return (
         <>
-            {/* <ViewNotesDialog client={client as any} isOpen={isNotesOpen} onOpenChange={setNotesOpen} /> */}
             <div ref={setNodeRef} style={style}>
                 <Card className="mb-3 shadow-sm hover:shadow-lg transition-shadow duration-200 gap-0 py-2">
                     <CardHeader className="flex flex-row items-start justify-between p-3 space-y-0">
@@ -68,7 +63,6 @@ export function ClientCard({ client }: { client: ClientCardProps }) {
                     </CardHeader>
 
                     <CardContent className="p-3 pt-0 text-sm space-y-3">
-                        {/* --- ESTA ES LA NUEVA FILA COMBINADA --- */}
                         <div className="flex items-center justify-between text-muted-foreground">
                             <div className="flex items-center gap-1 text-xs">
                                 <User className="h-3 w-3" />
@@ -79,8 +73,6 @@ export function ClientCard({ client }: { client: ClientCardProps }) {
                                 <span>420.000</span>
                             </div>
                         </div>
-
-                        {/* Última Interacción */}
                         <div className="flex items-center text-muted-foreground">
                             <CalendarDays className="h-4 w-4 mr-2 shrink-0" />
                             <div>
@@ -88,17 +80,6 @@ export function ClientCard({ client }: { client: ClientCardProps }) {
                                 <p className="text-xs">{client.ultimaInteraccionFecha ? format(new Date(client.ultimaInteraccionFecha), 'dd MMM yyyy', { locale: es }) : ''}</p>
                             </div>
                         </div>
-
-                        {/* Acciones Rápidas */}
-                        {/* <div className="flex items-center justify-between border-t pt-2 mt-2">
-                            <div className="flex items-center gap-1">
-                                <WhatsAppButton telefono={client.telefono} />
-                                {client.email && <EmailButton email={client.email} />}
-                            </div>
-                            <button onClick={() => setNotesOpen(true)} title="Ver/Editar Notas" className="p-1.5 rounded-md hover:bg-muted">
-                                <FileText className="h-4 w-4 text-muted-foreground" />
-                            </button>
-                        </div> */}
                     </CardContent>
                 </Card>
             </div>

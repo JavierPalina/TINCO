@@ -19,6 +19,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { IContactData, IFinancieraLegalData, ILaboralData, IPersonalData } from '@/models/User';
 
 interface IUser {
     _id: string;
@@ -26,13 +27,16 @@ interface IUser {
     email: string;
     rol: 'admin' | 'vendedor';
     activo: boolean;
+    personalData?: IPersonalData;
+    contactData?: IContactData;
+    laboralData?: ILaboralData;
+    financieraLegalData?: IFinancieraLegalData;
 }
-
 export default function UsersPage() {
     const queryClient = useQueryClient();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<IUser | undefined>(undefined);
-    const [userToDelete, setUserToDelete] = useState<string | null>(null); // Estado para el modal de eliminación
+    const [userToDelete, setUserToDelete] = useState<string | null>(null);
 
     const { data: users, isLoading, error } = useQuery<IUser[]>({
         queryKey: ['users'],
@@ -47,7 +51,7 @@ export default function UsersPage() {
         onSuccess: () => {
             toast.success('Usuario eliminado correctamente.');
             queryClient.invalidateQueries({ queryKey: ['users'] });
-            setUserToDelete(null); // Cerrar el modal
+            setUserToDelete(null);
         },
         onError: () => {
             toast.error('Error al eliminar el usuario.');
@@ -64,9 +68,26 @@ export default function UsersPage() {
         }
     };
 
-    const handleEdit = (user: IUser) => {
-        setEditingUser(user);
-        setIsFormOpen(true);
+    const handleEdit = async (userSummary: IUser) => {
+        const promise = async () => {
+            const { data } = await axios.get(`/api/users/${userSummary._id}`);
+            if (!data.success) {
+                throw new Error(data.error || 'No se pudieron cargar los datos del usuario.');
+            }
+            return data.data;
+        };
+
+        toast.promise(promise(), {
+            loading: 'Cargando datos del usuario...',
+            success: (fullUser) => {
+                setEditingUser(fullUser);
+                setIsFormOpen(true);
+                return 'Datos cargados con éxito.';
+            },
+            error: (err) => {
+                return err.message || 'Error al cargar los datos.';
+            },
+        });
     };
 
     const handleAdd = () => {
@@ -126,8 +147,6 @@ export default function UsersPage() {
                 onOpenChange={setIsFormOpen}
                 user={editingUser}
             />
-
-            {/* Modal de confirmación para eliminar */}
                 <AlertDialog 
                     open={!!userToDelete} 
                     onOpenChange={(open) => {

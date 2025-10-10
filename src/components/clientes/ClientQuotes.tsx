@@ -9,7 +9,6 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-// Interfaces
 interface Quote {
     _id: string;
     codigo: string;
@@ -18,7 +17,6 @@ interface Quote {
     createdAt: string;
 }
 
-// Mapeo de colores para los badges de estado
 const statusColors: Record<Quote['estado'], string> = {
     Borrador: 'bg-yellow-500',
     Enviada: 'bg-blue-500',
@@ -27,7 +25,6 @@ const statusColors: Record<Quote['estado'], string> = {
 }
 
 export function ClientQuotes({ clientId }: { clientId: string }) {
-    // Query para obtener las cotizaciones de este cliente
     const { data: quotes, isLoading } = useQuery<Quote[]>({
         queryKey: ['quotes', clientId],
         queryFn: async () => {
@@ -42,7 +39,6 @@ export function ClientQuotes({ clientId }: { clientId: string }) {
             <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Cotizaciones</CardTitle>
                 <Button asChild>
-                    {/* Este enlace nos llevará a la página de creación de cotizaciones que haremos después */}
                     <Link href={`/dashboard/cotizaciones/nueva?clienteId=${clientId}`}>
                         Crear Nueva
                     </Link>

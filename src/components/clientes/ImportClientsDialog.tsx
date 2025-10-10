@@ -10,14 +10,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from "@/components/ui/input";
 import { Upload } from 'lucide-react';
 
-// --- Definimos un tipo tipado para los clientes importados ---
 type ImportedClient = {
   nombreCompleto?: string;
   telefono?: string;
   email?: string;
   empresa?: string;
   prioridad?: string;
-  [key: string]: string | undefined; // permite acceder a cualquier columna del CSV
+  [key: string]: string | undefined;
 };
 
 export function ImportClientsDialog() {

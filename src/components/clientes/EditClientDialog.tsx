@@ -15,7 +15,6 @@ import { CompanyDataDialog } from './CompanyDataDialog';
 import { Pencil } from 'lucide-react';
 import { Combobox } from '../ui/combobox';
 
-// 1. El componente ahora recibe la lista de prioridades
 interface EditDialogProps {
     client: Client;
     isOpen: boolean;
@@ -34,7 +33,6 @@ export function EditClientDialog({ client, isOpen, onOpenChange, prioridadesOpti
   const [isCompanyDialogOpen, setCompanyDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  // 2. Combinamos las prioridades por defecto con las que vienen de la DB
   const opcionesDePrioridad = useMemo(() => {
     const combined = [...new Set([...defaultPrioridades, ...prioridadesOptions])];
     return combined.map(p => ({ value: p, label: p }));

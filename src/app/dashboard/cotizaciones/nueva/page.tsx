@@ -5,14 +5,12 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { Suspense, useEffect } from 'react';
-
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Trash2 } from 'lucide-react';
 
-// --- Interfaces y Tipos ---
 interface ProductLine {
   descripcion: string;
   cantidad: number;
@@ -25,13 +23,11 @@ interface QuoteFormData {
   estado: 'Borrador' | 'Enviada';
 }
 
-// --- Componente principal ---
 function CreateQuoteForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const clientId = searchParams.get('clienteId');
 
-  // Query para obtener el nombre del cliente y mostrarlo
   const { data: cliente, isLoading: isLoadingClient } = useQuery<{ nombreCompleto: string }>({
     queryKey: ['cliente', clientId],
     queryFn: async () => {
@@ -49,27 +45,23 @@ function CreateQuoteForm() {
     },
   });
 
-  // 1. Hook `useFieldArray` para manejar la lista dinámica de productos
   const { fields, append, remove } = useFieldArray({
     control,
     name: 'productos',
   });
 
-  // 2. "Observamos" los cambios en el array de productos para recalcular el total
   const watchedProducts = watch('productos');
 
   useEffect(() => {
     const total = watchedProducts.reduce((sum, item) => sum + (item.cantidad || 0) * (item.precioUnitario || 0), 0);
-    setValue('montoTotal', total); // Actualizamos el valor del total en el formulario
+    setValue('montoTotal', total);
   }, [watchedProducts, setValue]);
 
-  // 3. Mutación para enviar la nueva cotización a la API
   const mutation = useMutation({
     mutationFn: (newQuote: QuoteFormData) => {
       return axios.post(`/api/clientes/${clientId}/cotizaciones`, newQuote);
     },
     onSuccess: () => {
-      // Si tiene éxito, redirigimos de vuelta a la página del cliente
       router.push(`/dashboard/clientes/${clientId}`);
     },
     onError: (error) => {
@@ -94,7 +86,6 @@ function CreateQuoteForm() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {/* --- Sección de Productos Dinámicos --- */}
             <div className="space-y-4">
               {fields.map((field, index) => (
                 <div key={field.id} className="flex items-end gap-2 p-4 border rounded-md">
@@ -125,7 +116,6 @@ function CreateQuoteForm() {
 
             <hr/>
 
-            {/* --- Sección de Totales y Envío --- */}
             <div className="flex justify-between items-center text-xl font-bold">
               <span>Total:</span>
               <span>${watch('montoTotal').toLocaleString('es-AR')}</span>
@@ -143,7 +133,6 @@ function CreateQuoteForm() {
   );
 }
 
-// Envolvemos el componente en Suspense por el uso de useSearchParams
 export default function CreateQuotePage() {
     return (
         <Suspense fallback={<div className="p-10 text-center">Cargando...</div>}>

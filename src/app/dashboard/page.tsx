@@ -21,24 +21,20 @@ import {
 } from 'recharts';
 import { InitialSetupModal } from '@/components/dashboard/InitialSetupModal';
 
-// --- PALETA DE COLORES PERSONALIZADA ---
 const COLORS = {
-    primary: '#4fa588', // Verde Turquesa principal
-    light: '#e6f4f0',   // Verde muy pálido para fondos o resaltados
-    medium: '#70bfa3',  // Tono medio
-    dark: '#3e846b',    // Tono oscuro para texto o elementos clave
-    textPrimary: '#2d3748', // Un gris oscuro casi negro para texto principal
-    textSecondary: '#718096', // Un gris medio para texto secundario
-    // Colores para gráficos que necesitan múltiples tonos.
-    chart1: '#4fa588', // Principal
-    chart2: '#70bfa3', // Medio
-    chart3: '#a3d9c7', // Variante más clara
-    chart4: '#3e846b', // Oscuro
-    // Colores para el gráfico de torta
+    primary: '#4fa588',
+    light: '#e6f4f0',
+    medium: '#70bfa3',
+    dark: '#3e846b',
+    textPrimary: '#2d3748',
+    textSecondary: '#718096',
+    chart1: '#4fa588',
+    chart2: '#70bfa3',
+    chart3: '#a3d9c7',
+    chart4: '#3e846b',
     pieChartColors: ['#4fa588', '#70bfa3', '#a3d9c7', '#3e846b']
 };
 
-// --- DATOS FICTICIOS EN ESPAÑOL (sin cambios) ---
 const mockData = {
     ventaTotalAnual: 12584350,
     sucursalPrincipal: { nombre: "Sucursal Centro", ventaAnual: 4850200 },
@@ -78,9 +74,6 @@ const mockData = {
     ],
 };
 
-// --- COMPONENTES DEL DASHBOARD MODERNO ---
-
-// Tarjeta de estadística moderna (ajustada a la paleta)
 function StatCardModerno({ icon: Icon, title, value, footer }: { icon: React.ElementType, title: string, value: string, footer: string }) {
     return (
         <Card className="shadow-lg border-0 
@@ -99,12 +92,11 @@ function StatCardModerno({ icon: Icon, title, value, footer }: { icon: React.Ele
     );
 }
 
-// Gráfico principal de ventas mensuales (cambia entre sucursal y usuario) - Ajustado a la paleta
 function GraficoVentasMensuales() {
     const [vista, setVista] = useState<'sucursal' | 'usuario'>('sucursal');
     const datos = vista === 'sucursal' ? mockData.ventasMensualesSucursal : mockData.ventasMensualesUsuario;
     const keys = Object.keys(datos[0]).filter(k => k !== 'mes');
-    const colors = [COLORS.chart1, COLORS.chart2, COLORS.chart3, COLORS.chart4]; // Usamos los colores de la paleta
+    const colors = [COLORS.chart1, COLORS.chart2, COLORS.chart3, COLORS.chart4];
 
     return (
         <Card className="col-span-1 lg:col-span-4 shadow-xl border-0 bg-white dark:bg-slate-800">
@@ -155,7 +147,6 @@ function GraficoVentasMensuales() {
     );
 }
 
-// Ranking de Ventas (ajustado a la paleta)
 function RankingList({ title, data, icon: Icon }: { title: string, data: { nombre: string, ventas: number, avatar: string }[], icon: React.ElementType }) {
     const maxVentas = Math.max(...data.map(item => item.ventas));
     return (
@@ -191,7 +182,6 @@ function RankingList({ title, data, icon: Icon }: { title: string, data: { nombr
     );
 }
 
-// Gráfico de torta para ventas por producto (ajustado a la paleta)
 function GraficoVentasProducto({ data }: { data: typeof mockData.ventasPorProducto }) {
     return (
         <Card className="col-span-1 lg:col-span-2 shadow-xl border-0 bg-white dark:bg-slate-800">
@@ -200,7 +190,7 @@ function GraficoVentasProducto({ data }: { data: typeof mockData.ventasPorProduc
                 <CardTitle className="text-slate-800 dark:text-slate-100">Ventas por Producto</CardTitle>
             </CardHeader>
             <CardContent className="h-[300px] w-full">
-                 <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                         <Pie
                             data={data}
@@ -209,7 +199,7 @@ function GraficoVentasProducto({ data }: { data: typeof mockData.ventasPorProduc
                             labelLine={false}
                             outerRadius={100}
                             innerRadius={60}
-                            fill={COLORS.primary} // Color principal si solo hay una porción
+                            fill={COLORS.primary}
                             dataKey="value"
                             paddingAngle={5}
                         >
@@ -230,8 +220,6 @@ function GraficoVentasProducto({ data }: { data: typeof mockData.ventasPorProduc
     );
 }
 
-// --- PÁGINA PRINCIPAL DEL DASHBOARD ---
-
 export default function DashboardPage() {
     const stats = mockData;
 
@@ -240,8 +228,6 @@ export default function DashboardPage() {
             <InitialSetupModal />
             <div className="max-w-7xl mx-auto">
                 <h1 className="text-3xl font-bold mb-6 text-slate-800 dark:text-slate-100">Panel de Control</h1>
-                
-                {/* Tarjetas de estadísticas principales */}
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
                     <StatCardModerno 
                         icon={DollarSign}
@@ -249,19 +235,19 @@ export default function DashboardPage() {
                         value={`$${(stats.ventaTotalAnual / 1000000).toFixed(2)}M`}
                         footer="Actualizado al día de hoy"
                     />
-                     <StatCardModerno 
+                    <StatCardModerno 
                         icon={Building2}
                         title="Sucursal Principal"
                         value={stats.sucursalPrincipal.nombre}
                         footer={`$${(stats.sucursalPrincipal.ventaAnual / 1000000).toFixed(2)}M en ventas`}
                     />
-                     <StatCardModerno 
+                    <StatCardModerno 
                         icon={Crown}
                         title="Vendedor Estrella"
                         value={stats.vendedorEstrella.nombre}
                         footer={`$${(stats.vendedorEstrella.ventaAnual / 1000000).toFixed(2)}M en ventas`}
                     />
-                     <StatCardModerno 
+                    <StatCardModerno 
                         icon={Package}
                         title="Producto Más Vendido"
                         value={stats.productoMasVendido.nombre}
@@ -269,12 +255,8 @@ export default function DashboardPage() {
                     />
                 </div>
 
-                {/* Gráficos y Rankings */}
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                    {/* Gráfico principal */}
                     <GraficoVentasMensuales />
-                    
-                    {/* Rankings y gráfico de torta */}
                     <RankingList 
                         title="Ranking de Vendedores" 
                         data={stats.rankingUsuarios}

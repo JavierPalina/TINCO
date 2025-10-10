@@ -5,14 +5,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { useTheme } from "@/components/ThemeProvider";
 import { useSession, signOut } from "next-auth/react";
-
-// Lucide Icons (agregado ChevronDown)
 import { 
     Menu, X, Search, User, Settings, LogOut, Moon, Sun, UsersRound, 
     Mail, Bot, Globe, ChevronDown
 } from 'lucide-react';
-
-// shadcn/ui
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -24,10 +20,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
 import { NotificationBell } from "./NotificationBell";
 
-// Definición de tipos para las props
 type ListItemProps = {
   href: string;
   icon: React.ElementType;
@@ -35,7 +29,6 @@ type ListItemProps = {
   children: React.ReactNode;
 };
 
-// Componente para los items dentro del nuevo Dropdown de Servicios
 const DropdownListItem = ({ href, icon: Icon, title, children }: ListItemProps) => (
   <DropdownMenuItem asChild>
     <Link href={href} className="flex flex-row items-start gap-2 p-2">
@@ -71,7 +64,6 @@ export function Header() {
             <Link href="/dashboard/pipeline" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Pipeline</Link>
             <Link href="/dashboard/clientes" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Clientes</Link>
             <Link href="/dashboard/tareas" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Mis Tareas</Link>
-            {/* ✅ "Servicios" ahora es un DropdownMenu para abrir con clic */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="text-sm font-medium p-2 h-auto hover:bg-transparent">
@@ -126,7 +118,6 @@ export function Header() {
                 <Link href="/dashboard/perfil"><User className="mr-2 h-4 w-4" /><span>Perfil</span></Link>
               </DropdownMenuItem>
 
-              {/* ✅ CORRECCIÓN: Envolver en Fragmentos (<>) los hijos de los items con onClick */}
               <DropdownMenuItem onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>
                 {resolvedTheme === "dark" ? (
                   <><Sun className="mr-2 h-4 w-4" /><span>Tema Claro</span></>

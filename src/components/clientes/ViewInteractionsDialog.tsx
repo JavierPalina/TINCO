@@ -4,9 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { PlusCircle } from 'lucide-react'; // <-- 1. Importar el ícono
+import { PlusCircle } from 'lucide-react';
 
-// 2. Importar DialogFooter y Button
 import { 
   Dialog, 
   DialogContent, 
@@ -26,12 +25,11 @@ interface InteractionData {
   usuario: { name: string; };
 }
 
-// 3. Agregar la nueva prop 'onAddNew'
 type Props = {
   client: Client;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onAddNew: () => void; // <-- La función para abrir el diálogo de añadir
+  onAddNew: () => void;
 }
 
 export function ViewInteractionsDialog({ client, isOpen, onOpenChange, onAddNew }: Props) {
@@ -71,8 +69,6 @@ export function ViewInteractionsDialog({ client, isOpen, onOpenChange, onAddNew 
             )}
           </div>
         </div>
-        
-        {/* 4. Añadir el footer con el botón que usa 'onAddNew' */}
         <DialogFooter className="pt-4 border-t">
             <Button onClick={onAddNew} variant="outline">
               <PlusCircle className="mr-2 h-4 w-4" />

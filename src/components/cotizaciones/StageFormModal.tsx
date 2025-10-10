@@ -7,43 +7,38 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
-import { IFormField } from '@/types/IFormField'; // Asumiendo que esta es tu interfaz de campos
+import { IFormField } from '@/types/IFormField';
 
-// ✅ CORRECCIÓN: Tipo para los datos del formulario
 type IFormularioData = Record<string, string | number | string[]>;
 
 interface StageFormModalProps {
-    isOpen: boolean;
-    onOpenChange: (open: boolean) => void;
-    title: string;
-    description: string;
-    // ✅ CORRECCIÓN: Usamos la interfaz de campos para tipar el array
-    formFields: IFormField[]; 
-    // ✅ CORRECCIÓN: Usamos el nuevo tipo para los datos del formulario
-    onSave: (formData: IFormularioData) => Promise<void>; 
-    quoteId: string;
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    title: string;
+    description: string;
+    formFields: IFormField[]; 
+    onSave: (formData: IFormularioData) => Promise<void>; 
+    quoteId: string;
 }
 
 export function StageFormModal({ isOpen, onOpenChange, title, description, formFields, onSave }: StageFormModalProps) {
-    const { 
-        register, 
-        handleSubmit, 
-        formState: { isSubmitting, errors },    
-        reset 
-    } = useForm<IFormularioData>(); // ✅ CORRECCIÓN: Tipamos useForm
+    const { 
+        register, 
+        handleSubmit, 
+        formState: { isSubmitting, errors },
+        reset 
+    } = useForm<IFormularioData>();
 
-    // ✅ CORRECCIÓN: Usamos el tipo específico para los datos
-    const onSubmit: SubmitHandler<IFormularioData> = async (data) => {
-        try {
-            await onSave(data);
-            reset();
-            onOpenChange(false);
-        } catch (error) {
-            // ✅ CORRECCIÓN: Usamos la variable 'error'
+    const onSubmit: SubmitHandler<IFormularioData> = async (data) => {
+        try {
+            await onSave(data);
+            reset();
+            onOpenChange(false);
+        } catch (error) {
             const errorMessage = (error instanceof Error) ? error.message : "Error desconocido.";
-            toast.error(`Error al guardar los datos del formulario: ${errorMessage}`);
-        }
-    };
+            toast.error(`Error al guardar los datos del formulario: ${errorMessage}`);
+        }
+    };
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>

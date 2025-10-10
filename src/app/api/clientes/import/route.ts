@@ -17,7 +17,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "No se proporcionaron clientes para importar." }, { status: 400 });
     }
 
-    // Añadimos el vendedor asignado a cada cliente
     const clientesConVendedor = clientesParaImportar.map(cliente => ({
       ...cliente,
       vendedorAsignado: session.user.id,
@@ -25,7 +24,6 @@ export async function POST(request: NextRequest) {
       prioridad: cliente.prioridad || 'Media',
     }));
 
-    // Usamos insertMany para una inserción masiva y eficiente
     const resultado = await Cliente.insertMany(clientesConVendedor, { ordered: false });
 
     return NextResponse.json({ success: true, message: `${resultado.length} clientes importados con éxito.` });

@@ -18,8 +18,6 @@ export async function GET() {
   try {
     const userId = session.user.id;
     const now = new Date();
-
-    // 1. Tareas pendientes para hoy
     const tareasHoy = await Tarea.countDocuments({
       vendedorAsignado: userId,
       completada: false,
@@ -29,19 +27,14 @@ export async function GET() {
       },
     });
 
-    // 2. Nuevos clientes este mes
     const nuevosClientesMes = await Cliente.countDocuments({
-      // Si quieres que sea solo para el vendedor, añade: vendedorAsignado: userId,
       createdAt: {
         $gte: startOfMonth(now),
         $lte: endOfMonth(now),
       },
     });
 
-    // 3. Total cotizado vs. total ganado (usando agregación)
     const cotizacionesStats = await Cotizacion.aggregate([
-      // Opcional: Descomenta para filtrar solo por el vendedor logueado
-      // { $match: { vendedor: new mongoose.Types.ObjectId(userId) } },
       {
         $group: {
           _id: null,
@@ -55,7 +48,6 @@ export async function GET() {
       },
     ]);
 
-    // 4. Gráfico de Motivos de Rechazo (usando agregación)
     const motivosRechazo = await Cliente.aggregate([
       { $match: { etapa: 'Perdido', motivoRechazo: { $ne: null } } },
       {
@@ -64,11 +56,10 @@ export async function GET() {
           count: { $sum: 1 },
         },
       },
-      { $project: { name: '$_id', value: '$count', _id: 0 } }, // Formatear para la librería de gráficos
+      { $project: { name: '$_id', value: '$count', _id: 0 } },
       { $sort: { value: -1 } },
     ]);
 
-    // Consolidamos los resultados
     const stats = {
       tareasHoy,
       nuevosClientesMes,

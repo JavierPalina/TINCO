@@ -18,12 +18,9 @@ type FormInputs = { tipo: 'Llamada' | 'WhatsApp' | 'Email' | 'Reunión' | 'Nota'
 
 export function AddInteractionDialog({ client, isOpen, onOpenChange }: Props) {
   const { data: session } = useSession();
-  
-  // --- ESTE ES EL CAMBIO ---
-  // Establecemos un valor por defecto para 'tipo'
   const { control, register, handleSubmit, reset } = useForm<FormInputs>({
     defaultValues: {
-      tipo: 'Llamada', // Puedes cambiarlo a 'Nota' o el que prefieras
+      tipo: 'Llamada',
       nota: ''
     }
   });

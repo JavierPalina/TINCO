@@ -1,5 +1,5 @@
 export interface Task {
-    _id: string; // El ID siempre será un string en el frontend
+    _id: string;
     titulo: string;
     fechaVencimiento: string;
     completada: boolean;

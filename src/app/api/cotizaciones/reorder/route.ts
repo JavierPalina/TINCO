@@ -2,7 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from '@/lib/authOptions';
 import dbConnect from '@/lib/dbConnect';
-import Cotizacion from '@/models/Cotizacion'; // Ajusta la ruta a tu modelo
+import Cotizacion from '@/models/Cotizacion';
 import { Types } from 'mongoose';
 
 export async function PUT(request: NextRequest) {
@@ -19,8 +19,6 @@ export async function PUT(request: NextRequest) {
         if (!stageId || !Array.isArray(orderedQuoteIds)) {
             return NextResponse.json({ success: false, error: 'Datos inválidos' }, { status: 400 });
         }
-
-        // Prepara una operación de actualización masiva (bulk write)
         const bulkOps = orderedQuoteIds.map((quoteId, index) => ({
             updateOne: {
                 filter: { _id: new Types.ObjectId(quoteId) },

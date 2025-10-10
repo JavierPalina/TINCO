@@ -23,7 +23,7 @@ const NotaSchema: Schema = new Schema({
     trim: true,
   },
 }, {
-  timestamps: true // Esto añade automáticamente la fecha y hora de creación
+  timestamps: true
 });
 
 export default mongoose.models.Nota || mongoose.model<INota>('Nota', NotaSchema);

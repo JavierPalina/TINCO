@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo } from "react"; // NUEVO: Importamos useMemo
+import { useMemo } from "react";
 import { DateRange } from "react-day-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
-import { Badge } from "@/components/ui/badge"; // NUEVO: Importamos Badge
+import { Badge } from "@/components/ui/badge";
 import { Filter, CalendarIcon, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
@@ -50,10 +50,9 @@ export function QuotesPipelineFilters({ filters, setFilters }: Props) {
         });
     };
 
-    // MODIFICADO: Lógica mejorada para contar filtros activos usando useMemo
     const activeFilterCount = useMemo(() => {
         const defaultVendedorId = session?.user?.id;
-        if (!defaultVendedorId) return 0; // No calculamos hasta que la sesión esté lista
+        if (!defaultVendedorId) return 0;
 
         const isVendedorActive = filters.vendedorId !== defaultVendedorId;
         const isDateActive = !!filters.dateRange?.from;
@@ -61,7 +60,6 @@ export function QuotesPipelineFilters({ filters, setFilters }: Props) {
         return (isVendedorActive ? 1 : 0) + (isDateActive ? 1 : 0);
     }, [filters, session?.user?.id]);
 
-    // NUEVO: Función para obtener el texto del filtro de vendedor para el badge
     const getVendedorFilterText = () => {
         if (filters.vendedorId === "") return "Todos";
         return vendedores?.find(v => v._id === filters.vendedorId)?.name || "Otro";
@@ -69,7 +67,6 @@ export function QuotesPipelineFilters({ filters, setFilters }: Props) {
 
     return (
         <div className="flex items-center gap-4 mb-4 px-4 mt-4">
-            {/* Barra de Búsqueda (siempre visible) */}
             <div className="flex-grow">
                 <Input 
                 placeholder="Buscar por cliente o código..."
@@ -79,7 +76,6 @@ export function QuotesPipelineFilters({ filters, setFilters }: Props) {
                 /> 
             </div>
 
-            {/* NUEVO: Indicadores de filtros activos como badges */}
             <div className="flex items-center gap-2 flex-shrink-0">
                 {filters.vendedorId !== (session?.user?.id) && session?.user?.id && (
                     <Badge className="pl-2 pr-1 h-6 bg-primary">
@@ -94,10 +90,10 @@ export function QuotesPipelineFilters({ filters, setFilters }: Props) {
                     </Badge>
                 )}
                 {filters.dateRange?.from && (
-                      <Badge className="pl-2 pr-1 h-6 bg-primary">
+                    <Badge className="pl-2 pr-1 h-6 bg-primary">
                         <span className="mr-1">
-                          {format(filters.dateRange.from, "d/MM", { locale: es })}
-                          {filters.dateRange.to && ` - ${format(filters.dateRange.to, "d/MM", { locale: es })}`}
+                            {format(filters.dateRange.from, "d/MM", { locale: es })}
+                            {filters.dateRange.to && ` - ${format(filters.dateRange.to, "d/MM", { locale: es })}`}
                         </span>
                         <button 
                             onClick={() => handleFilterChange('dateRange', undefined)}
@@ -110,10 +106,8 @@ export function QuotesPipelineFilters({ filters, setFilters }: Props) {
                 )}
             </div>
 
-            {/* Popover con Filtros Avanzados */}
             <Popover>
                 <PopoverTrigger asChild>
-                    {/* El badge de número se mantiene en el botón principal */}
                     <Button variant="outline" className="relative flex-shrink-0">
                         <Filter className="mr-2 h-4 w-4" />
                         <span>Filtros</span>
@@ -125,7 +119,6 @@ export function QuotesPipelineFilters({ filters, setFilters }: Props) {
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80" align="end">
-                    {/* El contenido del popover no cambia */}
                     <div className="grid gap-4">
                         <div className="space-y-2">
                             <h4 className="font-medium leading-none">Filtros Adicionales</h4>
@@ -146,7 +139,7 @@ export function QuotesPipelineFilters({ filters, setFilters }: Props) {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value={session?.user?.id || ''}>Mis Cotizaciones</SelectItem>
-                                        <SelectItem value="all">Todas</SelectItem> {/* Este se convierte en '' */}
+                                        <SelectItem value="all">Todas</SelectItem>
                                         {vendedores?.filter(v => v._id !== session?.user?.id).map(v => (
                                             <SelectItem key={v._id} value={v._id}>{v.name}</SelectItem>
                                         ))}

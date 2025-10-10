@@ -6,7 +6,6 @@ import axios from 'axios';
 import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors, DragOverlay, closestCorners } from '@dnd-kit/core';
 import { createPortal } from 'react-dom';
 import { useDebounce } from 'use-debounce';
-
 import { KanbanColumn } from './KanbanColumn';
 import { RejectionReasonModal, RejectionFormData } from './RejectionReasonModal';
 import { ClientCard, ClientCardProps } from './ClientCard';
@@ -21,9 +20,6 @@ interface MovingClientInfo {
   targetStage: string;
 }
 
-// --- SOLUCIÓN ---
-// Se mueve columnOrder fuera del componente.
-// Ahora es una constante estable y no causará que el useEffect se ejecute infinitamente.
 const columnOrder: string[] = ['Nuevo', 'Contactado', 'Cotizado', 'Negociación', 'Ganado', 'Perdido'];
 
 export function KanbanBoard() {
@@ -59,7 +55,6 @@ export function KanbanBoard() {
   useEffect(() => {
     if (clientes) {
       const initialColumns: Columns = {};
-      // Usamos la constante definida afuera
       columnOrder.forEach(stage => initialColumns[stage] = []);
       clientes.forEach(client => {
           if(initialColumns[client.etapa]) {
@@ -68,7 +63,6 @@ export function KanbanBoard() {
       });
       setColumns(initialColumns);
     }
-    // Ahora, como 'columnOrder' es estable, este useEffect solo se ejecutará cuando 'clientes' cambie.
   }, [clientes]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 10 } }));
@@ -178,7 +172,6 @@ export function KanbanBoard() {
 
       <RejectionReasonModal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); queryClient.invalidateQueries({ queryKey: ['clientes'] }); }} onSubmit={handleRejectionSubmit} isSubmitting={updateClientStage.isPending} />
       
-      {/* --- VISTA DE ESCRITORIO (KANBAN) --- */}
       <div className={cn("hidden md:flex flex-grow transition-opacity", isFetching ? "opacity-50" : "opacity-100")}>
         <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
           <div className="flex gap-4 p-4 h-full items-start overflow-x-auto w-full">
@@ -193,7 +186,6 @@ export function KanbanBoard() {
         </DndContext>
       </div>
 
-      {/* --- VISTA MÓVIL (PESTAÑAS) --- */}
       <div className={cn("md:hidden flex-grow p-2 transition-opacity", isFetching ? "opacity-50" : "opacity-100")}>
         <Tabs defaultValue={columnOrder[0]} className="h-full flex flex-col">
             <TabsList className="w-full overflow-x-auto justify-start">

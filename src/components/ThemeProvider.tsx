@@ -1,4 +1,3 @@
-// src/components/ThemeProvider.tsx
 "use client";
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
@@ -17,7 +16,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("light");
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
 
-  // Aplica la clase .dark en documentElement
   const apply = (t: Theme) => {
     const prefersDark =
       typeof window !== "undefined" &&
@@ -33,7 +31,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setResolvedTheme(isDark ? "dark" : "light");
   };
 
-  // Carga inicial desde localStorage
   useEffect(() => {
     try {
       const saved = localStorage.getItem("theme") as Theme | null;
@@ -50,7 +47,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Escucha cambios en la preferencia del sistema cuando theme === 'system'
   useEffect(() => {
     const mql = window.matchMedia("(prefers-color-scheme: dark)");
 
@@ -64,18 +60,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => mql.removeEventListener("change", listener);
   }, [theme]);
 
-  // Cuando se cambia theme desde UI
   const setTheme = (t: Theme) => {
     setThemeState(t);
     try {
       localStorage.setItem("theme", t);
     } catch {
-      /* ignorar */
     }
     apply(t);
   };
 
-  // 👇 agregado `setTheme` como dependencia para evitar warning
   const value = useMemo(
     () => ({ theme, setTheme, resolvedTheme }),
     [theme, resolvedTheme, setTheme]

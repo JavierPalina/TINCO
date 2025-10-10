@@ -17,8 +17,6 @@ import { createPortal } from 'react-dom';
 import { useDebounce } from 'use-debounce';
 import { useSession } from 'next-auth/react';
 import { TableCellActions } from '@/components/clientes/TableCellActions';
-
-// --- Iconos y Componentes UI ---
 import { Loader2, DollarSign, MoreVertical, Trash2, Paperclip, Mail, LayoutGrid, Columns } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import { CreateQuoteDialog } from '@/components/cotizaciones/CreateQuoteDialog';
@@ -45,12 +43,11 @@ import { toast } from 'sonner';
 import { FaWhatsapp } from 'react-icons/fa';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Skeleton } from "@/components/ui/skeleton"; // Importamos el Skeleton
+import { Skeleton } from "@/components/ui/skeleton";
 import { Client } from '@/types/client';
 import { StageFormModal } from '@/components/cotizaciones/StageFormModal';
 import { IFormField } from '@/types/IFormField';
 
-// --- Tipos de Datos ---
 interface Etapa { _id: string; nombre: string; color: string; }
 interface Cotizacion {
     historialEtapas: { etapa: { _id: string, nombre: string }, fecha: string }[];
@@ -84,7 +81,6 @@ type Columns = Record<string, Cotizacion[]>;
 type ViewMode = 'pipeline' | 'table';
 type StageColorMap = { [key: string]: string };
 
-// --- Componente Skeleton para la Tarjeta de Cotización ---
 function QuoteCardSkeleton() {
     return (
         <div className="mb-2 p-3 border rounded-lg bg-card space-y-3">
@@ -105,8 +101,6 @@ function QuoteCardSkeleton() {
     );
 }
 
-
-// --- Componente: Tarjeta de Cotización ---
 function QuoteCard({ quote, onDelete, stageColors }: { quote: Cotizacion, onDelete: (quoteId: string) => void, stageColors: StageColorMap }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
         id: quote._id, 
@@ -133,7 +127,7 @@ function QuoteCard({ quote, onDelete, stageColors }: { quote: Cotizacion, onDele
     };
 
     const handleWhatsApp = () => {
-        const phone = "5491111111111"; // Reemplazar con teléfono real
+        const phone = "5491111111111";
         const message = encodeURIComponent(`Hola ${quote.cliente?.nombreCompleto}, te escribo por la cotización ${quote.codigo}`);
         window.open(`https://wa.me/${phone}?text=${message}`, "_blank");
     };
@@ -201,7 +195,6 @@ function QuoteCard({ quote, onDelete, stageColors }: { quote: Cotizacion, onDele
     );
 }
 
-// --- Componente: Columna del Pipeline ---
 function QuoteColumn({ id, etapa, quotes, onDelete, stageColors, isFetching }: { 
     id: string; 
     etapa: Etapa; 
@@ -253,7 +246,6 @@ function QuoteColumn({ id, etapa, quotes, onDelete, stageColors, isFetching }: {
     );
 }
 
-// --- Componente para la Vista de Tabla ---
 function QuotesTableView({ quotes, onDelete, stageColors }: { quotes: Cotizacion[]; onDelete: (quoteId: string) => void; stageColors: StageColorMap; }) {
     return (
         <Card>
@@ -309,7 +301,6 @@ function QuotesTableView({ quotes, onDelete, stageColors }: { quotes: Cotizacion
     );
 }
 
-// --- Componente para la Vista de Pipeline ---
 function PipelineView({ etapas, columns, onDelete, sensors, onDragStart, onDragEnd, activeQuote, stageColors, isFetching }: PipelineViewProps) {
     return (
         <>
@@ -376,12 +367,11 @@ function PipelineView({ etapas, columns, onDelete, sensors, onDragStart, onDragE
     );
 }
 
-// --- Componente Principal de la Página ---
 export default function PipelinePage() {
     const [isStageFormModalOpen, setIsStageFormModalOpen] = useState(false);
-    const [formFieldsForStage, setFormFieldsForStage] = useState<IFormField[]>([]); // Almacena los campos del formulario
-    const [quoteToMove, setQuoteToMove] = useState<Cotizacion | null>(null); // Cotización que se va a mover
-    const [newStageId, setNewStageId] = useState<string | null>(null); // Nueva etapa de destino
+    const [formFieldsForStage, setFormFieldsForStage] = useState<IFormField[]>([]);
+    const [quoteToMove, setQuoteToMove] = useState<Cotizacion | null>(null);
+    const [newStageId, setNewStageId] = useState<string | null>(null);
     const { data: session } = useSession();
     const queryClient = useQueryClient();
     const [columns, setColumns] = useState<Columns>({});
@@ -532,7 +522,6 @@ export default function PipelinePage() {
         return;
     }
 
-    // Solo si se mueve entre etapas diferentes
     if (activeContainer !== overContainer) {
         console.log("DND LOG: Intento de movimiento de Etapa a Etapa. Buscando cotización...");
         
@@ -543,16 +532,11 @@ export default function PipelinePage() {
             return; 
         }
 
-        // 1. Buscamos la estructura del formulario de la nueva etapa
         try {
             console.log(`DND LOG: Buscando formulario para la nueva etapa: /api/formularios-etapa/${overContainer}`);
-            
             const { data } = await axios.get(`/api/formularios-etapa/${overContainer}`);
-            
-            // Verificamos si la API devolvió datos esperados.
             console.log("DND LOG: Respuesta de API de formulario (data.data):", data.data);
             
-            // Intentamos acceder a los campos.
             const camposFormulario = data.data?.campos || []; 
             
             console.log(`DND LOG: Campos del formulario encontrados:`, camposFormulario);
@@ -560,18 +544,14 @@ export default function PipelinePage() {
 
 
             if (camposFormulario.length > 0) {
-                // 2. Si hay campos, abrimos el modal.
                 console.log("DND LOG: ✅ ¡FORMULARIO ENCONTRADO! Abriendo modal...");
                 setQuoteToMove(quote);
                 setNewStageId(overContainer);
                 setFormFieldsForStage(camposFormulario);
                 setIsStageFormModalOpen(true); 
             } else {
-                // 3. Si no hay campos, movemos la cotización directamente
                 console.log("DND LOG: ❌ No hay formulario. Moviendo directamente sin modal.");
                 updateQuoteStage.mutate({ quoteId: activeId, newStageId: overContainer });
-                
-                // Lógica de reordenamiento visual inmediato (frontend)
                 const newSourceItems = [...columns[activeContainer]];
                 const newDestItems = [...columns[overContainer]];
                 
@@ -595,7 +575,6 @@ export default function PipelinePage() {
             queryClient.invalidateQueries({ queryKey: ['cotizacionesPipeline'] });
         }
     } else {
-        // Lógica de reordenamiento DENTRO de la misma columna
         const activeIndex = columns[activeContainer].findIndex(q => q._id === activeId);
         const overIndex = columns[overContainer].findIndex(q => q._id === overId);
         
@@ -627,41 +606,38 @@ export default function PipelinePage() {
                     formFields={formFieldsForStage}
                     quoteId={quoteToMove?._id || ''}
                     onSave={async (formData) => {
-        if (quoteToMove && newStageId) {
-            
-            // --- CÓDIGO CRÍTICO PARA EL MOVIMIENTO VISUAL FLUÍDO ---
-            const activeContainer = quoteToMove.etapa._id;
-            const overContainer = newStageId;
-            const quoteId = quoteToMove._id;
-            const newEtapa = etapas?.find(e => e._id === overContainer);
-            const movedQuote = {
-                ...quoteToMove, 
-                etapa: newEtapa || quoteToMove.etapa // Usa la nueva etapa o la etapa original como fallback
-            };
-            
-            setColumns(prev => {
-                const newPrev = {...prev};
-                const newSourceItems = newPrev[activeContainer].filter(q => q._id !== quoteId);
-                const newDestItems = [movedQuote, ...newPrev[overContainer]]; // Mover al inicio
-                
-                return {
-                    ...newPrev,
-                    [activeContainer]: newSourceItems,
-                    [overContainer]: newDestItems,
-                };
-            });
-            // --------------------------------------------------------
-            
-            await updateQuoteWithFormData.mutateAsync({
-                quoteId: quoteToMove._id,
-                newStageId: newStageId,
-                formData
-            });
-            
-            setQuoteToMove(null);
-            setNewStageId(null);
-        }
-    }}
+                        if (quoteToMove && newStageId) {
+                            const activeContainer = quoteToMove.etapa._id;
+                            const overContainer = newStageId;
+                            const quoteId = quoteToMove._id;
+                            const newEtapa = etapas?.find(e => e._id === overContainer);
+                            const movedQuote = {
+                                ...quoteToMove, 
+                                etapa: newEtapa || quoteToMove.etapa
+                            };
+
+                            setColumns(prev => {
+                                const newPrev = {...prev};
+                                const newSourceItems = newPrev[activeContainer].filter(q => q._id !== quoteId);
+                                const newDestItems = [movedQuote, ...newPrev[overContainer]];
+
+                                return {
+                                    ...newPrev,
+                                    [activeContainer]: newSourceItems,
+                                    [overContainer]: newDestItems,
+                                };
+                            });
+
+                            await updateQuoteWithFormData.mutateAsync({
+                                quoteId: quoteToMove._id,
+                                newStageId: newStageId,
+                                formData
+                            });
+
+                            setQuoteToMove(null);
+                            setNewStageId(null);
+                        }
+                    }}
                 />
             </div>
             

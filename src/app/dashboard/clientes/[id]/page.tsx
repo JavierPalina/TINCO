@@ -11,8 +11,6 @@ import { ClientQuotes } from '@/components/clientes/ClientQuotes';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-// --- Interfaces para el Tipado de Datos ---
-
 interface Vendedor {
   _id: string;
   name: string;
@@ -35,23 +33,19 @@ interface InteractionData {
   usuario: Vendedor;
 }
 
-// --- Componente de la Página de Detalle ---
-
 export default function ClienteDetailPage() {
   const params = useParams();
   const clientId = params.id as string;
 
-  // --- Query 1: Obtener los detalles del cliente específico ---
   const { data: cliente, isLoading: isLoadingClient, error: clientError } = useQuery<ClientData>({
     queryKey: ['cliente', clientId],
     queryFn: async () => {
       const { data } = await axios.get(`/api/clientes/${clientId}`);
       return data.data;
     },
-    enabled: !!clientId, // Solo ejecuta la query si el clientId existe
+    enabled: !!clientId,
   });
 
-  // --- Query 2: Obtener las interacciones de ese cliente ---
   const { data: interacciones, isLoading: isLoadingInteractions, error: interactionsError } = useQuery<InteractionData[]>({
     queryKey: ['interacciones', clientId],
     queryFn: async () => {
@@ -71,9 +65,7 @@ export default function ClienteDetailPage() {
 
   return (
     <div className="container mx-auto py-10 grid md:grid-cols-3 gap-8 items-start">
-      {/* Columna Izquierda: Módulos de acción rápida */}
       <div className="md:col-span-1 space-y-8">
-        {/* ---- Tarjeta de Información del Cliente ---- */}
         <Card>
           <CardHeader>
             <CardTitle className="text-3xl">{cliente.nombreCompleto}</CardTitle>
@@ -86,19 +78,14 @@ export default function ClienteDetailPage() {
           </CardContent>
         </Card>
         
-        {/* ---- Módulo de Tareas ---- */}
         <ClientTasks clientId={clientId} />
 
-        {/* ---- Formulario para Añadir Interacción ---- */}
         <AddInteractionForm clientId={clientId} />
       </div>
 
-      {/* Columna Derecha: Módulos de historial y datos */}
       <div className="md:col-span-2 space-y-8">
-        {/* ---- Módulo de Cotizaciones ---- */}
         <ClientQuotes clientId={clientId} />
 
-        {/* ---- Historial de Interacciones ---- */}
         <div>
           <h2 className="text-2xl font-bold mb-4">Historial de Interacciones</h2>
           <div className="space-y-6 border-l-2 border-border pl-6 relative">

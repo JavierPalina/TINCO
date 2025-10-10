@@ -11,7 +11,6 @@ interface Props {
   tasks: Task[];
 }
 
-// Helper para convertir la hora (ej: "09:30") a un porcentaje para el posicionamiento
 const timeToPercentage = (time?: string, startHour = 8, totalHours = 12) => {
   if (!time) return 0;
   const [hour, minute] = time.split(':').map(Number);
@@ -22,7 +21,7 @@ const timeToPercentage = (time?: string, startHour = 8, totalHours = 12) => {
 
 export function TasksTimeline({ tasks }: Props) {
   const startHour = 0;
-  const endHour = 24; // Extendemos hasta las 20:00
+  const endHour = 24;
   const totalHours = endHour - startHour;
   const hours = Array.from({ length: totalHours }, (_, i) => i + startHour);
 
@@ -41,7 +40,6 @@ export function TasksTimeline({ tasks }: Props) {
       </div>
     ) : (
       <div className="flex min-w-[1000px] h-full">
-        {/* Columna izquierda sticky */}
         <div className="w-56 pr-4 border-r bg-muted/20 sticky left-0 z-10">
           <div className="h-12 text-sm font-semibold flex items-center">Asignados</div>
           {tasks.map((task) => (
@@ -125,8 +123,6 @@ export function TasksTimeline({ tasks }: Props) {
                 </TooltipProvider>
               );
             })}
-
-            {/* Líneas de grilla */}
             <div
               className="absolute inset-0 grid -z-10"
               style={{ gridTemplateColumns: `repeat(${totalHours}, 1fr)` }}

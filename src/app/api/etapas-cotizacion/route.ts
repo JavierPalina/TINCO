@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import EtapaCotizacion from '@/models/EtapaCotizacion';
 
-// Obtener todas las etapas
 export async function GET() {
   await dbConnect();
   try {
@@ -13,7 +12,6 @@ export async function GET() {
   }
 }
 
-// Crear una nueva etapa
 export async function POST(request: NextRequest) {
   await dbConnect();
   try {

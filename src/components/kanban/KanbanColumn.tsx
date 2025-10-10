@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { SortableContext, useSortable } from '@dnd-kit/sortable';
 import { ClientCard, ClientCardProps } from './ClientCard';
-import { Users, DollarSign } from 'lucide-react'; // Importamos nuevos iconos
+import { Users, DollarSign } from 'lucide-react';
 
 interface Props {
     id: string;
@@ -14,16 +14,12 @@ interface Props {
 export function KanbanColumn({ id, title, clients }: Props) {
     const { setNodeRef } = useSortable({ id });
     const clientIds = useMemo(() => clients.map(c => c._id), [clients]);
-
-    // --- CÁLCULO DE TOTALES ---
-    // Usamos useMemo para que el cálculo solo se rehaga si la lista de clientes cambia.
     const totalCotizadoEnColumna = useMemo(() => {
         return clients.reduce((sum, client) => sum + (client.ultimaCotizacionMonto || 0), 0);
     }, [clients]);
 
     return (
         <div className="w-80 flex-shrink-0">
-            {/* --- ENCABEZADO DE COLUMNA MEJORADO --- */}
             <div className="p-3 mb-2 rounded-t-lg bg-muted/50 border-b">
                 <div className="flex items-center justify-between">
                     <h2 className="font-semibold text-lg">{title}</h2>
@@ -40,7 +36,6 @@ export function KanbanColumn({ id, title, clients }: Props) {
                 </div>
             </div>
             
-            {/* Cuerpo de la columna (sin cambios) */}
             <div ref={setNodeRef} className="p-2 h-full min-h-[200px] overflow-y-auto bg-muted/50 rounded-b-lg">
                 <SortableContext items={clientIds}>
                     {clients.map(client => (

@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CalendarIcon, Loader2 } from 'lucide-react';
 import { AddTaskDialog } from '@/components/tareas/AddTaskDialog';
 import { TasksTimeline } from '@/components/tareas/TasksTimeline';
-import { TaskItem } from '@/components/tareas/TaskItem'; // Reutilizamos el TaskItem anterior
+import { TaskItem } from '@/components/tareas/TaskItem';
 import { ITarea } from '@/models/Tarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Task } from '@/components/tareas/types';

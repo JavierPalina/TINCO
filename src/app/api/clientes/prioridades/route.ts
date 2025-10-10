@@ -10,10 +10,8 @@ export async function GET() {
 
   await dbConnect();
   try {
-    // Usamos el método distinct() de MongoDB para obtener valores únicos
     const prioridades = await Cliente.distinct('prioridad');
     
-    // Filtramos cualquier valor nulo o vacío que pueda existir
     const filteredPrioridades = prioridades.filter(p => p);
 
     return NextResponse.json({ success: true, data: filteredPrioridades });

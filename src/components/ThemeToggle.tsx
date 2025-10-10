@@ -1,4 +1,3 @@
-// src/components/ThemeToggle.tsx
 "use client";
 
 import React from "react";
@@ -8,7 +7,6 @@ export default function ThemeToggle() {
   const { theme, setTheme, resolvedTheme } = useTheme();
 
   const next = () => {
-    // cicla: system -> dark -> light -> system
     if (theme === "system") setTheme("dark");
     else if (theme === "dark") setTheme("light");
     else setTheme("system");

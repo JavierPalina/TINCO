@@ -16,7 +16,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 
-// Interfaces
 interface Task {
   _id: string;
   titulo: string;
@@ -33,7 +32,6 @@ export function ClientTasks({ clientId }: { clientId: string }) {
   const queryClient = useQueryClient();
   const { register, handleSubmit, control, reset } = useForm<NewTaskForm>();
 
-  // --- QUERY para obtener las tareas de este cliente ---
   const { data: tasks, isLoading } = useQuery<Task[]>({
     queryKey: ['tasks', clientId],
     queryFn: async () => {
@@ -42,7 +40,6 @@ export function ClientTasks({ clientId }: { clientId: string }) {
     },
   });
 
-  // --- MUTATION para crear una nueva tarea ---
   const addTaskMutation = useMutation({
     mutationFn: (newTask: NewTaskForm & { cliente: string }) => {
       return axios.post('/api/tareas', newTask);
@@ -53,7 +50,6 @@ export function ClientTasks({ clientId }: { clientId: string }) {
     },
   });
 
-  // --- MUTATION para actualizar una tarea (marcar como completada) ---
   const updateTaskMutation = useMutation({
     mutationFn: ({ taskId, completada }: { taskId: string; completada: boolean }) => {
       return axios.put(`/api/tareas/${taskId}`, { completada });
@@ -73,7 +69,6 @@ export function ClientTasks({ clientId }: { clientId: string }) {
         <CardTitle>Tareas Pendientes</CardTitle>
       </CardHeader>
       <CardContent>
-        {/* Formulario para añadir nueva tarea */}
         <form onSubmit={handleSubmit(onSubmit)} className="flex items-start gap-2 mb-6">
           <Input {...register('titulo', { required: true })} placeholder="Nueva tarea..." className="flex-grow" />
           <Controller
@@ -97,7 +92,6 @@ export function ClientTasks({ clientId }: { clientId: string }) {
           </Button>
         </form>
 
-        {/* Lista de tareas */}
         <div className="space-y-4">
           {isLoading && <p>Cargando tareas...</p>}
           {tasks?.map((task) => (

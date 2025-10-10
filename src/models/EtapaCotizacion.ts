@@ -16,7 +16,7 @@ const EtapaCotizacionSchema: Schema = new Schema({
     type: String,
     required: true,
     trim: true,
-    default: '#cccccc', // Un color gris por defecto
+    default: '#cccccc',
   },
 }, {
   timestamps: true

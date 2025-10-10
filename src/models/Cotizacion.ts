@@ -1,6 +1,5 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
 
-// Interface for the stage history with form data
 export interface IHistorialEtapas {
   etapa: Types.ObjectId;
   fecha: Date;
@@ -23,7 +22,6 @@ export interface ICotizacion extends Document {
 const HistorialEtapasSchema: Schema = new Schema({
     etapa: { type: Schema.Types.ObjectId, ref: 'EtapaCotizacion', required: true },
     fecha: { type: Date, default: Date.now },
-    // Cambio a Object para mayor compatibilidad
     datosFormulario: { type: Object, default: {} },
 }, { _id: false });
 

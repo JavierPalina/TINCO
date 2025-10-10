@@ -5,7 +5,7 @@ import { useForm, SubmitHandler, Controller } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import axios from 'axios';
-import { toast } from 'sonner'; // <-- 1. Importar toast
+import { toast } from 'sonner';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -49,7 +49,6 @@ export function AddClientDialog({ prioridadesOptions }: { prioridadesOptions: st
     mutationFn: (newClient: FormInputs & { vendedorAsignado: string }) => {
       return axios.post('/api/clientes', newClient);
     },
-    // --- 2. AÑADIR ESTOS CALLBACKS ---
     onSuccess: (data) => {
       toast.success(`Cliente "${data.data.data.nombreCompleto}" creado con éxito.`);
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
@@ -64,7 +63,6 @@ export function AddClientDialog({ prioridadesOptions }: { prioridadesOptions: st
   });
 
   const onSubmit: SubmitHandler<FormInputs> = (data) => {
-    // AÑADE ESTA LÍNEA PARA VER LOS DATOS EN LA CONSOLA DEL NAVEGADOR
     console.log("Datos enviados a la API:", data); 
 
     if (!session?.user?.id) return alert("You must be logged in.");
@@ -90,7 +88,6 @@ export function AddClientDialog({ prioridadesOptions }: { prioridadesOptions: st
               <DialogDescription>Completa la información para registrar un nuevo prospecto.</DialogDescription>
             </DialogHeader>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-              {/* --- The form fields remain the same --- */}
               <h3 className="md:col-span-2 font-semibold text-lg border-b pb-2">Información de Contacto</h3>
               <div className="space-y-2"><Label>Nombre Completo *</Label><Input {...register("nombreCompleto", { required: true })} /></div>
               <div className="space-y-2"><Label>Teléfono *</Label><Input {...register("telefono", { required: true })} /></div>

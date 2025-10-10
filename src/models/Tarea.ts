@@ -2,11 +2,11 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface ITarea extends Document {
   titulo: string;
-  descripcion?: string; // <-- NUEVO
-  prioridad: 'Alta' | 'Media' | 'Baja'; // <-- NUEVO
-  fechaVencimiento: Date; // Representará el DÍA de la tarea
-  horaInicio?: string; // <-- NUEVO (ej. "09:00")
-  horaFin?: string;    // <-- NUEVO (ej. "11:30")
+  descripcion?: string;
+  prioridad: 'Alta' | 'Media' | 'Baja';
+  fechaVencimiento: Date;
+  horaInicio?: string;
+  horaFin?: string;
   completada: boolean;
   cliente?: mongoose.Schema.Types.ObjectId;
   vendedorAsignado: mongoose.Schema.Types.ObjectId;

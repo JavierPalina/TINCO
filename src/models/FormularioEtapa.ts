@@ -1,13 +1,11 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-// Interface para los campos dentro del formulario
 export interface ICampoFormulario {
   titulo: string;
   tipo: 'texto' | 'seleccion' | 'numero' | 'fecha';
-  opciones?: string[]; // Solo para el tipo 'seleccion'
+  opciones?: string[];
 }
 
-// Interface para el documento del formulario de etapa
 export interface IFormularioEtapa extends Document {
   etapaId: mongoose.Schema.Types.ObjectId;
   campos: ICampoFormulario[];
@@ -16,7 +14,7 @@ export interface IFormularioEtapa extends Document {
 const FormularioEtapaSchema: Schema = new Schema({
   etapaId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'EtapaCotizacion', // Referencia al modelo de EtapaCotizacion
+    ref: 'EtapaCotizacion',
     required: true,
     unique: true,
   },

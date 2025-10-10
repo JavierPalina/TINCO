@@ -3,7 +3,7 @@
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { toast } from "sonner"; // <-- 1. Import the toast function
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -47,7 +47,6 @@ export function CompanyDataDialog({ client, isOpen, onOpenChange, getValues, set
       if (!client._id) throw new Error("Client ID is missing");
       return axios.put(`/api/clientes/${client._id}`, data);
     },
-    // --- 2. THIS IS THE KEY CHANGE ---
     onSuccess: () => {
       toast.success("Datos de la empresa actualizados");
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
@@ -61,14 +60,11 @@ export function CompanyDataDialog({ client, isOpen, onOpenChange, getValues, set
 
   const onSubmit: SubmitHandler<CompanyFormInputs> = (data) => {
     if (client._id) {
-      // If editing an existing client, call the API
       mutation.mutate(data);
     } else {
-      // If creating a new client, update the parent form's state
       Object.entries(data).forEach(([key, value]) => {
         setValue(key as keyof CompanyFormInputs, value);
       });
-      // --- 3. ADD FEEDBACK FOR NEW CLIENTS ---
       toast.info("Datos de la empresa guardados temporalmente");
       onOpenChange(false);
     }

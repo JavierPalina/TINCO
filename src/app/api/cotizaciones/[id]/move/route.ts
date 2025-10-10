@@ -18,7 +18,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         return NextResponse.json({ success: false, error: 'Invalid quote ID.' }, { status: 400 });
     }
 
-    // Validamos y obtenemos el ObjectId de la etapa de destino
     if (!etapa || !ObjectId.isValid(etapa)) {
         console.warn('[API] ⚠️ Invalid or missing target stage ID.');
         return NextResponse.json({ success: false, error: 'Target stage ID is invalid or missing.' }, { status: 400 });
@@ -26,7 +25,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const etapaObjectId = new mongoose.Types.ObjectId(etapa);
 
     try {
-        // Corregido: Obtenemos el documento y lo asertamos a ICotizacion.
         const cotizacion = await Cotizacion.findById(id) as ICotizacion;
         if (!cotizacion) {
             console.warn('[API] ⚠️ Quote not found:', id);
@@ -35,11 +33,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         
         console.log('[API] 📦 Fetched document:', JSON.stringify(cotizacion.toObject()));
 
-        // Creamos un objeto plano de los datos del historial
         const plainHistorial = historial === undefined ? {} : JSON.parse(JSON.stringify(historial));
         console.log('[API] 🛠️ Normalized history data:', JSON.stringify(plainHistorial));
 
-        // Creamos el nuevo objeto de historial. Ahora 'etapa' no puede ser 'undefined'.
         const newHistItem = {
             etapa: etapaObjectId,
             fecha: new Date(),
@@ -47,10 +43,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         };
         console.log('[API] 📝 New history item:', JSON.stringify(newHistItem));
 
-        // Actualizamos la etapa principal de la cotización
         cotizacion.etapa = etapaObjectId;
         
-        // Agregamos el nuevo elemento al array y marcamos como modificado
         cotizacion.historialEtapas.push(newHistItem);
         cotizacion.markModified('historialEtapas');
 
@@ -59,7 +53,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         await cotizacion.save();
         console.log('[API] ✅ Document saved successfully.');
 
-        // Re-fetch el documento para confirmar el guardado
         const refreshed = await Cotizacion.findById(id).lean() as ICotizacion | null;
         console.log('[API] ✨ Final document from DB:', JSON.stringify(refreshed?.historialEtapas));
 

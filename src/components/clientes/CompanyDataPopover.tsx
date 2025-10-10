@@ -3,7 +3,7 @@
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { toast } from "sonner"; // <-- 1. Importar la función toast
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Building2 } from 'lucide-react';
@@ -39,12 +39,10 @@ export function CompanyDataPopover({ client }: { client: Client }) {
     mutationFn: (data: CompanyFormInputs) => {
       return axios.put(`/api/clientes/${client._id}`, data);
     },
-    // --- 2. AÑADIR ESTOS CALLBACKS ---
     onSuccess: () => {
       toast.success("Datos de la empresa actualizados");
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
       queryClient.invalidateQueries({ queryKey: ['cliente', client._id] });
-      // El Popover se cierra solo al hacer clic fuera, así que no necesitamos manejarlo
     },
     onError: (error) => {
       toast.error("Error al actualizar", {

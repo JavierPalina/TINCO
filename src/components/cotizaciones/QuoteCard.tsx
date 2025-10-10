@@ -16,7 +16,6 @@ import { Client } from '@/types/client';
 import { Loader2, DollarSign, MoreVertical, Trash2, Paperclip, Mail, LayoutGrid, Columns } from 'lucide-react';
 import { FaWhatsapp } from 'react-icons/fa';
 
-// Tipos
 type StageColorMap = { [key: string]: string };
 
 interface Etapa { _id: string; nombre: string; color: string; }
@@ -62,7 +61,7 @@ function QuoteCard({ quote, onDelete, stageColors }: { quote: Cotizacion, onDele
     };
 
     const handleWhatsApp = () => {
-        const phone = "5491111111111"; // Reemplazar con teléfono real
+        const phone = "5491111111111";
         const message = encodeURIComponent(`Hola ${quote.cliente?.nombreCompleto}, te escribo por la cotización ${quote.codigo}`);
         window.open(`https://wa.me/${phone}?text=${message}`, "_blank");
     };

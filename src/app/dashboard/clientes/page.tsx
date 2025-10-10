@@ -28,24 +28,20 @@ import { cn } from '@/lib/utils';
 import { ClientMobileCard } from '@/components/clientes/ClientMobileCard';
 
 const formatAndTruncate = (text: string | null | undefined, maxLength: number): string => {
-  // Si el texto no existe, devuelve un guion.
   if (!text || typeof text !== 'string') {
     return '-';
   }
 
-  // 1. Pone en mayúscula la inicial de cada palabra (Title Case)
   const formattedText = text
     .toLowerCase()
     .split(' ')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 
-  // 2. Si es más largo que maxLength, lo corta y añade "..."
   if (formattedText.length > maxLength) {
     return formattedText.substring(0, maxLength).trim() + '...';
   }
 
-  // Si no, devuelve el texto formateado
   return formattedText;
 };
 

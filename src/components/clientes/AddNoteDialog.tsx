@@ -18,7 +18,6 @@ export function AddNoteDialog({ client, isOpen, onOpenChange }: Props) {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    // The data sent to axios.post must be an object like { contenido: "..." }
     mutationFn: (data: FormInputs) => axios.post(`/api/clientes/${client._id}/notas`, data),
     onSuccess: () => {
       toast.success("Nota añadida con éxito.");

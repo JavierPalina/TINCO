@@ -7,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 
-// Tipos para los datos del formulario
 export interface RejectionFormData {
   motivoRechazo: string;
   detalleRechazo?: string;

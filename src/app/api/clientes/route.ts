@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'; 
 import dbConnect from '@/lib/dbConnect';
 import Cliente from '@/models/Cliente';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/authOptions';
+
 
 export async function GET(request: NextRequest) {
   await dbConnect();
@@ -85,10 +88,18 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 });
+  }
   await dbConnect();
   try {
     const body = await request.json();
-    const cliente = await Cliente.create(body);
+    const clienteData = {
+      ...body,
+      vendedorAsignado: session.user.id,
+    };
+    const cliente = await Cliente.create(clienteData);
     
     return NextResponse.json({ success: true, data: cliente }, { status: 201 });
   } catch (error) {

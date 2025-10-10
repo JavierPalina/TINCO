@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Task } from '@/components/tareas/types';
 
-// This interface now matches the object returned by the API
 interface TasksData {
   hoy: Task[];
   vencidas: Task[];
@@ -17,21 +16,17 @@ interface TasksData {
   completadas: Task[];
 }
 
-// The query function remains the same, but we expect a TasksData object
 const getMyTasks = async (): Promise<TasksData> => {
   const { data } = await axios.get('/api/tareas');
   return data.data;
 };
 
 export function NotificationBell() {
-  // Update the type parameter for useQuery
   const { data: tasksData } = useQuery<TasksData>({
-    queryKey: ['tasks'], // Using a generic key is fine for the bell
+    queryKey: ['tasks'],
     queryFn: getMyTasks,
   });
 
-  // --- THIS IS THE FIX ---
-  // Combine the 'vencidas' and 'hoy' arrays to get all urgent tasks
   const urgentTasks = [
     ...(tasksData?.vencidas || []),
     ...(tasksData?.hoy || []),

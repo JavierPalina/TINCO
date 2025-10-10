@@ -8,13 +8,11 @@ if (!MONGODB_URI) {
   );
 }
 
-// Define a type for our cached connection on the global object
 interface MongooseCache {
   conn: Mongoose | null;
   promise: Promise<Mongoose> | null;
 }
 
-// Type assertion for the global object
 const globalWithMongoose = global as typeof globalThis & {
     mongoose: MongooseCache;
 };

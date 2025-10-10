@@ -5,7 +5,6 @@ import dbConnect from '@/lib/dbConnect';
 import Nota from '@/models/Nota';
 import User from '@/models/User';
 
-// --- GET: Obtener todas las notas de un cliente ---
 export async function GET(
   request: NextRequest, 
   { params }: { params: Promise<{ id: string }> }
@@ -13,12 +12,12 @@ export async function GET(
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse('No autorizado', { status: 401 });
 
-  const { id } = await params; // Se aplica el await aquí
+  const { id } = await params;
   await dbConnect();
   try {
-    void User; // asegura que el modelo esté cargado, sin warning
+    void User;
 
-    const notas = await Nota.find({ cliente: id }) // Se usa el 'id' resuelto
+    const notas = await Nota.find({ cliente: id })
       .populate('usuario', 'name')
       .sort({ createdAt: -1 });
       
@@ -29,7 +28,6 @@ export async function GET(
   }
 }
 
-// --- POST: Crear una nueva nota para un cliente ---
 export async function POST(
   request: NextRequest, 
   { params }: { params: Promise<{ id: string }> }
@@ -46,7 +44,7 @@ export async function POST(
   await dbConnect();
 
   try {
-    const { id } = await params; // Se aplica el await aquí
+    const { id } = await params;
     console.log("1. ID de Cliente recibido de la URL:", id);
     if (!id) {
       return NextResponse.json({ success: false, error: 'El ID del cliente es requerido en la URL' }, { status: 400 });

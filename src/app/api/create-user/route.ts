@@ -7,7 +7,10 @@ export async function POST(request: Request) {
   await dbConnect();
 
   try {
-    const { name, email, password, rol } = await request.json();
+    const { 
+      name, email, password, rol, 
+      personalData, contactData, laboralData, financieraLegalData
+    } = await request.json();
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -20,7 +23,11 @@ export async function POST(request: Request) {
       name,
       email,
       password: hashedPassword,
-      rol, 
+      rol,
+      personalData,
+      contactData,
+      laboralData,
+      financieraLegalData
     });
 
     return NextResponse.json({ message: 'Usuario creado con éxito', user }, { status: 201 });

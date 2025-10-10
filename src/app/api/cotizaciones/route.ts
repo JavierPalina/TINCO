@@ -7,8 +7,8 @@ import Tarea from '@/models/Tarea';
 import Cliente from '@/models/Cliente';
 import { addDays, startOfDay, endOfDay, parseISO } from 'date-fns';
 import mongoose from 'mongoose';
+import EtapaCotizacion from '@/models/EtapaCotizacion';
 
-// --- GET: Obtener todas las cotizaciones con filtros y datos populados ---
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse('No autorizado', { status: 401 });
@@ -34,8 +34,7 @@ export async function GET(request: NextRequest) {
 
     const pipeline: mongoose.PipelineStage[] = [
       { $match: matchFilter },
-      { $sort: { createdAt: -1 } }, // Ordenar antes para que los lookups sean sobre datos ordenados
-      // --- Lógica para popular el historial ---
+      { $sort: { createdAt: -1 } },
       { $unwind: { path: "$historialEtapas", preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
@@ -58,7 +57,6 @@ export async function GET(request: NextRequest) {
           newRoot: { $mergeObjects: [ "$doc", { historialEtapas: "$historialEtapas" } ] }
         }
       },
-      // --- Fin lógica de historial ---
       { $lookup: { from: 'clientes', localField: 'cliente', foreignField: '_id', as: 'clienteInfo' } },
       { $unwind: { path: "$clienteInfo", preserveNullAndEmptyArrays: true } },
       { $lookup: { from: 'etapacotizacions', localField: 'etapa', foreignField: '_id', as: 'etapaInfo' } },
@@ -123,7 +121,16 @@ export async function POST(request: NextRequest) {
   await dbConnect();
   try {
     const body = await request.json();
-    const { cliente: clienteId, etapa: etapaId, montoTotal, detalle, archivos } = body;
+    const { cliente: clienteId, tipoAbertura, comoNosConocio } = body;
+
+    let etapaInicial = await EtapaCotizacion.findOne({ nombre: new RegExp('^contacto inicial$', 'i') });
+    if (!etapaInicial) {
+      etapaInicial = await EtapaCotizacion.findOne().sort({ createdAt: 1 });
+    }
+    if (!etapaInicial) {
+      throw new Error('No se encontró una etapa inicial para la cotización. Por favor, crea al menos una etapa.');
+    }
+    const etapaId = etapaInicial._id;
 
     const ultimaCotizacion = await Cotizacion.findOne().sort({ createdAt: -1 });
     let nuevoCodigo = 'COT-001';
@@ -131,13 +138,15 @@ export async function POST(request: NextRequest) {
       const ultimoNumero = parseInt(ultimaCotizacion.codigo.split('-')[1]);
       nuevoCodigo = `COT-${(ultimoNumero + 1).toString().padStart(3, '0')}`;
     }
+    
+    const detalle = `Tipo de Abertura: ${tipoAbertura || 'No especificado'}\n | Cómo nos conoció: ${comoNosConocio || 'No especificado'}`;
 
     const nuevaCotizacion = await Cotizacion.create({
       cliente: clienteId,
       etapa: etapaId,
-      montoTotal,
+      montoTotal: 0,
       detalle,
-      archivos,
+      archivos: [],
       vendedor: session.user.id,
       codigo: nuevoCodigo,
       historialEtapas: [{ etapa: etapaId, fecha: new Date() }],

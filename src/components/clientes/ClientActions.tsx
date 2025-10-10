@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, forwardRef } from 'react'; // <-- Import forwardRef
+import { useState, forwardRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -12,7 +12,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { EditClientDialog } from './EditClientDialog';
 import { Client } from '@/types/client';
 
-// Define the CSV Headers here
 const csvHeaders = [
     { label: "Nombre Completo", key: "nombreCompleto" },
     { label: "Teléfono", key: "telefono" },
