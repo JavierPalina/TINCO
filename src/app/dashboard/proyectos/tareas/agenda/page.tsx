@@ -49,6 +49,42 @@ const ALL_VALUE = "__all";
 
 type AgendaStatusKey = "finalizado" | "iniciado" | "sin-iniciar";
 
+// Tipos mínimos para las subestructuras que usamos
+type AsignadoARef =
+  | {
+      name?: string;
+      _id?: string;
+    }
+  | string
+  | null
+  | undefined;
+
+interface VisitaTecnicaLite {
+  estadoTareaVisita?: string;
+  fechaVisita?: string | Date | null;
+  horaVisita?: string | null;
+  asignadoA?: AsignadoARef;
+  direccion?: string;
+  entrecalles?: string;
+  tipoVisita?: string;
+}
+
+interface ClienteLite {
+  nombreCompleto?: string;
+  telefono?: string;
+  direccion?: string;
+}
+
+interface VendedorLite {
+  name?: string;
+}
+
+type ProyectoLite = IProyecto & {
+  visitaTecnica?: VisitaTecnicaLite;
+  cliente?: ClienteLite | string | null;
+  vendedor?: VendedorLite | string | null;
+};
+
 type AgendaEvent = {
   dateKey: string;
   date: Date;
@@ -74,7 +110,9 @@ async function fetchProyectosVisitaTecnica(): Promise<IProyecto[]> {
 
 const dateKeyFromDate = (d: Date) => d.toISOString().slice(0, 10);
 
-function getAgendaStatus(vt: any): {
+function getAgendaStatus(
+  vt: VisitaTecnicaLite | null | undefined,
+): {
   key: AgendaStatusKey;
   label: string;
   bgClass: string;
@@ -143,7 +181,34 @@ function startOfDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 function endOfDay(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    23,
+    59,
+    59,
+    999,
+  );
+}
+
+// Helpers para refs populadas
+function toClienteLite(
+  ref: ClienteLite | string | null | undefined,
+): ClienteLite {
+  return ref && typeof ref === "object" ? ref : {};
+}
+
+function toVendedorLite(
+  ref: VendedorLite | string | null | undefined,
+): VendedorLite {
+  return ref && typeof ref === "object" ? ref : {};
+}
+
+function getTecnicoNombre(asignadoA: AsignadoARef): string {
+  if (!asignadoA) return "Sin asignar";
+  if (typeof asignadoA === "string") return asignadoA;
+  return asignadoA.name || "Sin asignar";
 }
 
 export default function AgendaVisitaTecnicaPage() {
@@ -187,29 +252,27 @@ export default function AgendaVisitaTecnicaPage() {
     const list: AgendaEvent[] = [];
     if (!proyectos) return list;
 
-    for (const proyecto of proyectos) {
-      const vt: any = (proyecto as any).visitaTecnica;
+    for (const proyectoBase of proyectos as ProyectoLite[]) {
+      const vt = proyectoBase.visitaTecnica;
       if (!vt) continue;
 
-      const tieneTecnico = Boolean(
-        vt.asignadoA?.name ||
-          typeof vt.asignadoA === "string" ||
-          vt.asignadoA?._id,
-      );
-      if (!tieneTecnico || !vt.fechaVisita || !vt.horaVisita) continue;
+      const asignadoA = vt.asignadoA;
+      const hasTecnico =
+        typeof asignadoA === "string"
+          ? asignadoA.trim().length > 0
+          : Boolean(asignadoA && (asignadoA.name || asignadoA._id));
+
+      if (!hasTecnico || !vt.fechaVisita || !vt.horaVisita) continue;
 
       const fecha = new Date(vt.fechaVisita);
       if (Number.isNaN(fecha.getTime())) continue;
 
       const dateKey = dateKeyFromDate(fecha);
 
-      const tecnicoNombre =
-        vt.asignadoA?.name ||
-        (typeof vt.asignadoA === "string" && vt.asignadoA) ||
-        "Sin asignar";
+      const tecnicoNombre = getTecnicoNombre(asignadoA);
 
-      const cliente: any = (proyecto as any).cliente || {};
-      const clienteNombre = cliente?.nombreCompleto || "Sin nombre";
+      const clienteLite = toClienteLite(proyectoBase.cliente);
+      const clienteNombre = clienteLite.nombreCompleto || "Sin nombre";
 
       const status = getAgendaStatus(vt);
 
@@ -217,7 +280,7 @@ export default function AgendaVisitaTecnicaPage() {
         dateKey,
         date: fecha,
         horaVisita: vt.horaVisita,
-        proyecto,
+        proyecto: proyectoBase,
         tecnicoNombre,
         clienteNombre,
         estadoTareaVisita: vt.estadoTareaVisita,
@@ -240,7 +303,7 @@ export default function AgendaVisitaTecnicaPage() {
   }, [allEvents]);
 
   // 2) Aplicamos filtros / búsqueda
-  const filteredEvents = useMemo(() => {
+  const filteredEvents = useMemo<AgendaEvent[]>(() => {
     if (!allEvents.length) return [];
 
     const q = searchTerm.trim().toLowerCase();
@@ -250,10 +313,10 @@ export default function AgendaVisitaTecnicaPage() {
     const to = dateRange?.to ? endOfDay(dateRange.to) : null;
 
     return allEvents.filter((ev) => {
-      const proyecto: any = ev.proyecto;
-      const vt: any = (proyecto as any).visitaTecnica || {};
-      const cliente: any = proyecto.cliente || {};
-      const vendedor: any = proyecto.vendedor || {};
+      const proyecto = ev.proyecto as ProyectoLite;
+      const vt = proyecto.visitaTecnica ?? {};
+      const cliente = toClienteLite(proyecto.cliente);
+      const vendedor = toVendedorLite(proyecto.vendedor);
 
       // Filtro por estado (Finalizado / Iniciado / Sin iniciar)
       if (estadoFilter !== ALL_VALUE && ev.statusKey !== estadoFilter) {
@@ -272,10 +335,10 @@ export default function AgendaVisitaTecnicaPage() {
       // Filtro "Cliente u Obra"
       if (clienteObra) {
         const textoClienteObra = [
-          cliente?.nombreCompleto,
-          cliente?.direccion,
-          vt?.direccion,
-          vt?.entrecalles,
+          cliente.nombreCompleto,
+          cliente.direccion,
+          vt.direccion,
+          vt.entrecalles,
         ]
           .filter(Boolean)
           .join(" ")
@@ -290,12 +353,12 @@ export default function AgendaVisitaTecnicaPage() {
       if (q) {
         const textoGlobal = [
           ev.clienteNombre,
-          cliente?.telefono,
-          cliente?.direccion,
+          cliente.telefono,
+          cliente.direccion,
           proyecto.numeroOrden,
           proyecto.estadoActual,
-          vendedor?.name,
-          vt?.tipoVisita,
+          vendedor.name,
+          vt.tipoVisita,
         ]
           .filter(Boolean)
           .join(" ")
@@ -335,8 +398,7 @@ export default function AgendaVisitaTecnicaPage() {
 
   // Eventos del día seleccionado (para "Ver más...")
   const selectedDayEvents = useMemo(
-    () =>
-      selectedDayKey ? eventsByDate[selectedDayKey] || [] : [],
+    () => (selectedDayKey ? eventsByDate[selectedDayKey] || [] : []),
     [selectedDayKey, eventsByDate],
   );
 
@@ -564,7 +626,7 @@ export default function AgendaVisitaTecnicaPage() {
                         mode="range"
                         selected={dateRange}
                         onSelect={setDateRange}
-                        numberOfMonths={1}   // un solo mes
+                        numberOfMonths={1} // un solo mes
                         initialFocus
                       />
                     </PopoverContent>
@@ -659,12 +721,11 @@ export default function AgendaVisitaTecnicaPage() {
             {monthMatrix.map((week, wIdx) =>
               week.map((date, dIdx) => {
                 if (!date) {
-                  return (
+                  return
                     <div
                       key={`empty-${wIdx}-${dIdx}`}
                       className="border-b border-r min-h-[110px] bg-background/40"
-                    />
-                  );
+                    />;
                 }
 
                 const key = dateKeyFromDate(date);
@@ -698,69 +759,70 @@ export default function AgendaVisitaTecnicaPage() {
                     </div>
 
                     {/* eventos del día */}
-                    {events.length > 0 && (() => {
-                      const MAX_EVENTS = 5;
-                      const visibleEvents = events.slice(0, MAX_EVENTS);
-                      const hasMore = events.length > MAX_EVENTS;
+                    {events.length > 0 &&
+                      (() => {
+                        const MAX_EVENTS = 5;
+                        const visibleEvents = events.slice(0, MAX_EVENTS);
+                        const hasMore = events.length > MAX_EVENTS;
 
-                      return (
-                        <div className="px-1 pb-1 flex flex-col gap-1.5 max-h-[110px] overflow-y-auto">
-                          {visibleEvents.map((ev) => (
-                            <button
-                              key={`${ev.proyecto._id}-${ev.horaVisita}`}
-                              type="button"
-                              onClick={() => {
-                                setProyectoSeleccionado(ev.proyecto);
-                                if (ev.proyecto.estadoActual === "Medición") {
-                                  setViewStage("medicion");
-                                } else if (
-                                  ev.proyecto.estadoActual === "Verificación"
-                                ) {
-                                  setViewStage("verificacion");
-                                } else {
-                                  setViewStage("visitaTecnica");
-                                }
-                              }}
-                              className={cn(
-                                "w-full rounded-md px-2 py-1 text-left text-[11px] text-white shadow-sm flex flex-col gap-0.5 hover:brightness-110 transition",
-                                ev.statusBgClass,
-                              )}
-                            >
-                              <div className="flex items-center justify-between gap-1">
-                                <span className="inline-flex items-center gap-1 font-semibold">
-                                  <Clock className="h-3 w-3" />
-                                  {ev.horaVisita}
-                                </span>
-                                <span className="truncate font-medium">
-                                  {ev.clienteNombre}
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between gap-1 opacity-90">
-                                <span className="inline-flex items-center gap-1 truncate">
-                                  <UserIcon className="h-3 w-3" />
-                                  {ev.tecnicoNombre}
-                                </span>
-                                {ev.statusLabel && (
-                                  <span className="text-[10px] font-medium">
-                                    {ev.statusLabel}
-                                  </span>
+                        return (
+                          <div className="px-1 pb-1 flex flex-col gap-1.5 max-h-[110px] overflow-y-auto">
+                            {visibleEvents.map((ev) => (
+                              <button
+                                key={`${ev.proyecto._id}-${ev.horaVisita}`}
+                                type="button"
+                                onClick={() => {
+                                  setProyectoSeleccionado(ev.proyecto);
+                                  if (ev.proyecto.estadoActual === "Medición") {
+                                    setViewStage("medicion");
+                                  } else if (
+                                    ev.proyecto.estadoActual === "Verificación"
+                                  ) {
+                                    setViewStage("verificacion");
+                                  } else {
+                                    setViewStage("visitaTecnica");
+                                  }
+                                }}
+                                className={cn(
+                                  "w-full rounded-md px-2 py-1 text-left text-[11px] text-white shadow-sm flex flex-col gap-0.5 hover:brightness-110 transition",
+                                  ev.statusBgClass,
                                 )}
-                              </div>
-                            </button>
-                          ))}
+                              >
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className="inline-flex items-center gap-1 font-semibold">
+                                    <Clock className="h-3 w-3" />
+                                    {ev.horaVisita}
+                                  </span>
+                                  <span className="truncate font-medium">
+                                    {ev.clienteNombre}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-1 opacity-90">
+                                  <span className="inline-flex items-center gap-1 truncate">
+                                    <UserIcon className="h-3 w-3" />
+                                    {ev.tecnicoNombre}
+                                  </span>
+                                  {ev.statusLabel && (
+                                    <span className="text-[10px] font-medium">
+                                      {ev.statusLabel}
+                                    </span>
+                                  )}
+                                </div>
+                              </button>
+                            ))}
 
-                          {hasMore && (
-                            <button
-                              type="button"
-                              onClick={() => setSelectedDayKey(key)}
-                              className="mt-1 text-[10px] font-medium text-primary underline-offset-2 hover:underline text-left px-1"
-                            >
-                              Ver más...
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })()}
+                            {hasMore && (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedDayKey(key)}
+                                className="mt-1 text-[10px] font-medium text-primary underline-offset-2 hover:underline text-left px-1"
+                              >
+                                Ver más...
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                     {events.length === 0 && (
                       <div className="px-2 pb-3 text-[10px] text-muted-foreground/60">
@@ -878,7 +940,9 @@ export default function AgendaVisitaTecnicaPage() {
                       setProyectoSeleccionado(ev.proyecto);
                       if (ev.proyecto.estadoActual === "Medición") {
                         setViewStage("medicion");
-                      } else if (ev.proyecto.estadoActual === "Verificación") {
+                      } else if (
+                        ev.proyecto.estadoActual === "Verificación"
+                      ) {
                         setViewStage("verificacion");
                       } else {
                         setViewStage("visitaTecnica");

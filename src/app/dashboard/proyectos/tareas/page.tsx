@@ -67,15 +67,7 @@ import { VisitaTecnicaView } from "@/components/proyectos/VisitaTecnicaView";
 import VerificacionFormModal from "@/components/proyectos/FormVerificacion";
 import { VerificacionView } from "@/components/proyectos/VerificacionView";
 
-// --- FETCH SOLO VISITA TÉCNICA / MEDICIÓN / VERIFICACIÓN ---
-async function fetchProyectosVisitaTecnica(): Promise<IProyecto[]> {
-  const { data } = await axios.get("/api/proyectos", {
-    params: {
-      estados: "Visita Técnica,Medición,Verificación",
-    },
-  });
-  return data.data;
-}
+// --- Tipos auxiliares para evitar any ---
 
 type DestinoEstado =
   | "Medición"
@@ -84,6 +76,61 @@ type DestinoEstado =
   | "Depósito"
   | "Logística";
 
+type AsignadoARef =
+  | {
+      name?: string;
+      _id?: string;
+    }
+  | string
+  | null
+  | undefined;
+
+interface VisitaTecnicaLite {
+  asignadoA?: AsignadoARef;
+  fechaVisita?: string | Date | null;
+  horaVisita?: string | null;
+  direccion?: string;
+  entrecalles?: string;
+  estadoObra?: string;
+  tipoVisita?: string;
+  recomendacionTecnica?: string;
+  condicionVanos?: string[];
+  tipoAberturaMedida?: string;
+  materialSolicitado?: string;
+}
+
+interface ClienteLite {
+  nombreCompleto?: string;
+  telefono?: string;
+  email?: string;
+  direccion?: string;
+}
+
+interface VendedorLite {
+  name?: string;
+}
+
+type ProyectoLite = IProyecto & {
+  visitaTecnica?: VisitaTecnicaLite;
+  cliente?: ClienteLite | string | null;
+  vendedor?: VendedorLite | string | null;
+};
+
+type Filters = {
+  recomendacionTecnica: string;
+  tecnico: string;
+  estadoObra: string;
+  tipoVisita: string;
+  condicionVano: string;
+  tipoAbertura: string;
+  materialSolicitado: string;
+  estado: string;
+  vendedor: string;
+};
+
+const ALL_VALUE = "__all__";
+
+// Helpers reutilizables
 const getEstadoBadgeColor = (estado: string) => {
   switch (estado) {
     case "Taller":
@@ -103,19 +150,33 @@ const getEstadoBadgeColor = (estado: string) => {
   }
 };
 
-type Filters = {
-  recomendacionTecnica: string;
-  tecnico: string;
-  estadoObra: string;
-  tipoVisita: string;
-  condicionVano: string;
-  tipoAbertura: string;
-  materialSolicitado: string;
-  estado: string;
-  vendedor: string; // 🔹 nuevo
-};
+function toClienteLite(
+  ref: ClienteLite | string | null | undefined,
+): ClienteLite {
+  return ref && typeof ref === "object" ? ref : {};
+}
 
-const ALL_VALUE = "__all__";
+function toVendedorLite(
+  ref: VendedorLite | string | null | undefined,
+): VendedorLite {
+  return ref && typeof ref === "object" ? ref : {};
+}
+
+function getTecnicoLabel(asignadoA: AsignadoARef): string {
+  if (!asignadoA) return "";
+  if (typeof asignadoA === "string") return asignadoA;
+  return asignadoA.name ?? "";
+}
+
+// --- FETCH SOLO VISITA TÉCNICA / MEDICIÓN / VERIFICACIÓN ---
+async function fetchProyectosVisitaTecnica(): Promise<IProyecto[]> {
+  const { data } = await axios.get("/api/proyectos", {
+    params: {
+      estados: "Visita Técnica,Medición,Verificación",
+    },
+  });
+  return data.data;
+}
 
 export default function VisitaTecnicaPage() {
   const router = useRouter();
@@ -189,22 +250,21 @@ export default function VisitaTecnicaPage() {
     const tipoAberturaSet = new Set<string>();
     const materialSet = new Set<string>();
     const estadoSet = new Set<string>();
-    const vendedorSet = new Set<string>(); // 🔹 nuevo
+    const vendedorSet = new Set<string>();
 
-    (proyectos || []).forEach((p: any) => {
-      const vt = p.visitaTecnica || {};
-      const vendedor = p.vendedor || {};
+    (proyectos as ProyectoLite[] | undefined)?.forEach((p) => {
+      const vt = p.visitaTecnica ?? {};
+      const vendedorRef = toVendedorLite(p.vendedor);
 
       // técnico
-      if (vt.asignadoA?.name) {
-        tecnicoSet.add(vt.asignadoA.name);
-      } else if (typeof vt.asignadoA === "string") {
-        tecnicoSet.add(vt.asignadoA);
+      const tecnicoLabel = getTecnicoLabel(vt.asignadoA);
+      if (tecnicoLabel) {
+        tecnicoSet.add(tecnicoLabel);
       }
 
       // vendedor
-      if (vendedor?.name) {
-        vendedorSet.add(vendedor.name);
+      if (vendedorRef.name) {
+        vendedorSet.add(vendedorRef.name);
       } else if (typeof p.vendedor === "string") {
         vendedorSet.add(p.vendedor);
       }
@@ -213,11 +273,10 @@ export default function VisitaTecnicaPage() {
       if (vt.estadoObra) estadoObraSet.add(vt.estadoObra);
       if (vt.tipoVisita) tipoVisitaSet.add(vt.tipoVisita);
 
-      if (Array.isArray(vt.condicionVanos)) {
-        vt.condicionVanos.forEach((c: string) => {
-          if (c) condicionVanoSet.add(c);
-        });
-      }
+      const condicionVanos = vt.condicionVanos ?? [];
+      condicionVanos.forEach((c) => {
+        if (c) condicionVanoSet.add(c);
+      });
 
       if (vt.tipoAberturaMedida) tipoAberturaSet.add(vt.tipoAberturaMedida);
       if (vt.materialSolicitado) materialSet.add(vt.materialSolicitado);
@@ -256,11 +315,16 @@ export default function VisitaTecnicaPage() {
       queryClient.invalidateQueries({ queryKey: ["proyectos-visita-tecnica"] });
       setProyectoAPasar(null);
     },
-    onError: (error: any) => {
-      toast.error(
-        "Error al cambiar de estado: " +
-          (error?.response?.data?.error || error.message),
-      );
+    onError: (error: unknown) => {
+      let message = "Error desconocido";
+
+      if (axios.isAxiosError(error)) {
+        message = error.response?.data?.error || error.message;
+      } else if (error instanceof Error) {
+        message = error.message;
+      }
+
+      toast.error("Error al cambiar de estado: " + message);
       setProyectoAPasar(null);
     },
   });
@@ -287,24 +351,28 @@ export default function VisitaTecnicaPage() {
       {
         accessorKey: "cliente.nombreCompleto",
         header: "Cliente",
-        cell: ({ row }) =>
-          (row.original as any).cliente?.nombreCompleto || "N/A",
+        cell: ({ row }) => {
+          const clienteLite = toClienteLite(
+            (row.original as ProyectoLite).cliente,
+          );
+          return clienteLite.nombreCompleto || "N/A";
+        },
       },
       {
         accessorKey: "visitaTecnica.asignadoA",
         header: "Técnico Asignado",
         cell: ({ row }) => {
-          const vt: any = (row.original as any).visitaTecnica;
-          if (vt?.asignadoA?.name) return vt.asignadoA.name;
-          if (typeof vt?.asignadoA === "string") return vt.asignadoA;
-          return "Sin asignar";
+          const vt = (row.original as ProyectoLite).visitaTecnica;
+          if (!vt) return "Sin asignar";
+          const label = getTecnicoLabel(vt.asignadoA);
+          return label || "Sin asignar";
         },
       },
       {
         accessorKey: "visitaTecnica.fechaVisita",
         header: "Fecha Visita",
         cell: ({ row }) => {
-          const vt: any = (row.original as any).visitaTecnica;
+          const vt = (row.original as ProyectoLite).visitaTecnica;
           if (!vt?.fechaVisita) return "-";
           const fecha = new Date(vt.fechaVisita);
           if (Number.isNaN(fecha.getTime())) return "-";
@@ -315,7 +383,7 @@ export default function VisitaTecnicaPage() {
         accessorKey: "visitaTecnica.horaVisita",
         header: "Hora Visita",
         cell: ({ row }) => {
-          const vt: any = (row.original as any).visitaTecnica;
+          const vt = (row.original as ProyectoLite).visitaTecnica;
           return vt?.horaVisita || "-";
         },
       },
@@ -323,7 +391,7 @@ export default function VisitaTecnicaPage() {
         accessorKey: "visitaTecnica.direccion",
         header: "Dirección",
         cell: ({ row }) => {
-          const vt: any = (row.original as any).visitaTecnica;
+          const vt = (row.original as ProyectoLite).visitaTecnica;
           return vt?.direccion || "-";
         },
       },
@@ -331,7 +399,7 @@ export default function VisitaTecnicaPage() {
         accessorKey: "visitaTecnica.estadoObra",
         header: "Estado Obra",
         cell: ({ row }) => {
-          const vt: any = (row.original as any).visitaTecnica;
+          const vt = (row.original as ProyectoLite).visitaTecnica;
           return vt?.estadoObra || "-";
         },
       },
@@ -339,7 +407,7 @@ export default function VisitaTecnicaPage() {
         accessorKey: "visitaTecnica.tipoVisita",
         header: "Tipo Visita",
         cell: ({ row }) => {
-          const vt: any = (row.original as any).visitaTecnica;
+          const vt = (row.original as ProyectoLite).visitaTecnica;
           return vt?.tipoVisita || "-";
         },
       },
@@ -356,15 +424,15 @@ export default function VisitaTecnicaPage() {
   }, []);
 
   // Aplicar filtros + buscador
-  const filteredData = useMemo(() => {
+  const filteredData: IProyecto[] = useMemo(() => {
     if (!proyectos) return [];
 
     const q = searchTerm.trim().toLowerCase();
 
-    return proyectos.filter((p: any) => {
-      const vt = p.visitaTecnica || {};
-      const cliente = p.cliente || {};
-      const vendedor = p.vendedor || {};
+    return (proyectos as ProyectoLite[]).filter((p) => {
+      const vt = p.visitaTecnica ?? {};
+      const cliente = toClienteLite(p.cliente);
+      const vendedor = toVendedorLite(p.vendedor);
 
       // Filtros exactos
       if (
@@ -375,9 +443,7 @@ export default function VisitaTecnicaPage() {
       }
 
       if (filters.tecnico) {
-        const tecnicoLabel =
-          vt.asignadoA?.name ||
-          (typeof vt.asignadoA === "string" ? vt.asignadoA : "");
+        const tecnicoLabel = getTecnicoLabel(vt.asignadoA);
         if (tecnicoLabel !== filters.tecnico) return false;
       }
 
@@ -390,9 +456,7 @@ export default function VisitaTecnicaPage() {
       }
 
       if (filters.condicionVano) {
-        const arr = Array.isArray(vt.condicionVanos)
-          ? vt.condicionVanos
-          : [];
+        const arr = vt.condicionVanos ?? [];
         if (!arr.includes(filters.condicionVano)) return false;
       }
 
@@ -416,28 +480,24 @@ export default function VisitaTecnicaPage() {
 
       if (filters.vendedor) {
         const vendedorLabel =
-          vendedor?.name ||
+          vendedor.name ||
           (typeof p.vendedor === "string" ? p.vendedor : "");
         if (vendedorLabel !== filters.vendedor) return false;
       }
 
-      // 🔎 Buscador global:
-      // - Cualquier dato de cliente
-      // - Estado actual
-      // - Vendedor
-      // - Número de orden
+      // 🔎 Buscador global
       if (q) {
         const vendedorLabel =
-          vendedor?.name ||
+          vendedor.name ||
           (typeof p.vendedor === "string" ? p.vendedor : "");
 
         const textoBusqueda = [
-          cliente?.nombreCompleto,
-          cliente?.telefono,
-          cliente?.email,
-          cliente?.direccion,
-          vt?.direccion,
-          vt?.entrecalles,
+          cliente.nombreCompleto,
+          cliente.telefono,
+          cliente.email,
+          cliente.direccion,
+          vt.direccion,
+          vt.entrecalles,
           p.numeroOrden,
           p.estadoActual,
           vendedorLabel,

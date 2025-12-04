@@ -33,6 +33,51 @@ type EtapaCotizacion = {
   color: string;
 };
 
+// Proyecto con campos extra que usamos acá
+type ProyectoWithExtras = IProyecto & {
+  cotizacion?: string | { _id?: string };
+  medicion?: MedicionData | null;
+  cliente?: {
+    nombreCompleto?: string;
+  } | null;
+};
+
+// Medición
+type MedicionMedida = {
+  alto?: string | number;
+  ancho?: string | number;
+  profundidad?: string | number;
+  largo?: string | number;
+  cantidad?: string | number;
+};
+
+type MedicionData = {
+  medidasTomadas?: MedicionMedida[];
+  condicionVanos?: string[];
+  planosAdjuntos?: string[];
+  fotosMedicion?: string[];
+  fechaMedicion?: string | Date;
+
+  asignadoA?: { name?: string } | string | null;
+  numeroOrdenMedicion?: string;
+  tipoAberturaMedida?: string;
+
+  direccionObra?: string;
+  clienteObraEmpresa?: string;
+  cantidadAberturasMedidas?: number | string;
+
+  toleranciasRecomendadas?: string;
+  estadoObraMedicion?: string;
+  tipoPerfilPrevisto?: string;
+  color?: string;
+  tipoVidrioSolicitado?: string;
+
+  observacionesMedicion?: string;
+  estadoFinalMedicion?: string;
+  enviarAVerificacion?: string;
+  firmaValidacionTecnico?: string;
+};
+
 // estados a los que se puede pasar con el botón "Finalizar"
 const NEXT_ESTADOS: string[] = [
   "Medición",
@@ -67,21 +112,27 @@ const getEstadoBadgeColor = (estado: string) => {
  * Obtiene el ObjectId de la cotización asociada al proyecto,
  * ya sea que venga populado o como string suelto.
  */
-const getCotizacionIdFromProyecto = (proyecto: any): string | null => {
+const getCotizacionIdFromProyecto = (
+  proyecto: Pick<ProyectoWithExtras, "cotizacion"> | null | undefined,
+): string | null => {
   if (!proyecto) return null;
 
-  if (proyecto.cotizacion && typeof proyecto.cotizacion === "object") {
-    return proyecto.cotizacion._id?.toString() ?? null;
+  const { cotizacion } = proyecto;
+
+  if (cotizacion && typeof cotizacion === "object") {
+    return cotizacion._id?.toString() ?? null;
   }
 
-  if (typeof proyecto.cotizacion === "string") {
-    return proyecto.cotizacion;
+  if (typeof cotizacion === "string") {
+    return cotizacion;
   }
 
   return null;
 };
 
 export function MedicionView({ proyecto, onDeleted }: Props) {
+  const proyectoExtras = proyecto as ProyectoWithExtras;
+
   // Eliminar SOLO la medición
   const [deleteMedicionOpen, setDeleteMedicionOpen] = useState(false);
   const [isDeletingMedicion, setIsDeletingMedicion] = useState(false);
@@ -100,10 +151,10 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
   );
   const [isMovingEstado, setIsMovingEstado] = useState(false);
 
-  const md: any = (proyecto as any).medicion || {};
-  const cliente: any = (proyecto as any).cliente || {};
+  const md: MedicionData = proyectoExtras.medicion || {};
+  const cliente = proyectoExtras.cliente || {};
 
-  const medidas: any[] = Array.isArray(md.medidasTomadas)
+  const medidas: MedicionMedida[] = Array.isArray(md.medidasTomadas)
     ? md.medidasTomadas
     : [];
   const condicionVanos: string[] = Array.isArray(md.condicionVanos)
@@ -127,8 +178,10 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
   >({
     queryKey: ["etapasCotizacion"],
     queryFn: async () => {
-      const { data } = await axios.get("/api/etapas-cotizacion");
-      return data.data as EtapaCotizacion[];
+      const { data } = await axios.get<{ data: EtapaCotizacion[] }>(
+        "/api/etapas-cotizacion",
+      );
+      return data.data;
     },
   });
 
@@ -143,7 +196,7 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
    * según su nombre ("Proyecto Finalizado", "Proyectos no realizados", etc.).
    */
   const moveCotizacionToEtapa = async (nombreEtapa: string) => {
-    const cotizacionId = getCotizacionIdFromProyecto(proyecto);
+    const cotizacionId = getCotizacionIdFromProyecto(proyectoExtras);
     if (!cotizacionId) {
       toast.error("Este proyecto no tiene una cotización asociada.");
       return;
@@ -176,12 +229,20 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
       toast.success("Medición eliminada correctamente");
       setDeleteMedicionOpen(false);
       onDeleted?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(
-        "Error al eliminar la medición: " +
-          (error?.response?.data?.error || error.message),
-      );
+
+      if (axios.isAxiosError(error)) {
+        const msg =
+          (error.response?.data as { error?: string } | undefined)?.error ??
+          error.message;
+        toast.error("Error al eliminar la medición: " + msg);
+      } else {
+        toast.error(
+          "Error al eliminar la medición: " +
+            (error instanceof Error ? error.message : "Error desconocido"),
+        );
+      }
     } finally {
       setIsDeletingMedicion(false);
     }
@@ -208,12 +269,20 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
       );
       setDeleteProjectOpen(false);
       onDeleted?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(
-        "Error al eliminar el proyecto: " +
-          (error?.response?.data?.error || error.message),
-      );
+
+      if (axios.isAxiosError(error)) {
+        const msg =
+          (error.response?.data as { error?: string } | undefined)?.error ??
+          error.message;
+        toast.error("Error al eliminar el proyecto: " + msg);
+      } else {
+        toast.error(
+          "Error al eliminar el proyecto: " +
+            (error instanceof Error ? error.message : "Error desconocido"),
+        );
+      }
     } finally {
       setIsDeletingProject(false);
     }
@@ -236,12 +305,20 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
         "Proyecto completado y cotización movida a 'Proyecto Finalizado' en el pipeline.",
       );
       onDeleted?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(
-        "Error al terminar el proyecto: " +
-          (error?.response?.data?.error || error.message),
-      );
+
+      if (axios.isAxiosError(error)) {
+        const msg =
+          (error.response?.data as { error?: string } | undefined)?.error ??
+          error.message;
+        toast.error("Error al terminar el proyecto: " + msg);
+      } else {
+        toast.error(
+          "Error al terminar el proyecto: " +
+            (error instanceof Error ? error.message : "Error desconocido"),
+        );
+      }
     } finally {
       setIsTerminatingProject(false);
     }
@@ -265,12 +342,20 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
       setMoveDialogOpen(false);
       setSelectedNextEstado(null);
       onDeleted?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(
-        "Error al mover el proyecto: " +
-          (error?.response?.data?.error || error.message),
-      );
+
+      if (axios.isAxiosError(error)) {
+        const msg =
+          (error.response?.data as { error?: string } | undefined)?.error ??
+          error.message;
+        toast.error("Error al mover el proyecto: " + msg);
+      } else {
+        toast.error(
+          "Error al mover el proyecto: " +
+            (error instanceof Error ? error.message : "Error desconocido"),
+        );
+      }
     } finally {
       setIsMovingEstado(false);
     }
@@ -289,7 +374,8 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
               Esta acción eliminará todos los datos cargados en la medición del
               proyecto <strong>{proyecto.numeroOrden}</strong>.
               <br />
-              El proyecto seguirá existiendo, pero la sección de medición quedará vacía.
+              El proyecto seguirá existiendo, pero la sección de medición quedará
+              vacía.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -324,13 +410,15 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Marcar proyecto como no realizado?</AlertDialogTitle>
+            <AlertDialogTitle>
+              ¿Marcar proyecto como no realizado?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               Esto marcará el proyecto{" "}
               <strong>{proyecto.numeroOrden}</strong> como{" "}
               <strong>Rechazado</strong> y moverá la cotización asociada a la
-              etapa <strong>"Proyectos no realizados"</strong> en el pipeline de
-              cotizaciones.
+              etapa <strong>&quot;Proyectos no realizados&quot;</strong> en el
+              pipeline de cotizaciones.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -362,7 +450,9 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
       <AlertDialog open={moveDialogOpen} onOpenChange={setMoveDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿A dónde querés pasar la orden?</AlertDialogTitle>
+            <AlertDialogTitle>
+              ¿A dónde querés pasar la orden?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               Esta acción cambiará el estado del proyecto{" "}
               <strong>{proyecto.numeroOrden}</strong> a la etapa seleccionada.
@@ -455,9 +545,9 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
           <div className="space-y-1">
             <p className="text-muted-foreground text-xs">Técnico</p>
             <p className="font-medium">
-              {md?.asignadoA?.name ||
-                (typeof md?.asignadoA === "string" && md.asignadoA) ||
-                "Sin asignar"}
+              {typeof md?.asignadoA === "string"
+                ? md.asignadoA
+                : md?.asignadoA?.name || "Sin asignar"}
             </p>
           </div>
 
@@ -488,9 +578,7 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
             <p className="text-muted-foreground text-xs">
               Tipo de abertura medida
             </p>
-            <p className="font-medium">
-              {md?.tipoAberturaMedida || "-"}
-            </p>
+            <p className="font-medium">{md?.tipoAberturaMedida || "-"}</p>
           </div>
 
           <div className="space-y-1 sm:col-span-2">
@@ -503,9 +591,7 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
               Cliente / Obra / Empresa
             </p>
             <p className="font-medium">
-              {md?.clienteObraEmpresa ||
-                cliente?.nombreCompleto ||
-                "-"}
+              {md?.clienteObraEmpresa || cliente?.nombreCompleto || "-"}
             </p>
           </div>
 
@@ -594,9 +680,7 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
             <p className="text-muted-foreground text-xs">
               Estado de la obra al medir
             </p>
-            <p className="font-medium">
-              {md?.estadoObraMedicion || "-"}
-            </p>
+            <p className="font-medium">{md?.estadoObraMedicion || "-"}</p>
           </div>
         </div>
       </section>
@@ -614,25 +698,19 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
             <p className="text-muted-foreground text-xs">
               Tipo de perfil previsto
             </p>
-            <p className="font-medium">
-              {md?.tipoPerfilPrevisto || "-"}
-            </p>
+            <p className="font-medium">{md?.tipoPerfilPrevisto || "-"}</p>
           </div>
 
           <div className="space-y-1">
             <p className="text-muted-foreground text-xs">Color</p>
-            <p className="font-medium">
-              {md?.color || "-"}
-            </p>
+            <p className="font-medium">{md?.color || "-"}</p>
           </div>
 
           <div className="space-y-1">
             <p className="text-muted-foreground text-xs">
               Tipo de vidrio solicitado
             </p>
-            <p className="font-medium">
-              {md?.tipoVidrioSolicitado || "-"}
-            </p>
+            <p className="font-medium">{md?.tipoVidrioSolicitado || "-"}</p>
           </div>
         </div>
       </section>
@@ -674,9 +752,7 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
         </div>
 
         <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">
-            Fotos de medición
-          </p>
+          <p className="text-xs text-muted-foreground">Fotos de medición</p>
           {fotos.length ? (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {fotos.map((url) => (
@@ -723,18 +799,14 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
           <p className="text-muted-foreground text-xs">
             Estado final de la medición
           </p>
-          <p className="font-medium">
-            {md?.estadoFinalMedicion || "-"}
-          </p>
+          <p className="font-medium">{md?.estadoFinalMedicion || "-"}</p>
         </div>
 
         <div className="space-y-1">
           <p className="text-muted-foreground text-xs">
             Enviar a verificación
           </p>
-          <p className="font-medium">
-            {md?.enviarAVerificacion || "-"}
-          </p>
+          <p className="font-medium">{md?.enviarAVerificacion || "-"}</p>
         </div>
 
         <div className="space-y-1">

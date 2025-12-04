@@ -60,15 +60,88 @@ const getEstadoBadgeColor = (estado: string) => {
   }
 };
 
-const getCotizacionIdFromProyecto = (proyecto: any): string | null => {
-  if (!proyecto) return null;
-  if (proyecto.cotizacion && typeof proyecto.cotizacion === "object") {
-    return proyecto.cotizacion._id?.toString() ?? null;
-  }
-  if (typeof proyecto.cotizacion === "string") {
-    return proyecto.cotizacion;
-  }
-  return null;
+// ---- Tipos auxiliares para evitar any ---- //
+
+type CotizacionRef =
+  | string
+  | {
+      _id?: string | { toString(): string } | null;
+    }
+  | null
+  | undefined;
+
+interface ProyectoConCotizacion {
+  cotizacion?: CotizacionRef;
+}
+
+type UsuarioVerifico =
+  | {
+      name?: string | null;
+      nombre?: string | null;
+    }
+  | string
+  | null
+  | undefined;
+
+type VerificacionData = {
+  clienteObraEmpresa?: string;
+  direccionObra?: string;
+  usuarioVerifico?: UsuarioVerifico;
+  fechaRevisionPlano?: string | Date | null;
+  fechaVerificacionCompleta?: string | Date | null;
+  archivosPlanosCroquis?: string[];
+
+  medidasVerificadas?: string;
+  medidasVerificadasObservaciones?: string;
+  fuenteMedidas?: string;
+  planosRevisados?: string;
+
+  materialesDisponiblesEstado?: string;
+  listaMaterialesRevisada?: string;
+  accesoriosCompletosEstado?: string;
+  vidriosDisponiblesEstado?: string;
+
+  materialesFaltantesDetalle?: string;
+  materialesProveedorPendiente?: string;
+  accesoriosFaltantesDetalle?: string;
+
+  tipoMaterial?: string;
+  tipoPerfilVerificado?: string;
+  proveedorPerfil?: string;
+  estadoPerfiles?: string;
+  compatibilidadHerrajes?: string;
+  medidasVidriosConfirmadas?: string;
+
+  color?: string;
+  estadoColor?: string;
+
+  estadoGeneralVerificacion?: string;
+  aprobadoParaProduccion?: string;
+  observacionesVerificacion?: string;
+};
+
+type ClienteData = {
+  nombreCompleto?: string | null;
+};
+
+type VisitaTecnicaData = {
+  direccion?: string | null;
+};
+
+// Obtiene el ObjectId de la cotización desde el proyecto
+const getCotizacionIdFromProyecto = (
+  proyecto: ProyectoConCotizacion | null | undefined,
+): string | null => {
+  if (!proyecto?.cotizacion) return null;
+
+  const cotizacion = proyecto.cotizacion;
+
+  if (typeof cotizacion === "string") return cotizacion;
+
+  const id = cotizacion._id;
+  if (!id) return null;
+
+  return typeof id === "string" ? id : id.toString();
 };
 
 export function VerificacionView({ proyecto, onDeleted }: Props) {
@@ -86,9 +159,9 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
   );
   const [isMovingEstado, setIsMovingEstado] = useState(false);
 
-  const v: any = (proyecto as any).verificacion || {};
-  const cliente: any = (proyecto as any).cliente || {};
-  const vt: any = (proyecto as any).visitaTecnica || {};
+  const v = (proyecto.verificacion ?? {}) as VerificacionData;
+  const cliente = (proyecto.cliente ?? {}) as ClienteData;
+  const vt = (proyecto.visitaTecnica ?? {}) as VisitaTecnicaData;
 
   const archivos: string[] = Array.isArray(v.archivosPlanosCroquis)
     ? v.archivosPlanosCroquis
@@ -156,12 +229,19 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
       toast.success("Verificación eliminada correctamente");
       setDeleteVerificacionOpen(false);
       onDeleted?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(
-        "Error al eliminar la verificación: " +
-          (error?.response?.data?.error || error.message),
-      );
+      if (axios.isAxiosError(error)) {
+        toast.error(
+          "Error al eliminar la verificación: " +
+            ((error.response?.data as { error?: string } | undefined)?.error || error.message),
+        );
+      } else {
+        toast.error(
+          "Error al eliminar la verificación: " +
+            (error instanceof Error ? error.message : "Error desconocido"),
+        );
+      }
     } finally {
       setIsDeletingVerificacion(false);
     }
@@ -185,12 +265,20 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
       );
       setDeleteProjectOpen(false);
       onDeleted?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(
-        "Error al eliminar el proyecto: " +
-          (error?.response?.data?.error || error.message),
-      );
+      if (axios.isAxiosError(error)) {
+        toast.error(
+          "Error al eliminar el proyecto: " +
+            ((error.response?.data as { error?: string } | undefined)?.error ??
+              error.message),
+        );
+      } else {
+        toast.error(
+          "Error al eliminar el proyecto: " +
+            (error instanceof Error ? error.message : "Error desconocido"),
+        );
+      }
     } finally {
       setIsDeletingProject(false);
     }
@@ -211,12 +299,20 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
         "Proyecto completado y cotización movida a 'Proyecto Finalizado' en el pipeline.",
       );
       onDeleted?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(
-        "Error al terminar el proyecto: " +
-          (error?.response?.data?.error || error.message),
-      );
+      if (axios.isAxiosError(error)) {
+        toast.error(
+          "Error al terminar el proyecto: " +
+            ((error.response?.data as { error?: string } | undefined)?.error ??
+              error.message),
+        );
+      } else {
+        toast.error(
+          "Error al terminar el proyecto: " +
+            (error instanceof Error ? error.message : "Error desconocido"),
+        );
+      }
     } finally {
       setIsTerminatingProject(false);
     }
@@ -240,21 +336,29 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
       setMoveDialogOpen(false);
       setSelectedNextEstado(null);
       onDeleted?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(
-        "Error al mover el proyecto: " +
-          (error?.response?.data?.error || error.message),
-      );
+      if (axios.isAxiosError(error)) {
+        toast.error(
+          "Error al mover el proyecto: " +
+            ((error.response?.data as { error?: string } | undefined)?.error ??
+            error.message),
+        );
+      } else {
+        toast.error(
+          "Error al mover el proyecto: " +
+            (error instanceof Error ? error.message : "Error desconocido"),
+        );
+      }
     } finally {
       setIsMovingEstado(false);
     }
   };
 
   const usuarioVerificoNombre =
-    v.usuarioVerifico?.name ||
-    v.usuarioVerifico?.nombre ||
-    (typeof v.usuarioVerifico === "string" ? v.usuarioVerifico : "—");
+    (typeof v.usuarioVerifico === "string"
+      ? v.usuarioVerifico
+      : v.usuarioVerifico?.name || v.usuarioVerifico?.nombre) ?? "—";
 
   const direccionObra = v.direccionObra || vt.direccion || "—";
 
@@ -310,13 +414,16 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Marcar proyecto como no realizado?</AlertDialogTitle>
+            <AlertDialogTitle>
+              ¿Marcar proyecto como no realizado?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               Esto marcará el proyecto{" "}
               <strong>{proyecto.numeroOrden}</strong> como{" "}
               <strong>Rechazado</strong> y moverá la cotización asociada a{" "}
-              <strong>"Proyectos no realizados"</strong> en el pipeline de
-              cotizaciones. Luego el proyecto se eliminará de la base de datos.
+              <strong>&quot;Proyectos no realizados&quot;</strong> en el
+              pipeline de cotizaciones. Luego el proyecto se eliminará de la
+              base de datos.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

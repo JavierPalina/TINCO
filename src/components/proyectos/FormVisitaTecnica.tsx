@@ -122,14 +122,61 @@ type FormState = {
   firmaVerificacion: string;
 };
 
+// Tipo auxiliar para la data de visita técnica que viene del backend
+type VisitaTecnicaData = {
+  asignadoA?: string | { _id?: string };
+  fechaVisita?: string | Date;
+  horaVisita?: string;
+  tipoVisita?: string;
+
+  direccion?: string;
+  entrecalles?: string;
+  otraInfoDireccion?: string;
+
+  estadoObra?: string;
+  condicionVanos?: string[];
+  medidasTomadas?: {
+    alto?: string | number;
+    ancho?: string | number;
+    profundidad?: string | number;
+    largo?: string | number;
+    cantidad?: string | number;
+  }[];
+  tipoAberturaMedida?: string;
+
+  materialSolicitado?: string;
+  color?: string;
+  vidriosConfirmados?: string;
+
+  planosAdjuntos?: string[];
+  fotosObra?: string[];
+
+  firmaVerificacion?: string;
+  observacionesTecnicas?: string;
+  recomendacionTecnica?: string;
+  estadoTareaVisita?: string;
+};
+
 export default function VisitaTecnicaFormModal({
   proyecto,
   onClose,
   onSaved,
 }: Props) {
-  const vt: any = proyecto.visitaTecnica || {};
-  const clienteNombre =
-    (proyecto as any)?.cliente?.nombreCompleto || "Sin nombre de cliente";
+  const vt = (proyecto.visitaTecnica || {}) as VisitaTecnicaData;
+
+  // Cliente
+  let clienteNombre = "Sin nombre de cliente";
+  const cliente = proyecto.cliente as unknown;
+  if (
+    cliente &&
+    typeof cliente === "object" &&
+    "nombreCompleto" in cliente &&
+    typeof (cliente as { nombreCompleto?: unknown }).nombreCompleto === "string"
+  ) {
+    clienteNombre =
+      (cliente as { nombreCompleto?: string }).nombreCompleto ??
+      "Sin nombre de cliente";
+  }
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -156,7 +203,7 @@ export default function VisitaTecnicaFormModal({
     // Medidas tomadas iniciales
     let medidas: MedidaTomada[] = [];
     if (Array.isArray(vt.medidasTomadas) && vt.medidasTomadas.length) {
-      medidas = vt.medidasTomadas.map((m: any) => ({
+      medidas = vt.medidasTomadas.map((m) => ({
         alto: m.alto?.toString() ?? "",
         ancho: m.ancho?.toString() ?? "",
         profundidad: m.profundidad?.toString() ?? "",
@@ -172,7 +219,10 @@ export default function VisitaTecnicaFormModal({
     return {
       clienteObraEmpresa: clienteNombre,
 
-      asignadoA: vt.asignadoA?._id || vt.asignadoA || "",
+      asignadoA:
+        typeof vt.asignadoA === "string"
+          ? vt.asignadoA
+          : vt.asignadoA?._id || "",
       fechaVisita: fecha,
       horaVisita: hora,
       tipoVisita: vt.tipoVisita || "",
@@ -203,7 +253,10 @@ export default function VisitaTecnicaFormModal({
     };
   });
 
-  const updateField = (field: keyof FormState, value: any) => {
+  const updateField = <K extends keyof FormState>(
+    field: K,
+    value: FormState[K],
+  ) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -335,12 +388,20 @@ export default function VisitaTecnicaFormModal({
       toast.success("Visita técnica actualizada correctamente");
       onSaved?.();
       onClose?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(
-        "Error al guardar la visita técnica: " +
-          (error?.response?.data?.error || error.message),
-      );
+
+      if (axios.isAxiosError(error)) {
+        const msg =
+          (error.response?.data as { error?: string } | undefined)?.error ??
+          error.message;
+        toast.error("Error al guardar la visita técnica: " + msg);
+      } else {
+        toast.error(
+          "Error al guardar la visita técnica: " +
+            (error instanceof Error ? error.message : "Error desconocido"),
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -595,7 +656,9 @@ export default function VisitaTecnicaFormModal({
                                 value={estadoObraSearch.trim()}
                                 onSelect={handleCreateEstadoObra}
                               >
-                                Crear "{estadoObraSearch.trim()}"
+                                Crear &quot;
+                                {estadoObraSearch.trim()}
+                                &quot;
                               </CommandItem>
                             </CommandGroup>
                           )}

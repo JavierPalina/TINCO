@@ -63,22 +63,88 @@ const getEstadoBadgeColor = (estado: string) => {
   }
 };
 
+/* ------------ Tipos auxiliares para eliminar any ------------ */
+
+type CotizacionRef =
+  | string
+  | {
+      _id?: string | { toString(): string } | null;
+    }
+  | null
+  | undefined;
+
+interface ProyectoConCotizacion {
+  cotizacion?: CotizacionRef;
+}
+
+type AsignadoARef =
+  | string
+  | {
+      name?: string | null;
+    }
+  | null
+  | undefined;
+
+type MedidaTomada = Partial<{
+  alto: string | number | null;
+  ancho: string | number | null;
+  profundidad: string | number | null;
+  largo: string | number | null;
+  cantidad: string | number | null;
+}>;
+
+type VisitaTecnicaData = {
+  asignadoA?: AsignadoARef;
+  tipoVisita?: string | null;
+
+  fechaVisita?: string | Date | null;
+  horaVisita?: string | null;
+
+  direccion?: string | null;
+  entrecalles?: string | null;
+  otraInfoDireccion?: string | null;
+
+  estadoObra?: string | null;
+  condicionVanos?: string[];
+
+  medidasTomadas?: MedidaTomada[];
+  tipoAberturaMedida?: string | null;
+
+  materialSolicitado?: string | null;
+  color?: string | null;
+  vidriosConfirmados?: string | null;
+  estadoTareaVisita?: string | null;
+  recomendacionTecnica?: string | null;
+  observacionesTecnicas?: string | null;
+
+  planosAdjuntos?: string[];
+  fotosObra?: string[];
+  firmaVerificacion?: string | null;
+};
+
+type ClienteData = {
+  nombreCompleto?: string | null;
+};
+
 /**
  * Obtiene el ObjectId de la cotización asociada al proyecto,
  * ya sea que venga populado o como string suelto.
  */
-const getCotizacionIdFromProyecto = (proyecto: any): string | null => {
-  if (!proyecto) return null;
+const getCotizacionIdFromProyecto = (
+  proyecto: ProyectoConCotizacion | null | undefined,
+): string | null => {
+  if (!proyecto?.cotizacion) return null;
 
-  if (proyecto.cotizacion && typeof proyecto.cotizacion === "object") {
-    return proyecto.cotizacion._id?.toString() ?? null;
+  const cotizacion = proyecto.cotizacion;
+
+  if (typeof cotizacion === "string") {
+    return cotizacion;
   }
 
-  if (typeof proyecto.cotizacion === "string") {
-    return proyecto.cotizacion;
-  }
+  const id = cotizacion._id;
+  if (!id) return null;
 
-  return null;
+  return typeof id === "string" ? id : id.toString();
 };
 
 export function VisitaTecnicaView({ proyecto, onDeleted }: Props) {
@@ -100,10 +166,10 @@ export function VisitaTecnicaView({ proyecto, onDeleted }: Props) {
   );
   const [isMovingEstado, setIsMovingEstado] = useState(false);
 
-  const vt: any = (proyecto as any).visitaTecnica || {};
-  const cliente: any = (proyecto as any).cliente || {};
+  const vt = (proyecto.visitaTecnica ?? {}) as VisitaTecnicaData;
+  const cliente = (proyecto.cliente ?? {}) as ClienteData;
 
-  const medidas: any[] = Array.isArray(vt.medidasTomadas)
+  const medidas: MedidaTomada[] = Array.isArray(vt.medidasTomadas)
     ? vt.medidasTomadas
     : [];
   const condicionVanos: string[] = Array.isArray(vt.condicionVanos)
@@ -174,12 +240,20 @@ export function VisitaTecnicaView({ proyecto, onDeleted }: Props) {
       toast.success("Visita técnica eliminada correctamente");
       setDeleteVisitOpen(false);
       onDeleted?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(
-        "Error al eliminar la visita técnica: " +
-          (error?.response?.data?.error || error.message),
-      );
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data as { error?: string } | undefined;
+        toast.error(
+          "Error al eliminar la visita técnica: " +
+            (apiError?.error ?? error.message),
+        );
+      } else {
+        toast.error(
+          "Error al eliminar la visita técnica: " +
+            (error instanceof Error ? error.message : "Error desconocido"),
+        );
+      }
     } finally {
       setIsDeletingVisit(false);
     }
@@ -187,35 +261,43 @@ export function VisitaTecnicaView({ proyecto, onDeleted }: Props) {
 
   // 🟡 "Eliminar proyecto" → pipeline a "Proyectos no realizados" + Proyecto.estadoActual = "Rechazado"
   const handleEliminarProyecto = async () => {
-  try {
-    setIsDeletingProject(true);
+    try {
+      setIsDeletingProject(true);
 
-    // 1) Mover la cotización en el pipeline
-    await moveCotizacionToEtapa("Proyectos no realizados");
+      // 1) Mover la cotización en el pipeline
+      await moveCotizacionToEtapa("Proyectos no realizados");
 
-    // 2) Marcar el proyecto como Rechazado (por si querés dejarlo logueado en historial antes de borrarlo)
-    await axios.put(`/api/proyectos/${proyecto._id}`, {
-      estadoActual: "Rechazado",
-    });
+      // 2) Marcar el proyecto como Rechazado
+      await axios.put(`/api/proyectos/${proyecto._id}`, {
+        estadoActual: "Rechazado",
+      });
 
-    // 3) Eliminar el proyecto de la base de datos
-    await axios.delete(`/api/proyectos/${proyecto._id}`);
+      // 3) Eliminar el proyecto de la base de datos
+      await axios.delete(`/api/proyectos/${proyecto._id}`);
 
-    toast.success(
-      "Proyecto eliminado y cotización movida a 'Proyectos no realizados' en el pipeline."
-    );
-    setDeleteProjectOpen(false);
-    onDeleted?.();
-  } catch (error: any) {
-    console.error(error);
-    toast.error(
-      "Error al eliminar el proyecto: " +
-        (error?.response?.data?.error || error.message),
-    );
-  } finally {
-    setIsDeletingProject(false);
-  }
-};
+      toast.success(
+        "Proyecto eliminado y cotización movida a 'Proyectos no realizados' en el pipeline.",
+      );
+      setDeleteProjectOpen(false);
+      onDeleted?.();
+    } catch (error: unknown) {
+      console.error(error);
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data as { error?: string } | undefined;
+        toast.error(
+          "Error al eliminar el proyecto: " +
+            (apiError?.error ?? error.message),
+        );
+      } else {
+        toast.error(
+          "Error al eliminar el proyecto: " +
+            (error instanceof Error ? error.message : "Error desconocido"),
+        );
+      }
+    } finally {
+      setIsDeletingProject(false);
+    }
+  };
 
   // ✅ "Terminar proyecto" → pipeline a "Proyecto Finalizado" + Proyecto.estadoActual = "Completado"
   const handleTerminarProyecto = async () => {
@@ -234,12 +316,20 @@ export function VisitaTecnicaView({ proyecto, onDeleted }: Props) {
         "Proyecto completado y cotización movida a 'Proyecto Finalizado' en el pipeline.",
       );
       onDeleted?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(
-        "Error al terminar el proyecto: " +
-          (error?.response?.data?.error || error.message),
-      );
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data as { error?: string } | undefined;
+        toast.error(
+          "Error al terminar el proyecto: " +
+            (apiError?.error ?? error.message),
+        );
+      } else {
+        toast.error(
+          "Error al terminar el proyecto: " +
+            (error instanceof Error ? error.message : "Error desconocido"),
+        );
+      }
     } finally {
       setIsTerminatingProject(false);
     }
@@ -263,16 +353,29 @@ export function VisitaTecnicaView({ proyecto, onDeleted }: Props) {
       setMoveDialogOpen(false);
       setSelectedNextEstado(null);
       onDeleted?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(
-        "Error al mover el proyecto: " +
-          (error?.response?.data?.error || error.message),
-      );
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data as { error?: string } | undefined;
+        toast.error(
+          "Error al mover el proyecto: " +
+            (apiError?.error ?? error.message),
+        );
+      } else {
+        toast.error(
+          "Error al mover el proyecto: " +
+            (error instanceof Error ? error.message : "Error desconocido"),
+        );
+      }
     } finally {
       setIsMovingEstado(false);
     }
   };
+
+  const asignadoANombre =
+    (typeof vt.asignadoA === "string"
+      ? vt.asignadoA
+      : vt.asignadoA?.name) ?? "Sin asignar";
 
   return (
     <div className="space-y-8 text-sm">
@@ -324,13 +427,15 @@ export function VisitaTecnicaView({ proyecto, onDeleted }: Props) {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Marcar proyecto como no realizado?</AlertDialogTitle>
+            <AlertDialogTitle>
+              ¿Marcar proyecto como no realizado?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               Esto marcará el proyecto{" "}
               <strong>{proyecto.numeroOrden}</strong> como{" "}
               <strong>Rechazado</strong> y moverá la cotización asociada a la
-              etapa <strong>"Proyectos no realizados"</strong> en el pipeline de
-              cotizaciones.
+              etapa <strong>&quot;Proyectos no realizados&quot;</strong> en el
+              pipeline de cotizaciones.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -424,7 +529,7 @@ export function VisitaTecnicaView({ proyecto, onDeleted }: Props) {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Header SIN botones de acción, solo estado y descripción */}
+      {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
           <h3 className="text-lg font-semibold">Datos generales</h3>
@@ -454,11 +559,7 @@ export function VisitaTecnicaView({ proyecto, onDeleted }: Props) {
 
           <div className="space-y-1">
             <p className="text-muted-foreground text-xs">Técnico asignado</p>
-            <p className="font-medium">
-              {vt?.asignadoA?.name ||
-                (typeof vt?.asignadoA === "string" && vt.asignadoA) ||
-                "Sin asignar"}
-            </p>
+            <p className="font-medium">{asignadoANombre}</p>
           </div>
 
           <div className="space-y-1">

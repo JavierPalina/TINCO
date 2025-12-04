@@ -132,20 +132,74 @@ type FormState = {
   enviarAVerificacion: EnviarAVerificacion | "";
 };
 
+// Tipo auxiliar para la data de medición que viene del backend
+type MedicionData = {
+  fechaMedicion?: string | Date;
+  medidasTomadas?: { alto?: string | number; ancho?: string | number }[];
+  cantidadAberturasMedidas?: number | string;
+  numeroOrdenMedicion?: number | string;
+
+  clienteObraEmpresa?: string;
+  direccionObra?: string;
+
+  asignadoA?: { _id?: string } | string;
+  tipoAberturaMedida?: string;
+
+  toleranciasRecomendadas?: string;
+
+  condicionVanos?: string[];
+  estadoObraMedicion?: string;
+
+  tipoPerfilPrevisto?: string;
+  color?: string;
+  tipoVidrioSolicitado?: string;
+
+  planosAdjuntos?: string[];
+  fotosMedicion?: string[];
+
+  observacionesMedicion?: string;
+  firmaValidacionTecnico?: string;
+
+  estadoFinalMedicion?: string;
+  enviarAVerificacion?: EnviarAVerificacion;
+};
+
 export default function MedicionFormModal({
   proyecto,
   onClose,
   onSaved,
 }: Props) {
-  const md: any = proyecto.medicion || {};
-  const clienteNombre =
-    (proyecto as any)?.cliente?.nombreCompleto || "Sin nombre de cliente";
+  const md = (proyecto.medicion || {}) as MedicionData;
 
-  // Dirección: si ya viene en medición la usamos; si no, tratamos de leer de visita técnica
-  const direccionBase =
-    md.direccionObra ||
-    (proyecto as any)?.visitaTecnica?.direccion ||
-    "";
+  // Cliente (sin usar any)
+  let clienteNombre = "Sin nombre de cliente";
+  const cliente = proyecto.cliente as unknown;
+  if (
+    cliente &&
+    typeof cliente === "object" &&
+    "nombreCompleto" in cliente &&
+    typeof (cliente as { nombreCompleto?: unknown }).nombreCompleto === "string"
+  ) {
+    clienteNombre =
+      (cliente as { nombreCompleto?: string }).nombreCompleto ??
+      "Sin nombre de cliente";
+  }
+
+  // Dirección de visita técnica si existe
+  let direccionVisita = "";
+  const visitaTecnica = proyecto.visitaTecnica as unknown;
+  if (
+    visitaTecnica &&
+    typeof visitaTecnica === "object" &&
+    "direccion" in visitaTecnica &&
+    typeof (visitaTecnica as { direccion?: unknown }).direccion === "string"
+  ) {
+    direccionVisita =
+      (visitaTecnica as { direccion?: string }).direccion ?? "";
+  }
+
+  // Dirección: medición > visita técnica
+  const direccionBase = md.direccionObra || direccionVisita || "";
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -179,27 +233,33 @@ export default function MedicionFormModal({
     // Cantidad & medidas
     let medidas: MedidaTomada[] = [];
     if (Array.isArray(md.medidasTomadas) && md.medidasTomadas.length) {
-      medidas = md.medidasTomadas.map((m: any) => ({
-        alto: m.alto?.toString() ?? "",
-        ancho: m.ancho?.toString() ?? "",
+      medidas = md.medidasTomadas.map((m) => ({
+        alto: m.alto !== undefined ? String(m.alto) : "",
+        ancho: m.ancho !== undefined ? String(m.ancho) : "",
       }));
     } else {
       medidas = [{ alto: "", ancho: "" }];
     }
 
     const cantidad =
-      md.cantidadAberturasMedidas?.toString() || medidas.length.toString();
+      md.cantidadAberturasMedidas !== undefined
+        ? String(md.cantidadAberturasMedidas)
+        : String(medidas.length);
 
     return {
       numeroOrdenMedicion:
-        md.numeroOrdenMedicion?.toString() || proyecto.numeroOrden?.toString() || "",
+        md.numeroOrdenMedicion !== undefined
+          ? String(md.numeroOrdenMedicion)
+          : proyecto.numeroOrden?.toString() || "",
 
-      clienteObraEmpresa:
-        md.clienteObraEmpresa || clienteNombre || "",
+      clienteObraEmpresa: md.clienteObraEmpresa || clienteNombre || "",
 
       direccionObra: direccionBase,
 
-      asignadoA: md.asignadoA?._id || md.asignadoA || "",
+      asignadoA:
+        (typeof md.asignadoA === "string"
+          ? md.asignadoA
+          : md.asignadoA?._id) || "",
       fechaMedicion: fecha,
       tipoAberturaMedida: md.tipoAberturaMedida || "",
 
@@ -226,7 +286,10 @@ export default function MedicionFormModal({
     };
   });
 
-  const updateField = (field: keyof FormState, value: any) => {
+  const updateField = (
+    field: keyof FormState,
+    value: FormState[keyof FormState],
+  ) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -268,8 +331,7 @@ export default function MedicionFormModal({
     setForm((prev) => {
       const copy = [...prev.medidasTomadas];
       copy.splice(index, 1);
-      const nuevaCantidad =
-        copy.length > 0 ? copy.length.toString() : "1";
+      const nuevaCantidad = copy.length > 0 ? copy.length.toString() : "1";
 
       return {
         ...prev,
@@ -318,18 +380,15 @@ export default function MedicionFormModal({
           alto: m.alto.trim(),
           ancho: m.ancho.trim(),
         }))
-        .filter((m) =>
-          Object.values(m).some((v) => v !== ""),
-        );
+        .filter((m) => Object.values(m).some((v) => v !== ""));
 
-      const payload: any = {
+      const payload = {
         datosFormulario: {
           medicion: {
             numeroOrdenMedicion:
               form.numeroOrdenMedicion || proyecto.numeroOrden || undefined,
 
-            clienteObraEmpresa:
-              form.clienteObraEmpresa || undefined,
+            clienteObraEmpresa: form.clienteObraEmpresa || undefined,
             direccionObra: form.direccionObra || undefined,
 
             asignadoA: form.asignadoA || undefined,
@@ -350,14 +409,11 @@ export default function MedicionFormModal({
               form.condicionVanos && form.condicionVanos.length
                 ? form.condicionVanos
                 : undefined,
-            estadoObraMedicion:
-              form.estadoObraMedicion || undefined,
+            estadoObraMedicion: form.estadoObraMedicion || undefined,
 
-            tipoPerfilPrevisto:
-              form.tipoPerfilPrevisto || undefined,
+            tipoPerfilPrevisto: form.tipoPerfilPrevisto || undefined,
             color: form.color || undefined,
-            tipoVidrioSolicitado:
-              form.tipoVidrioSolicitado || undefined,
+            tipoVidrioSolicitado: form.tipoVidrioSolicitado || undefined,
 
             planosAdjuntos:
               form.planosAdjuntos && form.planosAdjuntos.length
@@ -373,12 +429,13 @@ export default function MedicionFormModal({
             firmaValidacionTecnico:
               form.firmaValidacionTecnico || undefined,
 
-            estadoFinalMedicion:
-              form.estadoFinalMedicion || undefined,
-            enviarAVerificacion:
-              form.enviarAVerificacion || undefined,
+            estadoFinalMedicion: form.estadoFinalMedicion || undefined,
+            enviarAVerificacion: form.enviarAVerificacion || undefined,
           },
         },
+      } as {
+        datosFormulario: { medicion: Record<string, unknown> };
+        estadoActual?: string;
       };
 
       // Si debe pasar a Verificación
@@ -396,12 +453,20 @@ export default function MedicionFormModal({
 
       onSaved?.();
       onClose?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(
-        "Error al guardar la medición: " +
-          (error?.response?.data?.error || error.message),
-      );
+
+      if (axios.isAxiosError(error)) {
+        const errorMessage =
+          (error.response?.data as { error?: string } | undefined)?.error ||
+          error.message;
+        toast.error("Error al guardar la medición: " + errorMessage);
+      } else {
+        toast.error(
+          "Error al guardar la medición: " +
+            (error instanceof Error ? error.message : "Error desconocido"),
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -434,9 +499,7 @@ export default function MedicionFormModal({
   const handleCreateColor = () => {
     const nuevo = colorSearch.trim();
     if (!nuevo) return;
-    setColorOptions((prev) =>
-      Array.from(new Set([...prev, nuevo])),
-    );
+    setColorOptions((prev) => Array.from(new Set([...prev, nuevo])));
     updateField("color", nuevo);
     setColorSearch("");
     setColorPopoverOpen(false);
@@ -451,9 +514,7 @@ export default function MedicionFormModal({
     <DialogContent className="sm:max-w-[900px] p-0">
       <ScrollArea className="max-h-[90vh] p-6">
         <DialogHeader>
-          <DialogTitle>
-            Editar Medición – {proyecto.numeroOrden}
-          </DialogTitle>
+          <DialogTitle>Editar Medición – {proyecto.numeroOrden}</DialogTitle>
           <DialogDescription>
             Completá los datos de la medición, el estado de la obra y la
             documentación asociada.
@@ -484,10 +545,10 @@ export default function MedicionFormModal({
               </h3>
 
               <div className="flex flex-col gap-2">
-                <Label htmlFor="cliente-obra">Cliente / Obra / Empresa</Label>
-                {/* En esta vista partimos de un proyecto ya creado,
-                    por eso va precargado. Más adelante se podría
-                    reemplazar por un combo con filtro. */}
+                <Label htmlFor="cliente-obra">
+                  Cliente / Obra / Empresa
+                </Label>
+                {/* Vista desde proyecto ya creado */}
                 <Input
                   id="cliente-obra"
                   value={form.clienteObraEmpresa}
@@ -524,7 +585,9 @@ export default function MedicionFormModal({
 
               {/* Fecha */}
               <div className="flex flex-col gap-2">
-                <Label htmlFor="fecha-medicion">Fecha de medición</Label>
+                <Label htmlFor="fecha-medicion">
+                  Fecha de medición
+                </Label>
                 <Input
                   id="fecha-medicion"
                   type="date"
@@ -684,10 +747,7 @@ export default function MedicionFormModal({
                   rows={3}
                   value={form.toleranciasRecomendadas}
                   onChange={(e) =>
-                    updateField(
-                      "toleranciasRecomendadas",
-                      e.target.value,
-                    )
+                    updateField("toleranciasRecomendadas", e.target.value)
                   }
                   placeholder="Margen para fabricación o instalación"
                 />
@@ -899,7 +959,9 @@ export default function MedicionFormModal({
                                 value={colorSearch.trim()}
                                 onSelect={handleCreateColor}
                               >
-                                Crear "{colorSearch.trim()}"
+                                Crear &quot;
+                                {colorSearch.trim()}
+                                &quot;
                               </CommandItem>
                             </CommandGroup>
                           )}
@@ -1025,9 +1087,7 @@ export default function MedicionFormModal({
 
             {/* ESTADO FINAL + ENVIAR A VERIFICACIÓN */}
             <div className="flex flex-col gap-4">
-              <h3 className="text-lg font-semibold">
-                Cierre de medición
-              </h3>
+              <h3 className="text-lg font-semibold">Cierre de medición</h3>
 
               {/* Estado final de la medición */}
               <div className="flex flex-col gap-2">

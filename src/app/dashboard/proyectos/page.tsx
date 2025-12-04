@@ -2,7 +2,6 @@
 
 // Imports de React y Next
 import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
 
 // Imports de TanStack (React Query)
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -65,6 +64,17 @@ import { IProyecto } from "@/models/Proyecto";
 
 const ALL_VALUE = "__all";
 
+// Tipos mínimos para referencias populadas
+type ClientePopulado = {
+  nombreCompleto?: string;
+  telefono?: string;
+  direccion?: string;
+};
+
+type VendedorPopulado = {
+  name?: string;
+};
+
 // --- FUNCIÓN DE FETCH ---
 async function fetchProyectos(): Promise<IProyecto[]> {
   const { data } = await axios.get("/api/proyectos?populate=cliente,vendedor");
@@ -93,7 +103,6 @@ const getEstadoBadgeColor = (estado: string) => {
 
 // --- COMPONENTE DE LA PÁGINA ---
 export default function ProyectosDashboardPage() {
-  const router = useRouter();
   const queryClient = useQueryClient();
 
   // Estado para el modal de CREAR
@@ -134,11 +143,16 @@ export default function ProyectosDashboardPage() {
       queryClient.invalidateQueries({ queryKey: ["proyectos"] });
       setProyectoAEliminar(null); // Cerrar el modal
     },
-    onError: (error: any) => {
-      toast.error(
-        "Error al eliminar el proyecto: " +
-          (error.response?.data?.error || error.message),
-      );
+    onError: (error: unknown) => {
+      let message = "Error desconocido";
+
+      if (axios.isAxiosError(error)) {
+        message = error.response?.data?.error || error.message;
+      } else if (error instanceof Error) {
+        message = error.message;
+      }
+
+      toast.error("Error al eliminar el proyecto: " + message);
       setProyectoAEliminar(null); // Cerrar el modal
     },
   });
@@ -152,12 +166,12 @@ export default function ProyectosDashboardPage() {
     (proyectos || []).forEach((p) => {
       if (p.estadoActual) estados.add(p.estadoActual);
 
-      const vendedor: any = p.vendedor;
+      const vendedor = p.vendedor as VendedorPopulado | string | null;
       const vendedorName =
         vendedor && typeof vendedor === "object" ? vendedor.name : undefined;
       if (vendedorName) vendedores.add(vendedorName);
 
-      const cliente: any = p.cliente;
+      const cliente = p.cliente as ClientePopulado | string | null;
       const clienteName =
         cliente && typeof cliente === "object"
           ? cliente.nombreCompleto
@@ -191,13 +205,28 @@ export default function ProyectosDashboardPage() {
     const q = searchTerm.trim().toLowerCase();
 
     return proyectos.filter((p) => {
-      const cliente: any = p.cliente || {};
-      const vendedor: any = p.vendedor || {};
+      const clienteRef = (p.cliente ??
+        null) as ClientePopulado | string | null;
+      const vendedorRef = (p.vendedor ??
+        null) as VendedorPopulado | string | null;
 
-      const clienteNombre = cliente?.nombreCompleto || "";
-      const clienteTelefono = cliente?.telefono || "";
-      const clienteDireccion = cliente?.direccion || "";
-      const vendedorNombre = vendedor?.name || "";
+      const clienteNombre =
+        clienteRef && typeof clienteRef === "object"
+          ? clienteRef.nombreCompleto ?? ""
+          : "";
+      const clienteTelefono =
+        clienteRef && typeof clienteRef === "object"
+          ? clienteRef.telefono ?? ""
+          : "";
+      const clienteDireccion =
+        clienteRef && typeof clienteRef === "object"
+          ? clienteRef.direccion ?? ""
+          : "";
+      const vendedorNombre =
+        vendedorRef && typeof vendedorRef === "object"
+          ? vendedorRef.name ?? ""
+          : "";
+
       const estadoActual = p.estadoActual || "";
       const numeroOrden = p.numeroOrden || "";
 
@@ -271,10 +300,16 @@ export default function ProyectosDashboardPage() {
         accessorKey: "cliente.nombreCompleto",
         header: "Cliente",
         cell: ({ row }) => {
-          const cliente = row.original.cliente as any;
-          return typeof cliente === "string"
-            ? "N/A"
-            : cliente?.nombreCompleto || "N/A";
+          const cliente = row.original.cliente as
+            | ClientePopulado
+            | string
+            | null
+            | undefined;
+
+          if (!cliente) return "N/A";
+          if (typeof cliente === "string") return "N/A";
+
+          return cliente.nombreCompleto || "N/A";
         },
       },
       {
@@ -291,19 +326,29 @@ export default function ProyectosDashboardPage() {
         accessorKey: "vendedor.name",
         header: "Vendedor",
         cell: ({ row }) => {
-          const vendedor = row.original.vendedor as any;
-          return typeof vendedor === "string"
-            ? "N/A"
-            : vendedor?.name || "N/A";
+          const vendedor = row.original.vendedor as
+            | VendedorPopulado
+            | string
+            | null
+            | undefined;
+
+          if (!vendedor) return "N/A";
+          if (typeof vendedor === "string") return "N/A";
+
+          return vendedor.name || "N/A";
         },
       },
       {
         accessorKey: "createdAt",
         header: "Fecha de Creación",
         cell: ({ row }) => {
-          const dateField =
-            (row.original as any).createdAt ||
-            (row.original as any).fecha;
+          const { createdAt, fecha } = row.original as IProyecto & {
+            createdAt?: string | Date;
+            fecha?: string | Date;
+          };
+
+          const dateField = createdAt ?? fecha;
+
           return dateField
             ? new Date(dateField).toLocaleDateString()
             : "N/A";
@@ -439,10 +484,7 @@ export default function ProyectosDashboardPage() {
               Filtros avanzados
             </Button>
           </PopoverTrigger>
-          <PopoverContent
-            className="w-[360px] sm:w-[520px]"
-            align="end"
-          >
+          <PopoverContent className="w-[360px] sm:w-[520px]" align="end">
             <div className="flex items-center justify-between mb-2">
               <div>
                 <p className="font-semibold text-sm">Filtros de proyectos</p>

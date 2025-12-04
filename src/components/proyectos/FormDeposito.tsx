@@ -1,36 +1,42 @@
 "use client";
 
-import * as z from 'zod';
-import { IProyecto } from '@/models/Proyecto';
-import { ProcesoFormWrapper } from './ProcesoFormWrapper';
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ConfigurableSelect } from '../ui/ConfigurableSelect';
+import * as z from "zod";
+import { IProyecto } from "@/models/Proyecto";
+import { ProcesoFormWrapper } from "./ProcesoFormWrapper";
+import { FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ConfigurableSelect } from "../ui/ConfigurableSelect";
 
 // 1. Definir Schema
 const depositoSchema = z.object({
   asignadoA: z.string().optional(),
   fechaIngreso: z.date().optional(),
   fechaSalida: z.date().optional(),
-  
+
   origenPedido: z.string().optional(),
   estadoProductoRecibido: z.string().optional(),
   cantidadUnidades: z.coerce.number().optional(),
-  
+
   ubicacionSeleccion: z.string().optional(),
   ubicacionTexto: z.string().optional(),
   codigoInterno: z.string().optional(),
-  
+
   verificacionEmbalaje: z.string().optional(),
   materialAlmacenado: z.string().optional(),
   materialAlmacenadoObs: z.string().optional(), // Condicional
-  
+
   controlMedidasPiezas: z.string().optional(),
   condicionVidrio: z.string().optional(),
   fotosIngreso: z.array(z.string()).optional(),
-  
+
   estadoInterno: z.string().optional(),
   observaciones: z.string().optional(),
 });
@@ -50,8 +56,8 @@ export function FormDeposito({ proyecto }: Props) {
       validationSchema={depositoSchema}
     >
       {(form, esCompletado) => {
-        const materialAlmacenado = form.watch('materialAlmacenado');
-        
+        const materialAlmacenado = form.watch("materialAlmacenado");
+
         return (
           <>
             {/* Columna 1 */}
@@ -64,19 +70,32 @@ export function FormDeposito({ proyecto }: Props) {
                     <FormLabel>Responsable de Recepción</FormLabel>
                     <FormControl>
                       {/* TODO: Select de Usuarios */}
-                      <Input {...field} disabled={esCompletado} placeholder="ID Usuario" />
+                      <Input
+                        {...field}
+                        disabled={esCompletado}
+                        placeholder="ID Usuario"
+                      />
                     </FormControl>
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={form.control}
                 name="origenPedido"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Origen del Pedido</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={esCompletado}>
-                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      disabled={esCompletado}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
                       <SelectContent>
                         <SelectItem value="Taller">Taller</SelectItem>
                         <SelectItem value="Proveedor">Proveedor</SelectItem>
@@ -87,14 +106,23 @@ export function FormDeposito({ proyecto }: Props) {
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={form.control}
                 name="materialAlmacenado"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Material Almacenado</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={esCompletado}>
-                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      disabled={esCompletado}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
                       <SelectContent>
                         <SelectItem value="Aluminio">Aluminio</SelectItem>
                         <SelectItem value="PVC">PVC</SelectItem>
@@ -106,13 +134,14 @@ export function FormDeposito({ proyecto }: Props) {
                   </FormItem>
                 )}
               />
-              {materialAlmacenado === 'Otros' && (
+
+              {materialAlmacenado === "Otros" && (
                 <FormField
                   control={form.control}
                   name="materialAlmacenadoObs"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Especificar "Otros"</FormLabel>
+                      <FormLabel>Especificar &quot;Otros&quot;</FormLabel>
                       <FormControl>
                         <Input {...field} disabled={esCompletado} />
                       </FormControl>
@@ -121,7 +150,7 @@ export function FormDeposito({ proyecto }: Props) {
                 />
               )}
             </div>
-            
+
             {/* Columna 2 */}
             <div className="space-y-4">
               <FormField
@@ -131,11 +160,17 @@ export function FormDeposito({ proyecto }: Props) {
                   <FormItem>
                     <FormLabel>Ubicación (Sector)</FormLabel>
                     <FormControl>
-                      <ConfigurableSelect tipo="ubicacionDeposito" value={field.value || ""} onChange={field.onChange} disabled={esCompletado} />
+                      <ConfigurableSelect
+                        tipo="ubicacionDeposito"
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        disabled={esCompletado}
+                      />
                     </FormControl>
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={form.control}
                 name="ubicacionTexto"
@@ -143,19 +178,30 @@ export function FormDeposito({ proyecto }: Props) {
                   <FormItem>
                     <FormLabel>Ubicación (Detalle)</FormLabel>
                     <FormControl>
-                      <Input {...field} disabled={esCompletado} placeholder="Estantería 2, Nivel 3" />
+                      <Input
+                        {...field}
+                        disabled={esCompletado}
+                        placeholder="Estantería 2, Nivel 3"
+                      />
                     </FormControl>
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={form.control}
                 name="codigoInterno"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Identificación (Código Interno / Etiqueta)</FormLabel>
+                    <FormLabel>
+                      Identificación (Código Interno / Etiqueta)
+                    </FormLabel>
                     <FormControl>
-                      <Input {...field} disabled={esCompletado} placeholder="A01-B03" />
+                      <Input
+                        {...field}
+                        disabled={esCompletado}
+                        placeholder="A01-B03"
+                      />
                     </FormControl>
                   </FormItem>
                 )}
@@ -171,22 +217,37 @@ export function FormDeposito({ proyecto }: Props) {
                   <FormItem>
                     <FormLabel>Observaciones de Depósito</FormLabel>
                     <FormControl>
-                      <Textarea {...field} rows={5} disabled={esCompletado} />
+                      <Textarea
+                        {...field}
+                        rows={5}
+                        disabled={esCompletado}
+                      />
                     </FormControl>
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={form.control}
                 name="estadoInterno"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Estado Actual del Pedido</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={esCompletado}>
-                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      disabled={esCompletado}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
                       <SelectContent>
                         <SelectItem value="En depósito">En depósito</SelectItem>
-                        <SelectItem value="Listo para entrega">Listo para entrega (Avanza a Logística)</SelectItem>
+                        <SelectItem value="Listo para entrega">
+                          Listo para entrega (Avanza a Logística)
+                        </SelectItem>
                         <SelectItem value="En revisión">En revisión</SelectItem>
                         <SelectItem value="Devolución">Devolución</SelectItem>
                       </SelectContent>

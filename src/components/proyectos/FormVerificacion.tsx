@@ -220,16 +220,83 @@ type FormState = {
   aprobadoParaProduccion: string;
 };
 
+// Tipo auxiliar de la data de verificación que viene del backend
+type VerificacionData = {
+  clienteObraEmpresa?: string;
+  direccionObra?: string;
+
+  medidasVerificadas?: string;
+  medidasVerificadasObservaciones?: string;
+
+  fuenteMedidas?: string;
+  planosRevisados?: string;
+  fechaRevisionPlano?: string | Date;
+
+  materialesDisponiblesEstado?: string;
+  materialesFaltantesDetalle?: string;
+  materialesProveedorPendiente?: string;
+  listaMaterialesRevisada?: string;
+
+  accesoriosCompletosEstado?: string;
+  accesoriosFaltantesDetalle?: string;
+
+  vidriosDisponiblesEstado?: string;
+
+  color?: string;
+  estadoColor?: string;
+
+  tipoMaterial?: string;
+  tipoPerfilVerificado?: string;
+  proveedorPerfil?: string;
+
+  estadoPerfiles?: string;
+  compatibilidadHerrajes?: string;
+  medidasVidriosConfirmadas?: string;
+
+  archivosPlanosCroquis?: string[];
+
+  usuarioVerifico?: { _id?: string } | string;
+  fechaVerificacionCompleta?: string | Date;
+
+  observacionesVerificacion?: string;
+  estadoGeneralVerificacion?: string;
+  aprobadoParaProduccion?: string;
+};
+
 export default function VerificacionFormModal({
   proyecto,
   onClose,
   onSaved,
 }: Props) {
-  const v: any = proyecto.verificacion || {};
-  const vt: any = (proyecto as any).visitaTecnica || {};
-  const clienteNombre =
-    (proyecto as any)?.cliente?.nombreCompleto || "Sin nombre de cliente";
-  const direccionBase = v.direccionObra || vt.direccion || "";
+  const v = (proyecto.verificacion || {}) as VerificacionData;
+
+  // visita técnica (solo nos interesa la dirección)
+  let direccionVisita = "";
+  const visita = proyecto.visitaTecnica as unknown;
+  if (
+    visita &&
+    typeof visita === "object" &&
+    "direccion" in visita &&
+    typeof (visita as { direccion?: unknown }).direccion === "string"
+  ) {
+    direccionVisita = (visita as { direccion?: string }).direccion ?? "";
+  }
+
+  // cliente
+  let clienteNombre = "Sin nombre de cliente";
+  const cliente = proyecto.cliente as unknown;
+  if (
+    cliente &&
+    typeof cliente === "object" &&
+    "nombreCompleto" in cliente &&
+    typeof (cliente as { nombreCompleto?: unknown }).nombreCompleto === "string"
+  ) {
+    clienteNombre =
+      (cliente as { nombreCompleto?: string }).nombreCompleto ??
+      "Sin nombre de cliente";
+  }
+
+  const direccionBase = v.direccionObra || direccionVisita || "";
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -246,7 +313,8 @@ export default function VerificacionFormModal({
 
   const [form, setForm] = useState<FormState>(() => {
     const fechaRev =
-      v.fechaRevisionPlano && !Number.isNaN(new Date(v.fechaRevisionPlano).getTime())
+      v.fechaRevisionPlano &&
+      !Number.isNaN(new Date(v.fechaRevisionPlano).getTime())
         ? new Date(v.fechaRevisionPlano).toISOString().slice(0, 10)
         : "";
 
@@ -291,7 +359,10 @@ export default function VerificacionFormModal({
 
       archivosPlanosCroquis: v.archivosPlanosCroquis || [],
 
-      usuarioVerifico: v.usuarioVerifico?._id || v.usuarioVerifico || "",
+      usuarioVerifico:
+        typeof v.usuarioVerifico === "string"
+          ? v.usuarioVerifico
+          : v.usuarioVerifico?._id || "",
       fechaVerificacionCompleta: fechaVerifCompleta,
 
       observacionesVerificacion: v.observacionesVerificacion || "",
@@ -300,7 +371,10 @@ export default function VerificacionFormModal({
     };
   });
 
-  const updateField = (field: keyof FormState, value: any) => {
+  const updateField = <K extends keyof FormState>(
+    field: K,
+    value: FormState[K],
+  ) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -414,12 +488,20 @@ export default function VerificacionFormModal({
       toast.success("Verificación actualizada correctamente");
       onSaved?.();
       onClose?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(
-        "Error al guardar la verificación: " +
-          (error?.response?.data?.error || error.message),
-      );
+
+      if (axios.isAxiosError(error)) {
+        const msg =
+          (error.response?.data as { error?: string } | undefined)?.error ??
+          error.message;
+        toast.error("Error al guardar la verificación: " + msg);
+      } else {
+        toast.error(
+          "Error al guardar la verificación: " +
+            (error instanceof Error ? error.message : "Error desconocido"),
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -429,7 +511,9 @@ export default function VerificacionFormModal({
     <DialogContent className="sm:max-w-[900px] p-0">
       <ScrollArea className="max-h-[90vh] p-6">
         <DialogHeader>
-          <DialogTitle>Editar Verificación – {proyecto.numeroOrden}</DialogTitle>
+          <DialogTitle>
+            Editar Verificación – {proyecto.numeroOrden}
+          </DialogTitle>
           <DialogDescription>
             Completá los datos de verificación de medidas, materiales y
             perfiles antes de pasar a taller.
@@ -522,15 +606,15 @@ export default function VerificacionFormModal({
                     <Command>
                       <CommandInput placeholder="Buscar fuente..." />
                       <CommandList>
-                        <CommandEmpty>No se encontraron opciones.</CommandEmpty>
+                        <CommandEmpty>
+                          No se encontraron opciones.
+                        </CommandEmpty>
                         <CommandGroup>
                           {FUENTE_MEDIDAS_OPTIONS.map((opt) => (
                             <CommandItem
                               key={opt}
                               value={opt}
-                              onSelect={() =>
-                                updateField("fuenteMedidas", opt)
-                              }
+                              onSelect={() => updateField("fuenteMedidas", opt)}
                             >
                               <Check
                                 className={cn(
@@ -568,7 +652,9 @@ export default function VerificacionFormModal({
                     <Command>
                       <CommandInput placeholder="Buscar opción..." />
                       <CommandList>
-                        <CommandEmpty>No se encontraron opciones.</CommandEmpty>
+                        <CommandEmpty>
+                          No se encontraron opciones.
+                        </CommandEmpty>
                         <CommandGroup>
                           {PLANOS_REVISADOS_OPTIONS.map((opt) => (
                             <CommandItem
@@ -759,7 +845,9 @@ export default function VerificacionFormModal({
 
             {/* Color y material / perfiles */}
             <div className="flex flex-col gap-4">
-              <h3 className="text-lg font-semibold">Color, perfiles y material</h3>
+              <h3 className="text-lg font-semibold">
+                Color, perfiles y material
+              </h3>
 
               {/* Color */}
               <div className="flex flex-col gap-2">
@@ -829,7 +917,9 @@ export default function VerificacionFormModal({
                                 value={colorSearch.trim()}
                                 onSelect={handleCreateColor}
                               >
-                                Crear "{colorSearch.trim()}"
+                                Crear &quot;
+                                {colorSearch.trim()}
+                                &quot;
                               </CommandItem>
                             </CommandGroup>
                           )}

@@ -97,11 +97,7 @@ export function FirmaDigitalField({ value, onChange }: Props) {
         >
           Limpiar
         </Button>
-        <Button
-          type="button"
-          onClick={handleSave}
-          disabled={isUploading}
-        >
+        <Button type="button" onClick={handleSave} disabled={isUploading}>
           {isUploading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -113,8 +109,8 @@ export function FirmaDigitalField({ value, onChange }: Props) {
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Dibujá la firma y hacé clic en "Guardar firma". Se sube a Cloudinary y
-        se guarda la URL en la visita técnica.
+        Dibujá la firma y hacé clic en &quot;Guardar firma&quot;. Se sube a
+        Cloudinary y se guarda la URL en la visita técnica.
       </p>
     </div>
   );

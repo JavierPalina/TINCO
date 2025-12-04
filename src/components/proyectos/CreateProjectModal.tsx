@@ -95,24 +95,32 @@ export function CreateProjectModal({ isOpen, onOpenChange }: CreateProjectModalP
 
   // 7. Configurar Mutación (POST a /api/proyectos)
   const mutation = useMutation({
-    mutationFn: (values: FormValues) => 
+    mutationFn: (values: FormValues) =>
       axios.post('/api/proyectos', values),
-    onSuccess: (data) => {
+    onSuccess: (response) => {
       toast.success('¡Proyecto creado con éxito!');
       queryClient.invalidateQueries({ queryKey: ['proyectos'] });
-      
-      const nuevoProyecto = data.data.data;
-      
+
+      const nuevoProyecto = response.data.data;
+
       // Cerramos el modal
       onOpenChange(false);
       form.reset();
-      
+
       // Redirigir al usuario a la página del nuevo proyecto
       router.push(`/dashboard/proyectos/${nuevoProyecto._id}`);
     },
-    onError: (error: any) => {
-      toast.error('Error al crear el proyecto: ' + (error.response?.data?.error || error.message));
-    }
+    onError: (error: unknown) => {
+      let message = 'Error desconocido';
+
+      if (axios.isAxiosError(error)) {
+        message = error.response?.data?.error || error.message;
+      } else if (error instanceof Error) {
+        message = error.message;
+      }
+
+      toast.error('Error al crear el proyecto: ' + message);
+    },
   });
 
   // 8. Handler de Envío

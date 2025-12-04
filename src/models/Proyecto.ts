@@ -21,6 +21,11 @@ export const ESTADOS_PROYECTO = [
   'Rechazado',
 ];
 
+// Tipos genéricos para las otras etapas (si no tenés interfaces específicas)
+export interface IEtapaGenerica {
+  [key: string]: unknown;
+}
+
 export interface IProyecto extends Document {
   numeroOrden: string;
   cliente: Types.ObjectId;
@@ -29,11 +34,11 @@ export interface IProyecto extends Document {
   estadoActual: string;
 
   visitaTecnica: IVisitaTecnica;
-  medicion: any;     // si tenés interfaces, podés tiparlas también
-  verificacion: any;
-  taller: any;
-  deposito: any;
-  logistica: any;
+  medicion: IEtapaGenerica;
+  verificacion: IEtapaGenerica;
+  taller: IEtapaGenerica;
+  deposito: IEtapaGenerica;
+  logistica: IEtapaGenerica;
 }
 
 const ProyectoSchema: Schema = new Schema(
@@ -65,24 +70,24 @@ ProyectoSchema.pre('save', async function (next) {
   if (this.isNew && !this.numeroOrden) {
     try {
       const Model = this.constructor as mongoose.Model<IProyecto>;
-      const ultimoProyecto = await Model.findOne({}, {}, { sort: { 'createdAt': -1 } });
+      const ultimoProyecto = await Model.findOne({}, {}, { sort: { createdAt: -1 } });
 
       let nuevoNumero = 1;
       if (ultimoProyecto && ultimoProyecto.numeroOrden) {
         const match = ultimoProyecto.numeroOrden.match(/\d+$/);
         if (match) {
-          nuevoNumero = parseInt(match[0]) + 1;
+          nuevoNumero = parseInt(match[0], 10) + 1;
         }
       }
-      
+
       this.numeroOrden = `OT-${nuevoNumero.toString().padStart(5, '0')}`;
       next();
-      
-    } catch (error: any) {
-      next(error); // Pasa el error si algo falla en la generación
+    } catch (error) {
+      // `error` es `unknown`, lo casteamos para pasarlo a next
+      next(error as Error);
     }
   } else {
-    next(); // No es nuevo o ya tiene un número, no hacer nada
+    next();
   }
 });
 
