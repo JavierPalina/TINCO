@@ -1,12 +1,19 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { useForm, UseFormReturn, DeepPartial } from "react-hook-form";
+import {
+  useForm,
+  UseFormReturn,
+  DeepPartial,
+  type Resolver,
+  type FieldValues,
+  type SubmitHandler,
+} from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ZodSchema } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
-import { IProyecto } from "@/models/Proyecto"; // Ajusta la ruta
+import { IProyecto } from "@/models/Proyecto";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import {
@@ -20,7 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
-interface ProcesoFormWrapperProps<T extends object> {
+interface ProcesoFormWrapperProps<T extends FieldValues> {
   proyecto: IProyecto;
   etapaKey: keyof IProyecto; // ej: "visitaTecnica"
   tituloEtapa: string;
@@ -46,7 +53,7 @@ type UpdateProyectoPayload =
       datosFormulario: unknown;
     };
 
-export function ProcesoFormWrapper<T extends object>({
+export function ProcesoFormWrapper<T extends FieldValues>({
   proyecto,
   etapaKey,
   tituloEtapa,
@@ -62,7 +69,7 @@ export function ProcesoFormWrapper<T extends object>({
 
   // 1. Configurar React Hook Form
   const form = useForm<T>({
-    resolver: zodResolver(validationSchema),
+    resolver: zodResolver(validationSchema) as Resolver<T>,
     defaultValues: (etapaData || {}) as DeepPartial<T>,
   });
 
@@ -76,19 +83,16 @@ export function ProcesoFormWrapper<T extends object>({
     mutationFn: (payload) =>
       axios.put(`/api/proyectos/${proyecto._id}`, payload),
     onSuccess: () => {
-      // Refrescar los datos del proyecto en la caché
       queryClient.invalidateQueries({ queryKey: ["proyecto", proyecto._id] });
-      // También refrescar la lista de proyectos por si cambió el estado
       queryClient.invalidateQueries({ queryKey: ["proyectos"] });
       toast.success("¡Guardado con éxito!");
     },
     onError: (error) => {
       if (axios.isAxiosError(error)) {
-        toast.error(
-          "Error al guardar: " +
-            (error.response?.data as { error?: string } | undefined)?.error ??
-            error.message,
-        );
+        const apiError =
+          (error.response?.data as { error?: string } | undefined)?.error ??
+          error.message;
+        toast.error("Error al guardar: " + apiError);
       } else {
         toast.error(
           "Error al guardar: " +
@@ -99,7 +103,7 @@ export function ProcesoFormWrapper<T extends object>({
   });
 
   // 4. Handler para "Guardar Cambios" (sin avanzar etapa)
-  const onSave = (values: T) => {
+  const onSave: SubmitHandler<T> = (values) => {
     const payload: UpdateProyectoPayload = {
       datosFormulario: {
         [etapaKey]: values, // Envía los datos anidados en su clave
@@ -109,7 +113,7 @@ export function ProcesoFormWrapper<T extends object>({
   };
 
   // 5. Handler para "Completar Etapa" (avanza el workflow)
-  const onComplete = (values: T) => {
+  const onComplete: SubmitHandler<T> = (values) => {
     const payload: UpdateProyectoPayload = {
       etapaACompletar: etapaKey,
       datosFormulario: values, // Envía los datos directamente
@@ -140,10 +144,10 @@ export function ProcesoFormWrapper<T extends object>({
       <CardContent>
         <Form {...form}>
           {/* Usamos dos botones 'submit' dentro del <form>.
-            Usamos el `handleSubmit` de RHF para decidir a qué función llamar.
+              Usamos el `handleSubmit` de RHF para decidir a qué función llamar.
           */}
           <form className="space-y-6">
-            {/* Aquí se renderizan los campos específicos del formulario */}
+            {/* Campos específicos del formulario */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {children(form, esCompletado)}
             </div>
