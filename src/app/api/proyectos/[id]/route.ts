@@ -39,9 +39,9 @@ interface ProyectoUpdateBody {
 // 🔹 PUT: actualizar etapas / formularios / forzar estado
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = params;
+  const { id } = await params;
 
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse("No autorizado", { status: 401 });
@@ -71,8 +71,8 @@ export async function PUT(
       proyecto.visitaTecnica,
     );
 
-    let proximoEstado: EstadoProyecto = proyecto
-      .estadoActual as EstadoProyecto;
+    let proximoEstado: EstadoProyecto =
+      proyecto.estadoActual as EstadoProyecto;
 
     const proyectoDynamic = proyecto as unknown as ProyectoDynamic;
 
@@ -269,9 +269,9 @@ export async function PUT(
 // --- DELETE: BORRAR UN PROYECTO COMPLETO ---
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = params;
+  const { id } = await params;
 
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse("No autorizado", { status: 401 });
