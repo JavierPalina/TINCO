@@ -10,8 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Importamos los 6 componentes de formulario (nos darán error hasta que los creemos)
 // import { FormVisitaTecnica } from '@/components/proyectos/FormVisitaTecnica';
-import { FormMedicion } from '@/components/proyectos/FormMedicion';
-import { FormVerificacion } from '@/components/proyectos/FormVerificacion';
+import MedicionFormModal from '@/components/proyectos/FormMedicion';
+import VerificacionFormModal from '@/components/proyectos/FormVerificacion';
 import { FormTaller } from '@/components/proyectos/FormTaller';
 import { FormDeposito } from '@/components/proyectos/FormDeposito';
 import { FormLogistica } from '@/components/proyectos/FormLogistica';
@@ -85,11 +85,11 @@ export default function ProyectoDetallePage() {
         </TabsContent> */}
         
         <TabsContent value="medicion" className="mt-4">
-          <FormMedicion proyecto={proyecto} />
+          <MedicionFormModal proyecto={proyecto} />
         </TabsContent>
         
         <TabsContent value="verificacion" className="mt-4">
-          <FormVerificacion proyecto={proyecto} />
+          <VerificacionFormModal proyecto={proyecto} />
         </TabsContent>
         
         <TabsContent value="taller" className="mt-4">

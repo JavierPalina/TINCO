@@ -1,16 +1,47 @@
+// ./src/app/api/proyectos/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Proyecto, { ESTADOS_PROYECTO } from "@/models/Proyecto";
 import { authOptions } from "@/lib/authOptions";
 import { getServerSession } from "next-auth";
 
+// ▶️ Tipos auxiliares
+
+type EstadoProyecto = (typeof ESTADOS_PROYECTO)[number];
+
+type EtapaNombre =
+  | "visitaTecnica"
+  | "medicion"
+  | "verificacion"
+  | "taller"
+  | "deposito"
+  | "logistica";
+
+// subdocumentos de etapas con campos dinámicos
+type EtapaSubdoc = {
+  estado?: string;
+  fechaCompletado?: Date;
+  [field: string]: unknown;
+};
+
+type ProyectoDynamic = {
+  [key: string]: EtapaSubdoc | undefined;
+};
+
+// body esperado en el PUT
+interface ProyectoUpdateBody {
+  etapaACompletar?: EtapaNombre;
+  datosFormulario?: unknown;
+  forzarEstado?: EstadoProyecto;
+  estadoActual?: EstadoProyecto;
+}
+
 // 🔹 PUT: actualizar etapas / formularios / forzar estado
 export async function PUT(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }, // tu firma actual
+  { params }: { params: { id: string } },
 ) {
-  const { params } = context;
-  const { id } = await params;
+  const { id } = params;
 
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse("No autorizado", { status: 401 });
@@ -18,10 +49,11 @@ export async function PUT(
   await dbConnect();
 
   try {
-    const body = await request.json();
+    const body = (await request.json()) as ProyectoUpdateBody;
     console.log("🟣 [PUT /api/proyectos/:id] body recibido:", body);
 
-    const { etapaACompletar, datosFormulario, forzarEstado, estadoActual } = body;
+    const { etapaACompletar, forzarEstado, estadoActual } = body;
+    const datosFormulario = body.datosFormulario;
 
     const proyecto = await Proyecto.findById(id);
     if (!proyecto) {
@@ -39,49 +71,93 @@ export async function PUT(
       proyecto.visitaTecnica,
     );
 
-    let proximoEstado = proyecto.estadoActual;
+    let proximoEstado: EstadoProyecto = proyecto
+      .estadoActual as EstadoProyecto;
+
+    const proyectoDynamic = proyecto as unknown as ProyectoDynamic;
 
     // 🔸 Caso 1: completar etapa del workflow (visitaTecnica, medicion, etc.)
-    if (etapaACompletar && datosFormulario !== undefined) {
+    if (
+      etapaACompletar &&
+      datosFormulario !== undefined &&
+      typeof datosFormulario === "object" &&
+      !Array.isArray(datosFormulario)
+    ) {
       console.log("🟢 Caso workflow, etapaACompletar:", etapaACompletar);
 
-      Object.assign((proyecto as any)[etapaACompletar], datosFormulario);
+      // Aseguramos que exista el subdoc
+      if (!proyectoDynamic[etapaACompletar]) {
+        proyectoDynamic[etapaACompletar] = {};
+      }
 
-      (proyecto as any)[etapaACompletar].estado = "Completado";
-      (proyecto as any)[etapaACompletar].fechaCompletado = new Date();
+      const etapa = proyectoDynamic[etapaACompletar];
 
+      if (etapa) {
+        // merge de los datos del formulario
+        Object.assign(
+          etapa,
+          datosFormulario as Record<string, unknown>,
+        );
+
+        etapa.estado = "Completado";
+        etapa.fechaCompletado = new Date();
+      }
+
+      // Narrowing de datos por etapa para los campos especiales
       switch (etapaACompletar) {
-        case "visitaTecnica":
+        case "visitaTecnica": {
           proximoEstado = "Medición";
           break;
-        case "medicion":
-          if (datosFormulario.enviarAVerificacion === "Sí") {
+        }
+        case "medicion": {
+          const datosMedicion = datosFormulario as {
+            enviarAVerificacion?: string;
+          };
+          if (datosMedicion.enviarAVerificacion === "Sí") {
             proximoEstado = "Verificación";
           }
           break;
-        case "verificacion":
-          if (datosFormulario.aprobadoParaProduccion === "Sí") {
+        }
+        case "verificacion": {
+          const datosVerificacion = datosFormulario as {
+            aprobadoParaProduccion?: string;
+          };
+          if (datosVerificacion.aprobadoParaProduccion === "Sí") {
             proximoEstado = "Taller";
           }
           break;
-        case "taller":
+        }
+        case "taller": {
+          const datosTaller = datosFormulario as {
+            pedidoListoParaEntrega?: string;
+            destinoFinal?: EstadoProyecto;
+          };
           if (
-            datosFormulario.pedidoListoParaEntrega === "Sí" &&
-            datosFormulario.destinoFinal
+            datosTaller.pedidoListoParaEntrega === "Sí" &&
+            datosTaller.destinoFinal
           ) {
-            proximoEstado = datosFormulario.destinoFinal;
+            proximoEstado = datosTaller.destinoFinal;
           }
           break;
-        case "deposito":
-          if (datosFormulario.estadoInterno === "Listo para entrega") {
+        }
+        case "deposito": {
+          const datosDeposito = datosFormulario as {
+            estadoInterno?: string;
+          };
+          if (datosDeposito.estadoInterno === "Listo para entrega") {
             proximoEstado = "Logística";
           }
           break;
-        case "logistica":
-          if (datosFormulario.estadoEntrega === "Entregado") {
+        }
+        case "logistica": {
+          const datosLogistica = datosFormulario as {
+            estadoEntrega?: string;
+          };
+          if (datosLogistica.estadoEntrega === "Entregado") {
             proximoEstado = "Completado";
           }
           break;
+        }
       }
 
       if (forzarEstado && ESTADOS_PROYECTO.includes(forzarEstado)) {
@@ -91,10 +167,18 @@ export async function PUT(
 
       proyecto.estadoActual = proximoEstado;
 
-    // 🔸 Caso 2: actualización genérica de una sub-doc sin workflow
-    } else if (datosFormulario && typeof datosFormulario === "object") {
-      const [etapaKey] = Object.keys(datosFormulario);
-      const subData = (datosFormulario as any)[etapaKey];
+      // 🔸 Caso 2: actualización genérica de una sub-doc sin workflow
+    } else if (
+      datosFormulario &&
+      typeof datosFormulario === "object" &&
+      !Array.isArray(datosFormulario)
+    ) {
+      const datosGenericos = datosFormulario as Record<string, unknown>;
+      const [etapaKey] = Object.keys(datosGenericos) as string[];
+
+      const subData = datosGenericos[etapaKey] as
+        | Record<string, unknown>
+        | undefined;
 
       console.log(
         "🔵 Caso genérico sub-doc. etapaKey:",
@@ -107,7 +191,15 @@ export async function PUT(
         // 👉 Si subData tiene campos → merge normal
         if (subData && Object.keys(subData).length > 0) {
           console.log("🔹 Merge normal de subdoc", etapaKey);
-          Object.assign((proyecto as any)[etapaKey], subData);
+
+          const proyectoRecord =
+            proyecto as unknown as Record<string, unknown>;
+
+          const targetSubdoc = (proyectoRecord[etapaKey] ??
+            {}) as Record<string, unknown>;
+
+          Object.assign(targetSubdoc, subData);
+          proyectoRecord[etapaKey] = targetSubdoc;
         } else {
           // 👉 Objeto vacío → interpretamos como "borrar / vaciar" ese subdoc
           console.log(
@@ -117,17 +209,20 @@ export async function PUT(
             proyecto._id.toString(),
           );
 
-          // Usamos updateOne directo para evitar sutilezas de defaults
           await Proyecto.updateOne(
             { _id: proyecto._id },
             { $set: { [etapaKey]: {} } },
           );
 
           const proyectoActualizado = await Proyecto.findById(proyecto._id);
+
+          const proyectoActualizadoRecord =
+            proyectoActualizado as unknown as Record<string, unknown>;
+
           console.log(
             "✅ Subdoc luego de limpiar:",
             etapaKey,
-            (proyectoActualizado as any)?.[etapaKey],
+            proyectoActualizadoRecord[etapaKey],
           );
 
           return NextResponse.json({
@@ -143,7 +238,10 @@ export async function PUT(
       !etapaACompletar &&
       (datosFormulario === undefined ||
         (typeof datosFormulario === "object" &&
-          Object.keys(datosFormulario).length === 0)) &&
+          datosFormulario !== null &&
+          !Array.isArray(datosFormulario) &&
+          Object.keys(datosFormulario as Record<string, unknown>).length ===
+            0)) &&
       estadoActual &&
       ESTADOS_PROYECTO.includes(estadoActual)
     ) {
@@ -171,10 +269,9 @@ export async function PUT(
 // --- DELETE: BORRAR UN PROYECTO COMPLETO ---
 export async function DELETE(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> },
+  { params }: { params: { id: string } },
 ) {
-  const { params } = context;
-  const { id } = await params;
+  const { id } = params;
 
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse("No autorizado", { status: 401 });
