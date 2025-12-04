@@ -218,56 +218,107 @@ function QuoteCard({ quote, onDelete, onUndo, stageColors }: {
     );
 }
 
-function QuoteColumn({ id, etapa, quotes, onDelete, stageColors, isFetching, onUndo }: { 
-    id: string; 
-    etapa: Etapa; 
-    quotes: Cotizacion[], 
-    onDelete: (quoteId: string) => void; 
+function QuoteColumn({
+    id,
+    etapa,
+    quotes,
+    onDelete,
+    stageColors,
+    isFetching,
+    onUndo,
+    highlight = false,
+}: {
+    id: string;
+    etapa: Etapa;
+    quotes: Cotizacion[];
+    onDelete: (quoteId: string) => void;
     onUndo: (quoteId: string) => void;
-    stageColors: StageColorMap; 
-    isFetching: boolean; 
+    stageColors: StageColorMap;
+    isFetching: boolean;
+    highlight?: boolean;
 }) {
     const quoteIds = useMemo(() => quotes.map(q => q._id), [quotes]);
     const totalAmount = useMemo(() => quotes.reduce((sum, quote) => sum + quote.montoTotal, 0), [quotes]);
     const { setNodeRef, isOver } = useSortable({ id, data: { type: 'Column' } });
 
     return (
-        <div ref={setNodeRef} className={cn("w-80 h-full flex flex-col flex-shrink-0 rounded-lg bg-card shadow-sm transition-colors duration-300", isOver ? "bg-primary/10" : "border")}>
-            <div className="p-3 pb-1 sticky top-0 bg-card/80 backdrop-blur-sm z-10 rounded-t-lg">
-                <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: stageColors[etapa._id] || etapa.color }}></div>
-                        <h2 className="font-semibold text-base">{etapa.nombre}</h2>
-                    </div>
-                    <span className="text-xs font-semibold text-muted-foreground bg-secondary rounded-full px-2 py-0.5">{quotes.length} Leads</span>
-                </div>
-                <div className="flex items-center gap-1 text-base font-bold">
-                    <DollarSign className="h-4 w-4" /><span>{totalAmount.toLocaleString('es-AR')}</span>
-                </div>
-            </div>
-            
-            <div className="flex-grow overflow-y-auto p-2">
-                {isFetching ? (
-                    <div className="space-y-2">
-                        <QuoteCardSkeleton />
-                        <QuoteCardSkeleton />
-                        <QuoteCardSkeleton />
-                    </div>
-                ) : (
-                    <>
-                        <SortableContext items={quoteIds}>
-                            {quotes.map(quote => <QuoteCard key={quote._id} quote={quote} onDelete={onDelete} onUndo={onUndo} stageColors={stageColors} />)}
-                        </SortableContext>
-                        {quotes.length === 0 && (
-                            <div className="flex items-center justify-center h-full">
-                                <p className="text-center text-sm text-muted-foreground p-4 italic">Arrastra una cotización aquí</p>
-                            </div>
-                        )}
-                    </>
-                )}
-            </div>
+  <div
+    ref={setNodeRef}
+    className={cn(
+      "w-80 h-full flex flex-col flex-shrink-0 rounded-lg bg-card shadow-sm transition-colors duration-300",
+      isOver && "bg-primary/10",
+        highlight
+            ? "border-2 border-primary ring-1 ring-primary/40 bg-primary/10"
+            : "border"
+    )}
+  >
+    {/* header de la columna */}
+    <div className="p-3 pb-1 sticky top-0 bg-card/80 backdrop-blur-sm z-10 rounded-t-lg">
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <div
+            className="w-2.5 h-2.5 rounded-full"
+            style={{ backgroundColor: stageColors[etapa._id] || etapa.color }}
+          />
+          <h2 className="font-semibold text-base">{etapa.nombre}</h2>
         </div>
-    );
+        <span className="text-xs font-semibold text-muted-foreground bg-secondary rounded-full px-2 py-0.5">
+          {quotes.length} Leads
+        </span>
+      </div>
+      <div className="flex items-center gap-1 text-base font-bold">
+        <DollarSign className="h-4 w-4" />
+        <span>{totalAmount.toLocaleString("es-AR")}</span>
+      </div>
+    </div>
+
+    {/* cards */}
+    <div className="flex-grow overflow-y-auto p-2">
+      {isFetching ? (
+        <div className="space-y-2">
+          <QuoteCardSkeleton />
+          <QuoteCardSkeleton />
+          <QuoteCardSkeleton />
+        </div>
+      ) : (
+        <>
+          <SortableContext items={quoteIds}>
+            {quotes.map((quote) => (
+              <QuoteCard
+                key={quote._id}
+                quote={quote}
+                onDelete={onDelete}
+                onUndo={onUndo}
+                stageColors={stageColors}
+              />
+            ))}
+          </SortableContext>
+          {quotes.length === 0 && (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-center text-sm text-muted-foreground p-4 italic">
+                Arrastra una cotización aquí
+              </p>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+
+    {/* 👇 Totales debajo de la columna */}
+    <div className="border-t px-3 py-2 bg-muted/40 text-[11px] flex flex-col gap-1 rounded-b-lg">
+      <div className="flex justify-between">
+        <span className="text-muted-foreground">Leads</span>
+        <span className="font-semibold">{quotes.length}</span>
+      </div>
+      <div className="flex justify-between">
+        <span className="text-muted-foreground">Total</span>
+        <span className="font-semibold">
+          ${totalAmount.toLocaleString("es-AR")}
+        </span>
+      </div>
+    </div>
+  </div>
+);
 }
 
 function QuotesTableView({ quotes, onDelete, stageColors }: { quotes: Cotizacion[]; onDelete: (quoteId: string) => void; stageColors: StageColorMap; }) {
@@ -332,19 +383,24 @@ function PipelineView({ etapas, columns, onDelete, onUndo, sensors, onDragStart,
                 <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>
                     <div className="flex gap-4 h-full items-start overflow-x-auto w-full pb-2">
                         <SortableContext items={etapas?.map((e: Etapa) => e._id) || []}>
-                            {etapas?.map((etapa: Etapa) => (
-                                <QuoteColumn
-                                    key={etapa._id}
-                                    id={etapa._id}
-                                    etapa={etapa}
-                                    quotes={columns[etapa._id] || []}
-                                    onDelete={onDelete}
-                                    onUndo={onUndo}
-                                    stageColors={stageColors}
-                                    isFetching={isFetching}
-                                />
-                            ))}
+                          {etapas?.map((etapa: Etapa) => (
+                            <QuoteColumn
+                              key={etapa._id}
+                              id={etapa._id}
+                              etapa={etapa}
+                              quotes={columns[etapa._id] || []}
+                              onDelete={onDelete}
+                              onUndo={onUndo}
+                              stageColors={stageColors}
+                              isFetching={isFetching}
+                              highlight={
+                                etapa.nombre === "Proyecto por Iniciar" ||
+                                etapa.nombre === "Proyectos no realizados" || etapa.nombre === "Proyecto Finalizado"
+                              }
+                            />
+                          ))}
                         </SortableContext>
+
                     </div>
                     {typeof document !== 'undefined' && createPortal(
                         <DragOverlay>
@@ -434,20 +490,30 @@ export default function PipelinePage() {
     const stageColors = useMemo(() => {
         const colorMap: StageColorMap = {};
         if (!etapas) return colorMap;
-
+        
         const themePrimaryColor = { h: 160, s: 35, l: 48 };
         const total = etapas.length;
         
         etapas.forEach((etapa, index) => {
-            const maxOpacity = 1.0;
-            const minOpacity = 0.2;
-            if (total <= 1) {
-                colorMap[etapa._id] = `hsla(${themePrimaryColor.h}, ${themePrimaryColor.s}%, ${themePrimaryColor.l}%, ${maxOpacity})`;
-                return;
-            }
-            const opacityStep = (maxOpacity - minOpacity) / (total - 1);
-            const opacity = maxOpacity - (index * opacityStep);
-            colorMap[etapa._id] = `hsla(${themePrimaryColor.h}, ${themePrimaryColor.s}%, ${themePrimaryColor.l}%, ${opacity})`;
+        // 💚 columnas verdes especiales
+        if (
+            etapa.nombre === "Proyecto por Iniciar" ||
+            etapa.nombre === "Proyectos no realizados" ||
+            etapa.nombre === "Proyecto Finalizado"
+        ) {
+            colorMap[etapa._id] = `hsla(${themePrimaryColor.h}, ${themePrimaryColor.s}%, ${themePrimaryColor.l}%, 1.0)`;
+            return;
+        }
+    
+        const maxOpacity = 1.0;
+        const minOpacity = 0.2;
+        if (total <= 1) {
+            colorMap[etapa._id] = `hsla(${themePrimaryColor.h}, ${themePrimaryColor.s}%, ${themePrimaryColor.l}%, ${maxOpacity})`;
+            return;
+        }
+        const opacityStep = (maxOpacity - minOpacity) / (total - 1);
+        const opacity = maxOpacity - index * opacityStep;
+        colorMap[etapa._id] = `hsla(${themePrimaryColor.h}, ${themePrimaryColor.s}%, ${themePrimaryColor.l}%, ${opacity})`;
         });
         
         return colorMap;
@@ -528,90 +594,170 @@ export default function PipelinePage() {
     }
 
     async function handleDragEnd(event: DragEndEvent) {
-    setActiveQuote(null);
-    const { active, over } = event;
-    if (!over || active.id === over.id) {
-        console.log("DND LOG: Arrastre cancelado o soltado en el mismo lugar.");
-        return;
+  setActiveQuote(null);
+  const { active, over } = event;
+
+  if (!over || active.id === over.id) {
+    console.log("DND LOG: Arrastre cancelado o soltado en el mismo lugar.");
+    return;
+  }
+
+  const activeId = active.id.toString();
+  const overId = over.id.toString();
+  const activeContainer = findContainer(activeId);
+  const overContainer = findContainer(overId);
+
+  console.log(
+    `DND LOG: Moviendo Cotización ${activeId} de Etapa ${activeContainer} a Etapa ${overContainer}`,
+  );
+
+  if (!activeContainer || !overContainer) {
+    console.error("DND LOG: Contenedor activo o destino no encontrado.");
+    return;
+  }
+
+  // 🔁 Movimiento entre columnas (cambio de etapa)
+  if (activeContainer !== overContainer) {
+    console.log(
+      "DND LOG: Intento de movimiento de Etapa a Etapa. Buscando cotización...",
+    );
+
+    const quote = columns[activeContainer].find((q) => q._id === activeId);
+
+    if (!quote) {
+      console.error(
+        `DND LOG: ¡ERROR! Cotización ${activeId} no encontrada en la columna ${activeContainer}.`,
+      );
+      return;
     }
 
-    const activeId = active.id.toString();
-    const overId = over.id.toString();
-    const activeContainer = findContainer(activeId);
-    const overContainer = findContainer(overId);
+    try {
+      console.log(
+        `DND LOG: Buscando formulario para la nueva etapa: /api/formularios-etapa/${overContainer}`,
+      );
+      const { data } = await axios.get(
+        `/api/formularios-etapa/${overContainer}`,
+      );
+      console.log(
+        "DND LOG: Respuesta de API de formulario (data.data):",
+        data.data,
+      );
 
-    console.log(`DND LOG: Moviendo Cotización ${activeId} de Etapa ${activeContainer} a Etapa ${overContainer}`);
+      const camposFormulario = data.data?.campos || [];
 
-    if (!activeContainer || !overContainer) {
-        console.error("DND LOG: Contenedor activo o destino no encontrado.");
-        return;
-    }
+      console.log("DND LOG: Campos del formulario encontrados:", camposFormulario);
+      console.log(
+        "DND LOG: ¿Hay formulario? (camposFormulario.length > 0):",
+        camposFormulario.length > 0,
+      );
 
-    if (activeContainer !== overContainer) {
-        console.log("DND LOG: Intento de movimiento de Etapa a Etapa. Buscando cotización...");
-        
-        const quote = columns[activeContainer].find(q => q._id === activeId);
-        
-        if (!quote) {
-            console.error(`DND LOG: ¡ERROR! Cotización ${activeId} no encontrada en la columna ${activeContainer}.`);
-            return; 
+      // 🧾 Hay formulario → abrimos modal
+      if (camposFormulario.length > 0) {
+        console.log("DND LOG: ✅ ¡FORMULARIO ENCONTRADO! Abriendo modal...");
+        setQuoteToMove(quote);
+        setNewStageId(overContainer);
+        setFormFieldsForStage(camposFormulario);
+        setIsStageFormModalOpen(true);
+      } else {
+        // 🚚 No hay formulario → mover directamente
+        console.log("DND LOG: ❌ No hay formulario. Moviendo directamente sin modal.");
+
+        const newSourceItems = [...columns[activeContainer]];
+        const newDestItems = [...columns[overContainer]];
+
+        const quoteIndex = newSourceItems.findIndex((q) => q._id === activeId);
+        if (quoteIndex === -1) return;
+
+        const [movedItem] = newSourceItems.splice(quoteIndex, 1);
+
+        const nuevaEtapa = etapas?.find((e) => e._id === overContainer);
+        if (nuevaEtapa) {
+          movedItem.etapa = nuevaEtapa;
         }
+
+        // Primero actualizamos UI
+        newDestItems.unshift(movedItem);
+        setColumns((prev) => ({
+          ...prev,
+          [activeContainer]: newSourceItems,
+          [overContainer]: newDestItems,
+        }));
 
         try {
-            console.log(`DND LOG: Buscando formulario para la nueva etapa: /api/formularios-etapa/${overContainer}`);
-            const { data } = await axios.get(`/api/formularios-etapa/${overContainer}`);
-            console.log("DND LOG: Respuesta de API de formulario (data.data):", data.data);
-            
-            const camposFormulario = data.data?.campos || []; 
-            
-            console.log(`DND LOG: Campos del formulario encontrados:`, camposFormulario);
-            console.log(`DND LOG: ¿Hay formulario? (camposFormulario.length > 0): ${camposFormulario.length > 0}`);
+          // Luego persistimos cambio de etapa
+          await updateQuoteStage.mutateAsync({
+            quoteId: activeId,
+            newStageId: overContainer,
+          });
 
-
-            if (camposFormulario.length > 0) {
-                console.log("DND LOG: ✅ ¡FORMULARIO ENCONTRADO! Abriendo modal...");
-                setQuoteToMove(quote);
-                setNewStageId(overContainer);
-                setFormFieldsForStage(camposFormulario);
-                setIsStageFormModalOpen(true); 
-            } else {
-                console.log("DND LOG: ❌ No hay formulario. Moviendo directamente sin modal.");
-                updateQuoteStage.mutate({ quoteId: activeId, newStageId: overContainer });
-                const newSourceItems = [...columns[activeContainer]];
-                const newDestItems = [...columns[overContainer]];
-                
-                const quoteIndex = newSourceItems.findIndex(q => q._id === activeId);
-                if (quoteIndex === -1) return;
-                
-                const [movedItem] = newSourceItems.splice(quoteIndex, 1);
-                
-                movedItem.etapa = etapas?.find(e => e._id === overContainer) || movedItem.etapa;
-                newDestItems.unshift(movedItem); 
-                
-                setColumns(prev => ({
-                    ...prev,
-                    [activeContainer]: newSourceItems,
-                    [overContainer]: newDestItems,
-                }));
-            }
-        } catch (err) {
-            console.error('DND LOG: ¡ERROR CRÍTICO! Fallo en la llamada API a formularios-etapa:', err);
-            toast.error('Error al cargar el formulario de la etapa o al mover la cotización.');
-            queryClient.invalidateQueries({ queryKey: ['cotizacionesPipeline'] });
-        }
-    } else {
-        const activeIndex = columns[activeContainer].findIndex(q => q._id === activeId);
-        const overIndex = columns[overContainer].findIndex(q => q._id === overId);
+          // 💚 Si la nueva etapa es "Proyecto por Iniciar", creamos Proyecto
+          if (nuevaEtapa?.nombre === "Proyecto por Iniciar") {
+          try {
+            console.log(
+              "DND LOG: Etapa 'Proyecto por Iniciar' → creando Proyecto desde cotización",
+            );
         
-        if (activeIndex !== overIndex) {
-            console.log("DND LOG: Reordenando dentro de la misma columna.");
-            const newOrderedQuotes = arrayMove(columns[overContainer], activeIndex, overIndex);
-            
-            setColumns(prev => ({ ...prev, [overContainer]: newOrderedQuotes }));
-            
-            reorderQuotesMutation.mutate({ stageId: overContainer, orderedQuoteIds: newOrderedQuotes.map(q => q._id) });
+            const response = await axios.post("/api/proyectos", {
+              clienteId: movedItem.cliente._id,
+              cotizacionId: movedItem._id,
+            });
+        
+            const proyectoCreado = response.data?.data;
+        
+            toast.success(
+              `Proyecto creado para ${movedItem.cliente?.nombreCompleto || "el cliente"}`
+            );
+          } catch (error) {
+            console.error(
+              "Error creando proyecto desde cotización en 'Proyecto por Iniciar'",
+              error,
+            );
+            toast.error(
+              "Se movió la cotización pero no se pudo crear el proyecto.",
+            );
+          }
         }
+        } catch (err) {
+          console.error("DND LOG: Error moviendo cotización:", err);
+          toast.error("Error al mover la cotización.");
+          queryClient.invalidateQueries({ queryKey });
+        }
+      }
+    } catch (err) {
+      console.error(
+        "DND LOG: ¡ERROR CRÍTICO! Fallo en la llamada API a formularios-etapa:",
+        err,
+      );
+      toast.error(
+        "Error al cargar el formulario de la etapa o al mover la cotización.",
+      );
+      queryClient.invalidateQueries({ queryKey: ["cotizacionesPipeline"] });
     }
+  } else {
+    // ↕️ Reordenar dentro de la misma columna
+    const activeIndex = columns[activeContainer].findIndex(
+      (q) => q._id === activeId,
+    );
+    const overIndex = columns[overContainer].findIndex(
+      (q) => q._id === overId,
+    );
+
+    if (activeIndex !== overIndex) {
+      console.log("DND LOG: Reordenando dentro de la misma columna.");
+      const newOrderedQuotes = arrayMove(
+        columns[overContainer],
+        activeIndex,
+        overIndex,
+      );
+
+      setColumns((prev) => ({ ...prev, [overContainer]: newOrderedQuotes }));
+
+      reorderQuotesMutation.mutate({
+        stageId: overContainer,
+        orderedQuoteIds: newOrderedQuotes.map((q) => q._id),
+      });
+    }
+  }
 }
 
     const undoQuoteStage = useMutation({
@@ -668,13 +814,32 @@ export default function PipelinePage() {
                             });
 
                             await updateQuoteWithFormData.mutateAsync({
-                                quoteId: quoteToMove._id,
-                                newStageId: newStageId,
-                                formData
-                            });
+  quoteId: quoteToMove._id,
+  newStageId: newStageId,
+  formData,
+});
 
-                            setQuoteToMove(null);
-                            setNewStageId(null);
+// 💚 si la nueva etapa es "Proyecto por Iniciar", creamos Proyecto
+if (newEtapa?.nombre === "Proyecto por Iniciar") {
+  try {
+    const response = await axios.post("/api/proyectos", {
+      clienteId: quoteToMove.cliente._id,
+      cotizacionId: quoteToMove._id,
+    });
+
+    const proyectoCreado = response.data?.data;
+
+    toast.success(
+      `Proyecto creado para ${quoteToMove.cliente?.nombreCompleto || "el cliente"}`
+    );
+  } catch (error) {
+    console.error("Error creando proyecto desde cotización", error);
+    toast.error("Se movió la cotización pero no se pudo crear el proyecto.");
+  }
+}
+
+setQuoteToMove(null);
+setNewStageId(null);
                         }
                     }}
                 />

@@ -20,10 +20,14 @@ export async function GET(request: NextRequest) {
     const fechaDesde = searchParams.get('fechaDesde');
     const fechaHasta = searchParams.get('fechaHasta');
     const searchTerm = searchParams.get('searchTerm');
+    const clienteId = searchParams.get('clienteId');
 
     const matchFilter: Record<string, unknown> = {};
     if (vendedorId) {
       matchFilter.vendedor = new mongoose.Types.ObjectId(vendedorId);
+    }
+    if (clienteId) {
+      matchFilter.cliente = new mongoose.Types.ObjectId(clienteId);
     }
     if (fechaDesde && fechaHasta) {
       matchFilter.createdAt = {

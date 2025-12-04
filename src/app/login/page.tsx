@@ -37,7 +37,7 @@ function AuthComponent() {
     });
     setIsLoginLoading(false);
     if (result?.ok) {
-      router.push('/dashboard');
+      router.push('/dashboard/pipeline');
       router.refresh();
     } else {
       setError(result?.error || 'Credenciales inválidas');
