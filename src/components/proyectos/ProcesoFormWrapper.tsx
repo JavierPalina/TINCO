@@ -1,3 +1,4 @@
+// ./src/components/proyectos/ProcesoFormWrapper.tsx
 "use client";
 
 import React, { useEffect, useMemo } from "react";
@@ -10,7 +11,7 @@ import {
   type SubmitHandler,
 } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 
@@ -46,11 +47,14 @@ type UpdateProyectoPayload =
 
 interface ProcesoFormWrapperProps<T extends FieldValues> {
   proyecto: IProyecto;
-  etapaKey: keyof IProyecto; // ej: "visitaTecnica" | "medicion" | "verificacion" | "logistica"
+  etapaKey: keyof IProyecto; // "visitaTecnica" | "medicion" | "verificacion" | "logistica"...
   tituloEtapa: string;
 
-  // 👇 IMPORTANTE: este tipo permite que T venga desde afuera
-  validationSchema: z.ZodType<T, any, any>;
+  /**
+   * ✅ Aceptamos cualquier schema Zod.
+   * No tipamos internals para no chocar con Zod v4.
+   */
+  validationSchema: z.ZodTypeAny;
 
   children: (form: UseFormReturn<T>, esCompletado: boolean) => React.ReactNode;
 }
@@ -64,36 +68,40 @@ export function ProcesoFormWrapper<T extends FieldValues>({
 }: ProcesoFormWrapperProps<T>) {
   const queryClient = useQueryClient();
 
-  // Datos actuales de esta etapa (tipados como T + campos comunes de etapa)
+  // Datos actuales de esta etapa
   const etapaData = proyecto[etapaKey] as (Partial<T> & EtapaBase) | undefined;
 
   const esCompletado = etapaData?.estado === "Completado";
   const esEstadoActual = proyecto.estadoActual === tituloEtapa;
 
-  // ✅ Default values correctos para RHF moderno
   const defaultValues = useMemo<DefaultValues<T>>(
-    () => ((etapaData || {}) as DefaultValues<T>),
+    () => (etapaData || {}) as DefaultValues<T>,
     [etapaData],
   );
 
-  // ✅ Resolver tipado sin pelearse con Zod/RHF
-  const resolver = useMemo(
-    () => zodResolver(validationSchema) as unknown as Resolver<T>,
-    [validationSchema],
-  );
+  /**
+   * ✅ FIX CLAVE:
+   * Forzamos el schema al tipo EXACTO que espera zodResolver
+   * (compatibilidad Zod v3/v4 sin any).
+   */
+  const resolver = useMemo<Resolver<T>>(() => {
+    type ZodResolverSchema = Parameters<typeof zodResolver>[0];
 
-  // 1) Configurar React Hook Form
+    return zodResolver(
+      validationSchema as unknown as ZodResolverSchema,
+    ) as unknown as Resolver<T>;
+  }, [validationSchema]);
+
   const form = useForm<T>({
     resolver,
     defaultValues,
+    mode: "onSubmit",
   });
 
-  // 2) Sincronizar el formulario si los datos del proyecto cambian
   useEffect(() => {
     form.reset(defaultValues);
   }, [defaultValues, form]);
 
-  // 3) Mutación PUT
   const mutation = useMutation<unknown, unknown, UpdateProyectoPayload>({
     mutationFn: (payload) =>
       axios.put(`/api/proyectos/${proyecto._id}`, payload),
@@ -121,7 +129,7 @@ export function ProcesoFormWrapper<T extends FieldValues>({
     },
   });
 
-  // 4) Guardar sin avanzar etapa
+  // Guardar sin avanzar etapa
   const onSave: SubmitHandler<T> = (values) => {
     const payload: UpdateProyectoPayload = {
       datosFormulario: {
@@ -131,7 +139,7 @@ export function ProcesoFormWrapper<T extends FieldValues>({
     mutation.mutate(payload);
   };
 
-  // 5) Completar etapa (avanza workflow)
+  // Completar etapa
   const onComplete: SubmitHandler<T> = (values) => {
     const payload: UpdateProyectoPayload = {
       etapaACompletar: etapaKey,
@@ -166,12 +174,10 @@ export function ProcesoFormWrapper<T extends FieldValues>({
       <CardContent>
         <Form {...form}>
           <form className="space-y-6">
-            {/* Campos del formulario */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {children(form, esCompletado)}
             </div>
 
-            {/* Botones */}
             {!esCompletado && (
               <div className="flex justify-end gap-4 pt-6 border-t">
                 <Button
