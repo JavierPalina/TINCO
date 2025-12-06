@@ -43,7 +43,6 @@ export function SignaturePad({ value, onChange, disabled }: Props) {
         penColor="black"
         canvasProps={{ className: 'w-full h-full' }}
         onEnd={handleEnd}
-        disabled={disabled}
       />
       {!disabled && (
         <Button
