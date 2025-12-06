@@ -1,18 +1,19 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   useForm,
-  UseFormReturn,
-  DeepPartial,
+  type UseFormReturn,
+  type DefaultValues,
   type Resolver,
   type FieldValues,
   type SubmitHandler,
 } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ZodSchema } from "zod";
+import * as z from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
+
 import { IProyecto } from "@/models/Proyecto";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
@@ -27,14 +28,6 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
-interface ProcesoFormWrapperProps<T extends FieldValues> {
-  proyecto: IProyecto;
-  etapaKey: keyof IProyecto; // ej: "visitaTecnica"
-  tituloEtapa: string;
-  validationSchema: ZodSchema<T>;
-  children: (form: UseFormReturn<T>, esCompletado: boolean) => React.ReactNode;
-}
-
 // Campos comunes que pueden existir en las distintas etapas
 interface EtapaBase {
   estado?: string;
@@ -44,14 +37,23 @@ interface EtapaBase {
 // Payloads posibles para el PUT
 type UpdateProyectoPayload =
   | {
-      datosFormulario: {
-        [key: string]: unknown;
-      };
+      datosFormulario: Record<string, unknown>;
     }
   | {
       etapaACompletar: keyof IProyecto;
       datosFormulario: unknown;
     };
+
+interface ProcesoFormWrapperProps<T extends FieldValues> {
+  proyecto: IProyecto;
+  etapaKey: keyof IProyecto; // ej: "visitaTecnica" | "medicion" | "verificacion" | "logistica"
+  tituloEtapa: string;
+
+  // 👇 IMPORTANTE: este tipo permite que T venga desde afuera
+  validationSchema: z.ZodType<T, any, any>;
+
+  children: (form: UseFormReturn<T>, esCompletado: boolean) => React.ReactNode;
+}
 
 export function ProcesoFormWrapper<T extends FieldValues>({
   proyecto,
@@ -63,28 +65,45 @@ export function ProcesoFormWrapper<T extends FieldValues>({
   const queryClient = useQueryClient();
 
   // Datos actuales de esta etapa (tipados como T + campos comunes de etapa)
-  const etapaData = proyecto[etapaKey] as (T & EtapaBase) | undefined;
+  const etapaData = proyecto[etapaKey] as (Partial<T> & EtapaBase) | undefined;
+
   const esCompletado = etapaData?.estado === "Completado";
   const esEstadoActual = proyecto.estadoActual === tituloEtapa;
 
-  // 1. Configurar React Hook Form
+  // ✅ Default values correctos para RHF moderno
+  const defaultValues = useMemo<DefaultValues<T>>(
+    () => ((etapaData || {}) as DefaultValues<T>),
+    [etapaData],
+  );
+
+  // ✅ Resolver tipado sin pelearse con Zod/RHF
+  const resolver = useMemo(
+    () => zodResolver(validationSchema) as unknown as Resolver<T>,
+    [validationSchema],
+  );
+
+  // 1) Configurar React Hook Form
   const form = useForm<T>({
-    resolver: zodResolver(validationSchema) as Resolver<T>,
-    defaultValues: (etapaData || {}) as DeepPartial<T>,
+    resolver,
+    defaultValues,
   });
 
-  // 2. Sincronizar el formulario si los datos del proyecto cambian para esa etapa
+  // 2) Sincronizar el formulario si los datos del proyecto cambian
   useEffect(() => {
-    form.reset((etapaData || {}) as DeepPartial<T>);
-  }, [etapaData, form]);
+    form.reset(defaultValues);
+  }, [defaultValues, form]);
 
-  // 3. Configurar la Mutación (API PUT)
+  // 3) Mutación PUT
   const mutation = useMutation<unknown, unknown, UpdateProyectoPayload>({
     mutationFn: (payload) =>
       axios.put(`/api/proyectos/${proyecto._id}`, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["proyecto", proyecto._id] });
       queryClient.invalidateQueries({ queryKey: ["proyectos"] });
+      queryClient.invalidateQueries({
+        queryKey: ["proyectos-visita-tecnica"],
+      });
+
       toast.success("¡Guardado con éxito!");
     },
     onError: (error) => {
@@ -102,21 +121,21 @@ export function ProcesoFormWrapper<T extends FieldValues>({
     },
   });
 
-  // 4. Handler para "Guardar Cambios" (sin avanzar etapa)
+  // 4) Guardar sin avanzar etapa
   const onSave: SubmitHandler<T> = (values) => {
     const payload: UpdateProyectoPayload = {
       datosFormulario: {
-        [etapaKey]: values, // Envía los datos anidados en su clave
+        [etapaKey]: values,
       },
     };
     mutation.mutate(payload);
   };
 
-  // 5. Handler para "Completar Etapa" (avanza el workflow)
+  // 5) Completar etapa (avanza workflow)
   const onComplete: SubmitHandler<T> = (values) => {
     const payload: UpdateProyectoPayload = {
       etapaACompletar: etapaKey,
-      datosFormulario: values, // Envía los datos directamente
+      datosFormulario: values,
     };
     mutation.mutate(payload);
   };
@@ -126,6 +145,7 @@ export function ProcesoFormWrapper<T extends FieldValues>({
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle>{tituloEtapa}</CardTitle>
+
           {esCompletado ? (
             <Badge className="bg-green-600">Completado</Badge>
           ) : esEstadoActual ? (
@@ -134,6 +154,7 @@ export function ProcesoFormWrapper<T extends FieldValues>({
             <Badge variant="secondary">Pendiente</Badge>
           )}
         </div>
+
         {etapaData?.fechaCompletado && (
           <CardDescription>
             Completado el:{" "}
@@ -141,18 +162,16 @@ export function ProcesoFormWrapper<T extends FieldValues>({
           </CardDescription>
         )}
       </CardHeader>
+
       <CardContent>
         <Form {...form}>
-          {/* Usamos dos botones 'submit' dentro del <form>.
-              Usamos el `handleSubmit` de RHF para decidir a qué función llamar.
-          */}
           <form className="space-y-6">
-            {/* Campos específicos del formulario */}
+            {/* Campos del formulario */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {children(form, esCompletado)}
             </div>
 
-            {/* Botones de Acción */}
+            {/* Botones */}
             {!esCompletado && (
               <div className="flex justify-end gap-4 pt-6 border-t">
                 <Button
@@ -161,11 +180,12 @@ export function ProcesoFormWrapper<T extends FieldValues>({
                   onClick={form.handleSubmit(onSave)}
                   disabled={mutation.isPending}
                 >
-                  {mutation.isPending ? (
+                  {mutation.isPending && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
+                  )}
                   Guardar Cambios
                 </Button>
+
                 <Button
                   type="button"
                   className="bg-green-600 hover:bg-green-700"
@@ -177,9 +197,9 @@ export function ProcesoFormWrapper<T extends FieldValues>({
                       : ""
                   }
                 >
-                  {mutation.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin text-primary" />
-                  ) : null}
+                  {mutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
                   Completar Etapa
                 </Button>
               </div>
