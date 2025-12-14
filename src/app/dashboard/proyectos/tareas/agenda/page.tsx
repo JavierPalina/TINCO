@@ -28,6 +28,7 @@ import {
 import { VisitaTecnicaView } from "@/components/proyectos/VisitaTecnicaView";
 import { MedicionView } from "@/components/proyectos/MedicionView";
 import { VerificacionView } from "@/components/proyectos/VerificacionView";
+import { TallerView } from "@/components/proyectos/TallerView";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -47,7 +48,27 @@ import { cn } from "@/lib/utils";
 // Clave especial para "todos" en selects
 const ALL_VALUE = "__all";
 
-type AgendaStatusKey = "finalizado" | "iniciado" | "sin-iniciar";
+// 🔹 Misma paleta que los chips de la tabla (estadoActual)
+function getEstadoColorClass(estado: string) {
+  switch (estado) {
+    case "Taller":
+      return "bg-orange-500 hover:bg-orange-600";
+    case "Logística":
+      return "bg-blue-500 hover:bg-blue-600";
+    case "Completado":
+      return "bg-green-600 hover:bg-green-700";
+    case "Visita Técnica":
+      return "bg-purple-500 hover:bg-purple-600";
+    case "Medición":
+      return "bg-purple-600 hover:bg-purple-700";
+    case "Verificación":
+      return "bg-yellow-600 hover:bg-yellow-700 text-black";
+    case "Depósito":
+      return "bg-slate-600 hover:bg-slate-700";
+    default:
+      return "bg-gray-400 hover:bg-gray-500";
+  }
+}
 
 // Tipos mínimos para las subestructuras que usamos
 type AsignadoARef =
@@ -69,6 +90,20 @@ interface VisitaTecnicaLite {
   tipoVisita?: string;
 }
 
+interface MedicionLite {
+  fechaMedicion?: string | Date | null;
+  asignadoA?: AsignadoARef;
+  estadoFinalMedicion?: string;
+}
+
+interface TallerLite {
+  fechaIngresoTaller?: string | Date | null;
+  horaIngresoTaller?: string | null;
+  asignadoA?: AsignadoARef;
+  fechaEstimadaFinalizacion?: string | Date | null;
+  estadoTaller?: string;
+}
+
 interface ClienteLite {
   nombreCompleto?: string;
   telefono?: string;
@@ -81,6 +116,8 @@ interface VendedorLite {
 
 type ProyectoLite = IProyecto & {
   visitaTecnica?: VisitaTecnicaLite;
+  medicion?: MedicionLite;
+  taller?: TallerLite;
   cliente?: ClienteLite | string | null;
   vendedor?: VendedorLite | string | null;
 };
@@ -88,60 +125,25 @@ type ProyectoLite = IProyecto & {
 type AgendaEvent = {
   dateKey: string;
   date: Date;
-  horaVisita: string;
+  horaVisita: string; // puede ser "10:00", "Medición", "Taller", etc.
   proyecto: IProyecto;
   tecnicoNombre: string;
   clienteNombre: string;
-  estadoTareaVisita?: string;
-  statusKey: AgendaStatusKey;
-  statusLabel: string;
-  statusBgClass: string;
+  estadoActual: string;
+  estadoBgClass: string;
 };
 
 async function fetchProyectosVisitaTecnica(): Promise<IProyecto[]> {
   const { data } = await axios.get("/api/proyectos", {
     params: {
-      // CSV de estados
-      estados: "Visita Técnica,Medición,Verificación",
+      // CSV de estados: mismo criterio que la tabla
+      estados: "Visita Técnica,Medición,Verificación,Taller,Depósito,Logística",
     },
   });
   return data.data;
 }
 
 const dateKeyFromDate = (d: Date) => d.toISOString().slice(0, 10);
-
-function getAgendaStatus(
-  vt: VisitaTecnicaLite | null | undefined,
-): {
-  key: AgendaStatusKey;
-  label: string;
-  bgClass: string;
-} {
-  const estado: string | undefined = vt?.estadoTareaVisita;
-
-  if (!estado) {
-    return {
-      key: "sin-iniciar",
-      label: "Sin iniciar",
-      bgClass: "bg-red-500",
-    };
-  }
-
-  if (estado === "Aprobado") {
-    return {
-      key: "finalizado",
-      label: "Finalizado",
-      bgClass: "bg-emerald-500",
-    };
-  }
-
-  // Pendiente / Rechazado -> Iniciado
-  return {
-    key: "iniciado",
-    label: "Iniciado",
-    bgClass: "bg-amber-500",
-  };
-}
 
 function buildMonthMatrix(currentMonth: Date) {
   const year = currentMonth.getFullYear();
@@ -220,7 +222,7 @@ export default function AgendaVisitaTecnicaPage() {
 
   // qué etapa se ve en el modal del proyecto
   const [viewStage, setViewStage] = useState<
-    "visitaTecnica" | "medicion" | "verificacion" | null
+    "visitaTecnica" | "medicion" | "verificacion" | "taller" | null
   >(null);
 
   // día seleccionado para "Ver más..."
@@ -229,7 +231,7 @@ export default function AgendaVisitaTecnicaPage() {
   // Filtros / búsqueda
   const [searchTerm, setSearchTerm] = useState("");
   const [estadoFilter, setEstadoFilter] =
-    useState<AgendaStatusKey | typeof ALL_VALUE>(ALL_VALUE);
+    useState<string | typeof ALL_VALUE>(ALL_VALUE);
   const [tecnicoFilter, setTecnicoFilter] = useState<string | typeof ALL_VALUE>(
     ALL_VALUE,
   );
@@ -247,47 +249,98 @@ export default function AgendaVisitaTecnicaPage() {
     return new Date(today.getFullYear(), today.getMonth(), 1);
   });
 
-  // 1) Armamos todos los eventos planos
+  // 1) Armamos todos los eventos planos (Visita Técnica + Medición + Taller)
   const allEvents = useMemo<AgendaEvent[]>(() => {
     const list: AgendaEvent[] = [];
     if (!proyectos) return list;
 
     for (const proyectoBase of proyectos as ProyectoLite[]) {
-      const vt = proyectoBase.visitaTecnica;
-      if (!vt) continue;
-
-      const asignadoA = vt.asignadoA;
-      const hasTecnico =
-        typeof asignadoA === "string"
-          ? asignadoA.trim().length > 0
-          : Boolean(asignadoA && (asignadoA.name || asignadoA._id));
-
-      if (!hasTecnico || !vt.fechaVisita || !vt.horaVisita) continue;
-
-      const fecha = new Date(vt.fechaVisita);
-      if (Number.isNaN(fecha.getTime())) continue;
-
-      const dateKey = dateKeyFromDate(fecha);
-
-      const tecnicoNombre = getTecnicoNombre(asignadoA);
-
       const clienteLite = toClienteLite(proyectoBase.cliente);
       const clienteNombre = clienteLite.nombreCompleto || "Sin nombre";
 
-      const status = getAgendaStatus(vt);
+      const estadoActualProyecto =
+        (proyectoBase.estadoActual as string | undefined) ||
+        "Visita Técnica";
+      const estadoBgClass = getEstadoColorClass(estadoActualProyecto);
 
-      list.push({
-        dateKey,
-        date: fecha,
-        horaVisita: vt.horaVisita,
-        proyecto: proyectoBase,
-        tecnicoNombre,
-        clienteNombre,
-        estadoTareaVisita: vt.estadoTareaVisita,
-        statusKey: status.key,
-        statusLabel: status.label,
-        statusBgClass: status.bgClass,
-      });
+      // --- Eventos de VISITA TÉCNICA ---
+      const vt = proyectoBase.visitaTecnica;
+      if (vt) {
+        const asignadoA = vt.asignadoA;
+        const hasTecnicoVT =
+          typeof asignadoA === "string"
+            ? asignadoA.trim().length > 0
+            : Boolean(asignadoA && (asignadoA.name || asignadoA._id));
+
+        if (hasTecnicoVT && vt.fechaVisita && vt.horaVisita) {
+          const fecha = new Date(vt.fechaVisita);
+          if (!Number.isNaN(fecha.getTime())) {
+            const dateKey = dateKeyFromDate(fecha);
+            const tecnicoNombre = getTecnicoNombre(asignadoA);
+
+            list.push({
+              dateKey,
+              date: fecha,
+              horaVisita: vt.horaVisita,
+              proyecto: proyectoBase,
+              tecnicoNombre,
+              clienteNombre,
+              estadoActual: estadoActualProyecto,
+              estadoBgClass,
+            });
+          }
+        }
+      }
+
+      // --- Eventos de MEDICIÓN (por fechaMedicion + técnico) ---
+      const med = proyectoBase.medicion;
+      if (med && med.fechaMedicion && med.asignadoA) {
+        const fechaMed = new Date(med.fechaMedicion);
+        if (!Number.isNaN(fechaMed.getTime())) {
+          const dateKey = dateKeyFromDate(fechaMed);
+          const tecnicoNombre = getTecnicoNombre(med.asignadoA);
+
+          list.push({
+            dateKey,
+            date: fechaMed,
+            // 👇 Mostramos explícitamente "Medición" en la tarjeta
+            horaVisita: "Medición",
+            proyecto: proyectoBase,
+            tecnicoNombre,
+            clienteNombre,
+            estadoActual: estadoActualProyecto,
+            estadoBgClass,
+          });
+        }
+      }
+
+      // --- Eventos de TALLER ---
+      const taller = proyectoBase.taller;
+      if (
+        taller &&
+        (taller.fechaIngresoTaller || taller.fechaEstimadaFinalizacion) &&
+        taller.asignadoA
+      ) {
+        const dateSource =
+          taller.fechaIngresoTaller || taller.fechaEstimadaFinalizacion;
+        const fechaTaller = new Date(dateSource as string | Date);
+        if (!Number.isNaN(fechaTaller.getTime())) {
+          const dateKey = dateKeyFromDate(fechaTaller);
+          const tecnicoNombre = getTecnicoNombre(taller.asignadoA);
+
+          list.push({
+            dateKey,
+            date: fechaTaller,
+            // si hay hora de ingreso la mostramos, sino "Taller"
+            horaVisita: taller.horaIngresoTaller || "Taller",
+            proyecto: proyectoBase,
+            tecnicoNombre,
+            clienteNombre,
+            estadoActual: estadoActualProyecto,
+            estadoBgClass,
+          });
+        }
+      }
     }
 
     return list;
@@ -298,6 +351,15 @@ export default function AgendaVisitaTecnicaPage() {
     const set = new Set<string>();
     allEvents.forEach((ev) => {
       if (ev.tecnicoNombre) set.add(ev.tecnicoNombre);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "es"));
+  }, [allEvents]);
+
+  // Opciones de estados (etapas) para el filtro y la leyenda, a partir de lo que realmente existe
+  const estadoOptions = useMemo(() => {
+    const set = new Set<string>();
+    allEvents.forEach((ev) => {
+      if (ev.estadoActual) set.add(ev.estadoActual);
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b, "es"));
   }, [allEvents]);
@@ -318,8 +380,8 @@ export default function AgendaVisitaTecnicaPage() {
       const cliente = toClienteLite(proyecto.cliente);
       const vendedor = toVendedorLite(proyecto.vendedor);
 
-      // Filtro por estado (Finalizado / Iniciado / Sin iniciar)
-      if (estadoFilter !== ALL_VALUE && ev.statusKey !== estadoFilter) {
+      // 🔹 Filtro por estado (ahora por etapa real, ej: "Visita Técnica", "Medición", etc.)
+      if (estadoFilter !== ALL_VALUE && ev.estadoActual !== estadoFilter) {
         return false;
       }
 
@@ -359,6 +421,7 @@ export default function AgendaVisitaTecnicaPage() {
           proyecto.estadoActual,
           vendedor.name,
           vt.tipoVisita,
+          ev.horaVisita, // incluye "Medición" o "Taller"
         ]
           .filter(Boolean)
           .join(" ")
@@ -388,7 +451,7 @@ export default function AgendaVisitaTecnicaPage() {
       grouped[ev.dateKey].push(ev);
     });
 
-    // Ordenamos por hora dentro de cada día
+    // Ordenamos por "horaVisita" (para Medición/Taller se verá después de las numéricas)
     Object.values(grouped).forEach((list) =>
       list.sort((a, b) => a.horaVisita.localeCompare(b.horaVisita)),
     );
@@ -458,6 +521,15 @@ export default function AgendaVisitaTecnicaPage() {
 
   const noEvents = Object.keys(eventsByDate).length === 0;
 
+  const titleStage =
+    viewStage === "medicion"
+      ? "Medición"
+      : viewStage === "verificacion"
+      ? "Verificación"
+      : viewStage === "taller"
+      ? "Taller"
+      : "Visita Técnica";
+
   return (
     <div className="container mx-auto py-10 space-y-6">
       {/* Header */}
@@ -468,8 +540,8 @@ export default function AgendaVisitaTecnicaPage() {
             Calendario de Mis Tareas
           </h1>
           <p className="text-muted-foreground text-sm">
-            Vista mensual con todas las tareas que tienen técnico, fecha y hora
-            asignadas.
+            Vista mensual con todas las tareas que tienen técnico y fecha
+            asignadas (Visita Técnica, Medición, Verificación y Taller).
           </p>
         </div>
 
@@ -525,7 +597,8 @@ export default function AgendaVisitaTecnicaPage() {
               <div>
                 <p className="font-semibold text-sm">Filtros de agenda</p>
                 <p className="text-xs text-muted-foreground">
-                  Filtrá las visitas por estado, técnico, cliente/obra y fechas.
+                  Filtrá las tareas por tipo de etapa, técnico, cliente/obra y
+                  fechas.
                 </p>
               </div>
               <button
@@ -538,23 +611,25 @@ export default function AgendaVisitaTecnicaPage() {
             </div>
 
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Estado */}
+              {/* Tipo de tarea / estadoActual */}
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Estado</p>
+                <p className="text-xs text-muted-foreground">Tipo de etapa</p>
                 <Select
                   value={estadoFilter}
                   onValueChange={(val) =>
-                    setEstadoFilter(val as AgendaStatusKey | typeof ALL_VALUE)
+                    setEstadoFilter(val as string | typeof ALL_VALUE)
                   }
                 >
                   <SelectTrigger className="h-8 text-xs w-full">
-                    <SelectValue placeholder="Todos" />
+                    <SelectValue placeholder="Todas" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={ALL_VALUE}>Todos</SelectItem>
-                    <SelectItem value="finalizado">Finalizado</SelectItem>
-                    <SelectItem value="iniciado">Iniciado</SelectItem>
-                    <SelectItem value="sin-iniciar">Sin iniciar</SelectItem>
+                    <SelectItem value={ALL_VALUE}>Todas</SelectItem>
+                    {estadoOptions.map((opt) => (
+                      <SelectItem key={opt} value={opt}>
+                        {opt}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -582,7 +657,9 @@ export default function AgendaVisitaTecnicaPage() {
 
               {/* Cliente / Obra */}
               <div className="space-y-1 sm:col-span-2">
-                <p className="text-xs text-muted-foreground">Cliente u Obra</p>
+                <p className="text-xs text-muted-foreground">
+                  Cliente u Obra
+                </p>
                 <Input
                   placeholder="Nombre del cliente, dirección de obra..."
                   value={clienteObraFilter}
@@ -626,7 +703,7 @@ export default function AgendaVisitaTecnicaPage() {
                         mode="range"
                         selected={dateRange}
                         onSelect={setDateRange}
-                        numberOfMonths={1} // un solo mes
+                        numberOfMonths={1}
                         initialFocus
                       />
                     </PopoverContent>
@@ -671,18 +748,20 @@ export default function AgendaVisitaTecnicaPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            Finalizado
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="h-2 w-2 rounded-full bg-amber-500" />
-            Iniciado
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="h-2 w-2 rounded-full bg-red-500" />
-            Sin iniciar
-          </span>
+          {estadoOptions.map((estado) => (
+            <span
+              key={estado}
+              className="inline-flex items-center gap-1 capitalize"
+            >
+              <span
+                className={cn(
+                  "h-2 w-2 rounded-full",
+                  getEstadoColorClass(estado),
+                )}
+              />
+              {estado}
+            </span>
+          ))}
 
           <span className="mx-2 h-4 w-px bg-border" />
           <Button
@@ -698,11 +777,11 @@ export default function AgendaVisitaTecnicaPage() {
 
       {noEvents ? (
         <div className="border rounded-xl p-10 text-center text-muted-foreground bg-muted/40">
-          No hay visitas técnicas que coincidan con los filtros actuales.
+          No hay tareas que coincidan con los filtros actuales.
           <br />
           <span className="text-xs">
-            Completá técnico, fecha y hora en la etapa de Visita Técnica para
-            que aparezcan en el calendario.
+            Completá técnico y fecha en Visita Técnica, Medición, Verificación o
+            Taller para que aparezcan en el calendario.
           </span>
         </div>
       ) : (
@@ -721,11 +800,12 @@ export default function AgendaVisitaTecnicaPage() {
             {monthMatrix.map((week, wIdx) =>
               week.map((date, dIdx) => {
                 if (!date) {
-                  return
+                  return (
                     <div
                       key={`empty-${wIdx}-${dIdx}`}
                       className="border-b border-r min-h-[110px] bg-background/40"
-                    />;
+                    />
+                  );
                 }
 
                 const key = dateKeyFromDate(date);
@@ -773,24 +853,26 @@ export default function AgendaVisitaTecnicaPage() {
                                 type="button"
                                 onClick={() => {
                                   setProyectoSeleccionado(ev.proyecto);
-                                  if (ev.proyecto.estadoActual === "Medición") {
+                                  const estado = ev.proyecto.estadoActual;
+                                  if (estado === "Medición") {
                                     setViewStage("medicion");
-                                  } else if (
-                                    ev.proyecto.estadoActual === "Verificación"
-                                  ) {
+                                  } else if (estado === "Verificación") {
                                     setViewStage("verificacion");
+                                  } else if (estado === "Taller") {
+                                    setViewStage("taller");
                                   } else {
                                     setViewStage("visitaTecnica");
                                   }
                                 }}
                                 className={cn(
                                   "w-full rounded-md px-2 py-1 text-left text-[11px] text-white shadow-sm flex flex-col gap-0.5 hover:brightness-110 transition",
-                                  ev.statusBgClass,
+                                  ev.estadoBgClass,
                                 )}
                               >
                                 <div className="flex items-center justify-between gap-1">
                                   <span className="inline-flex items-center gap-1 font-semibold">
                                     <Clock className="h-3 w-3" />
+                                    {/* Aquí se ve "10:00", "Medición" o "Taller" */}
                                     {ev.horaVisita}
                                   </span>
                                   <span className="truncate font-medium">
@@ -802,9 +884,9 @@ export default function AgendaVisitaTecnicaPage() {
                                     <UserIcon className="h-3 w-3" />
                                     {ev.tecnicoNombre}
                                   </span>
-                                  {ev.statusLabel && (
+                                  {ev.estadoActual && (
                                     <span className="text-[10px] font-medium">
-                                      {ev.statusLabel}
+                                      {ev.estadoActual}
                                     </span>
                                   )}
                                 </div>
@@ -837,7 +919,7 @@ export default function AgendaVisitaTecnicaPage() {
         </div>
       )}
 
-      {/* Modal detalle proyecto (Visita / Medición / Verificación) */}
+      {/* Modal detalle proyecto (Visita / Medición / Verificación / Taller) */}
       <Dialog
         open={!!proyectoSeleccionado}
         onOpenChange={(open) => {
@@ -851,12 +933,7 @@ export default function AgendaVisitaTecnicaPage() {
           <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
-                {proyectoSeleccionado.numeroOrden} –{" "}
-                {viewStage === "medicion"
-                  ? "Medición"
-                  : viewStage === "verificacion"
-                  ? "Verificación"
-                  : "Visita Técnica"}
+                {proyectoSeleccionado.numeroOrden} – {titleStage}
               </DialogTitle>
             </DialogHeader>
 
@@ -883,6 +960,8 @@ export default function AgendaVisitaTecnicaPage() {
                     });
                   }}
                 />
+              ) : viewStage === "taller" ? (
+                <TallerView proyecto={proyectoSeleccionado} />
               ) : (
                 <VisitaTecnicaView
                   proyecto={proyectoSeleccionado}
@@ -938,19 +1017,20 @@ export default function AgendaVisitaTecnicaPage() {
                     onClick={() => {
                       setSelectedDayKey(null);
                       setProyectoSeleccionado(ev.proyecto);
-                      if (ev.proyecto.estadoActual === "Medición") {
+                      const estado = ev.proyecto.estadoActual;
+                      if (estado === "Medición") {
                         setViewStage("medicion");
-                      } else if (
-                        ev.proyecto.estadoActual === "Verificación"
-                      ) {
+                      } else if (estado === "Verificación") {
                         setViewStage("verificacion");
+                      } else if (estado === "Taller") {
+                        setViewStage("taller");
                       } else {
                         setViewStage("visitaTecnica");
                       }
                     }}
                     className={cn(
                       "w-full rounded-md px-3 py-2 text-left text-xs text-white shadow-sm flex flex-col gap-1 hover:brightness-110 transition",
-                      ev.statusBgClass,
+                      ev.estadoBgClass,
                     )}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -967,9 +1047,9 @@ export default function AgendaVisitaTecnicaPage() {
                         <UserIcon className="h-3 w-3" />
                         {ev.tecnicoNombre}
                       </span>
-                      {ev.statusLabel && (
+                      {ev.estadoActual && (
                         <span className="text-[10px] font-medium">
-                          {ev.statusLabel}
+                          {ev.estadoActual}
                         </span>
                       )}
                     </div>

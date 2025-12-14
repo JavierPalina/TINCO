@@ -1,18 +1,26 @@
+// /app/dashboard/proyectos/visita-tecnica/page.tsx
 "use client";
 
-// Imports de React y Next
-import { useState, useMemo } from "react";
-
-// Imports de TanStack (React Query)
+import { useState, useMemo, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-
-// Imports de TanStack (React Table)
 import { ColumnDef } from "@tanstack/react-table";
+import axios from "axios";
+import {
+  Loader2,
+  ArrowUpDown,
+  MoreHorizontal,
+  Filter,
+  Search,
+} from "lucide-react";
+import { toast } from "sonner";
 
-// Imports de UI (shadcn)
-import { Button } from "@/components/ui/button";
+import { IProyecto } from "@/models/Proyecto";
 import { DataTable } from "@/components/ui/data-table";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,7 +38,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
+import { Dialog } from "@/components/ui/dialog";
+import { DialogContent } from "@/components/ui/dialog";
 import {
   Select,
   SelectTrigger,
@@ -38,245 +47,331 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 
-// Icons
-import {
-  Loader2,
-  ArrowUpDown,
-  MoreHorizontal,
-  Search,
-  Filter,
-} from "lucide-react";
+import MedicionFormModal from "@/components/proyectos/FormMedicion";
+import { MedicionView } from "@/components/proyectos/MedicionView";
+import VisitaTecnicaForm from "@/components/proyectos/FormVisitaTecnica";
+import { VisitaTecnicaView } from "@/components/proyectos/VisitaTecnicaView";
 
-// Otros
-import { toast } from "sonner";
-import axios from "axios";
-import Link from "next/link";
+// 🔹 VERIFICACIÓN
+import VerificacionFormModal from "@/components/proyectos/FormVerificacion";
+import { VerificacionView } from "@/components/proyectos/VerificacionView";
 
-// Componentes locales
-import { CreateProjectModal } from "@/components/proyectos/CreateProjectModal";
-import { IProyecto } from "@/models/Proyecto";
+// 🔹 TALLER
+import TallerFormModal from "@/components/proyectos/FormTaller";
+import { TallerView } from "@/components/proyectos/TallerView";
 
-const ALL_VALUE = "__all";
+// 🔹 DEPÓSITO
+import DepositoFormModal from "@/components/proyectos/FormDeposito";
+import { DepositoView } from "@/components/proyectos/DepositoView";
 
-// Tipos mínimos para referencias populadas
-type ClientePopulado = {
-  nombreCompleto?: string;
-  telefono?: string;
+// 🔹 LOGÍSTICA
+import LogisticaFormModal from "@/components/proyectos/FormLogistica";
+import { LogisticaView } from "@/components/proyectos/LogisticaView";
+
+// --- Tipos auxiliares para evitar any ---
+type DestinoEstado =
+  | "Medición"
+  | "Verificación"
+  | "Taller"
+  | "Depósito"
+  | "Logística";
+
+type AsignadoARef =
+  | {
+      name?: string;
+      _id?: string;
+    }
+  | string
+  | null
+  | undefined;
+
+interface VisitaTecnicaLite {
+  asignadoA?: AsignadoARef;
+  fechaVisita?: string | Date | null;
+  horaVisita?: string | null;
   direccion?: string;
-};
-
-type VendedorPopulado = {
-  name?: string;
-};
-
-// --- FUNCIÓN DE FETCH ---
-async function fetchProyectos(): Promise<IProyecto[]> {
-  const { data } = await axios.get("/api/proyectos?populate=cliente,vendedor");
-  return data.data;
+  entrecalles?: string;
+  estadoObra?: string;
+  tipoVisita?: string;
+  recomendacionTecnica?: string;
+  condicionVanos?: string[];
+  tipoAberturaMedida?: string;
+  materialSolicitado?: string;
 }
 
-// Helper para color de estado
+interface ClienteLite {
+  nombreCompleto?: string;
+  telefono?: string;
+  email?: string;
+  direccion?: string;
+}
+
+interface VendedorLite {
+  name?: string;
+}
+
+type ProyectoLite = IProyecto & {
+  visitaTecnica?: VisitaTecnicaLite;
+  cliente?: ClienteLite | string | null;
+  vendedor?: VendedorLite | string | null;
+};
+
+type Filters = {
+  recomendacionTecnica: string;
+  tecnico: string;
+  estadoObra: string;
+  tipoVisita: string;
+  condicionVano: string;
+  tipoAbertura: string;
+  materialSolicitado: string;
+  estado: string;
+  vendedor: string;
+};
+
+const ALL_VALUE = "__all__";
+
+// ✅ Normaliza strings para comparar estados con/ sin acentos (Deposito vs Depósito)
+const normalize = (s: string) =>
+  (s || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+type ViewStage =
+  | "visitaTecnica"
+  | "medicion"
+  | "verificacion"
+  | "taller"
+  | "deposito"
+  | "logistica"
+  | null;
+
+const getViewStageFromEstado = (estadoActual: string): ViewStage => {
+  const e = normalize(estadoActual);
+
+  if (e === "medicion") return "medicion";
+  if (e === "verificacion") return "verificacion";
+  if (e === "taller") return "taller";
+  if (e === "deposito") return "deposito";
+  if (e === "logistica") return "logistica";
+
+  // Por defecto, todo lo demás se ve como Visita Técnica
+  return "visitaTecnica";
+};
+
+// Helpers reutilizables
 const getEstadoBadgeColor = (estado: string) => {
-  switch (estado) {
-    case "Taller":
+  const e = normalize(estado);
+
+  switch (e) {
+    case "taller":
       return "bg-orange-500 hover:bg-orange-600";
-    case "Logística":
+    case "logistica":
       return "bg-blue-500 hover:bg-blue-600";
-    case "Completado":
+    case "completado":
       return "bg-green-600 hover:bg-green-700";
-    case "Visita Técnica":
+    case "visita tecnica":
       return "bg-purple-500 hover:bg-purple-600";
-    case "Medición":
+    case "medicion":
       return "bg-purple-600 hover:bg-purple-700";
-    case "Verificación":
+    case "verificacion":
       return "bg-yellow-600 hover:bg-yellow-700 text-black";
+    case "deposito":
+      return "bg-slate-600 hover:bg-slate-700";
     default:
       return "bg-gray-400 hover:bg-gray-500";
   }
 };
 
-// --- COMPONENTE DE LA PÁGINA ---
-export default function ProyectosDashboardPage() {
+function toClienteLite(
+  ref: ClienteLite | string | null | undefined,
+): ClienteLite {
+  return ref && typeof ref === "object" ? ref : {};
+}
+
+function toVendedorLite(
+  ref: VendedorLite | string | null | undefined,
+): VendedorLite {
+  return ref && typeof ref === "object" ? ref : {};
+}
+
+function getTecnicoLabel(asignadoA: AsignadoARef): string {
+  if (!asignadoA) return "";
+  if (typeof asignadoA === "string") return asignadoA;
+  return asignadoA.name ?? "";
+}
+
+// 🔸 Shell único para que los dialogs “View” queden idénticos a los FormModal
+function StandardDialogShell({
+  children,
+  className = "sm:max-w-[900px]",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <DialogContent className={`${className} p-0`}>
+      <ScrollArea className="max-h-[90vh] p-6">{children}</ScrollArea>
+    </DialogContent>
+  );
+}
+
+// --- FETCH TODAS LAS ETAPAS ---
+async function fetchProyectosVisitaTecnica(): Promise<IProyecto[]> {
+  const { data } = await axios.get("/api/proyectos", {
+    params: {
+      estados: "Visita Técnica,Medición,Verificación,Taller,Depósito,Logística",
+    },
+  });
+  return data.data;
+}
+
+export default function VisitaTecnicaPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
 
-  // Estado para el modal de CREAR
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  // Modal "pasar a X"
+  const [proyectoAPasar, setProyectoAPasar] = useState<{
+    proyecto: IProyecto;
+    destino: DestinoEstado;
+  } | null>(null);
 
-  // --- ESTADO PARA EL MODAL DE ELIMINAR ---
-  const [proyectoAEliminar, setProyectoAEliminar] = useState<IProyecto | null>(
-    null,
-  );
+  // Modal de vista de proyecto
+  const [proyectoSeleccionado, setProyectoSeleccionado] =
+    useState<IProyecto | null>(null);
 
-  // 🔍 Buscador global
+  // qué etapa se ve en el view
+  const [viewStage, setViewStage] = useState<ViewStage>(null);
+
+  // Modales de edición
+  const [proyectoEditandoVisita, setProyectoEditandoVisita] =
+    useState<IProyecto | null>(null);
+  const [proyectoEditandoMedicion, setProyectoEditandoMedicion] =
+    useState<IProyecto | null>(null);
+  const [proyectoEditandoVerificacion, setProyectoEditandoVerificacion] =
+    useState<IProyecto | null>(null);
+  const [proyectoEditandoTaller, setProyectoEditandoTaller] =
+    useState<IProyecto | null>(null);
+  const [proyectoEditandoDeposito, setProyectoEditandoDeposito] =
+    useState<IProyecto | null>(null);
+  const [proyectoEditandoLogistica, setProyectoEditandoLogistica] =
+    useState<IProyecto | null>(null);
+
+  // 🔎 Buscador global
   const [searchTerm, setSearchTerm] = useState("");
 
-  // 🎛️ Filtros select
-  const [estadoFilter, setEstadoFilter] =
-    useState<string | typeof ALL_VALUE>(ALL_VALUE);
-  const [vendedorFilter, setVendedorFilter] =
-    useState<string | typeof ALL_VALUE>(ALL_VALUE);
-  const [clienteFilter, setClienteFilter] =
-    useState<string | typeof ALL_VALUE>(ALL_VALUE);
+  // Filtros
+  const [filters, setFilters] = useState<Filters>({
+    recomendacionTecnica: "",
+    tecnico: "",
+    estadoObra: "",
+    tipoVisita: "",
+    condicionVano: "",
+    tipoAbertura: "",
+    materialSolicitado: "",
+    estado: "",
+    vendedor: "",
+  });
 
-  // Query para obtener los proyectos
+  const hasActiveFilters = useMemo(
+    () => Object.values(filters).some(Boolean),
+    [filters],
+  );
+
+  const activeFilterCount = useMemo(
+    () => Object.values(filters).filter(Boolean).length,
+    [filters],
+  );
+
   const {
     data: proyectos,
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ["proyectos"],
-    queryFn: fetchProyectos,
+    queryKey: ["proyectos-visita-tecnica"],
+    queryFn: fetchProyectosVisitaTecnica,
   });
 
-  // --- MUTACIÓN PARA ELIMINAR ---
-  const deleteMutation = useMutation({
-    mutationFn: (proyectoId: string) =>
-      axios.delete(`/api/proyectos/${proyectoId}`),
-    onSuccess: () => {
-      toast.success("Proyecto eliminado con éxito");
-      queryClient.invalidateQueries({ queryKey: ["proyectos"] });
-      setProyectoAEliminar(null); // Cerrar el modal
+  // Opciones únicas para filtros
+  const filterOptions = useMemo(() => {
+    const recomendacionSet = new Set<string>();
+    const tecnicoSet = new Set<string>();
+    const estadoObraSet = new Set<string>();
+    const tipoVisitaSet = new Set<string>();
+    const condicionVanoSet = new Set<string>();
+    const tipoAberturaSet = new Set<string>();
+    const materialSet = new Set<string>();
+    const estadoSet = new Set<string>();
+    const vendedorSet = new Set<string>();
+
+    (proyectos as ProyectoLite[] | undefined)?.forEach((p) => {
+      const vt = p.visitaTecnica ?? {};
+      const vendedorRef = toVendedorLite(p.vendedor);
+
+      const tecnicoLabel = getTecnicoLabel(vt.asignadoA);
+      if (tecnicoLabel) tecnicoSet.add(tecnicoLabel);
+
+      if (vendedorRef.name) vendedorSet.add(vendedorRef.name);
+      else if (typeof p.vendedor === "string") vendedorSet.add(p.vendedor);
+
+      if (vt.recomendacionTecnica) recomendacionSet.add(vt.recomendacionTecnica);
+      if (vt.estadoObra) estadoObraSet.add(vt.estadoObra);
+      if (vt.tipoVisita) tipoVisitaSet.add(vt.tipoVisita);
+
+      (vt.condicionVanos ?? []).forEach((c) => c && condicionVanoSet.add(c));
+
+      if (vt.tipoAberturaMedida) tipoAberturaSet.add(vt.tipoAberturaMedida);
+      if (vt.materialSolicitado) materialSet.add(vt.materialSolicitado);
+      if (p.estadoActual) estadoSet.add(p.estadoActual);
+    });
+
+    return {
+      recomendacionTecnica: Array.from(recomendacionSet),
+      tecnico: Array.from(tecnicoSet),
+      estadoObra: Array.from(estadoObraSet),
+      tipoVisita: Array.from(tipoVisitaSet),
+      condicionVano: Array.from(condicionVanoSet),
+      tipoAbertura: Array.from(tipoAberturaSet),
+      materialSolicitado: Array.from(materialSet),
+      estado: Array.from(estadoSet),
+      vendedor: Array.from(vendedorSet),
+    };
+  }, [proyectos]);
+
+  // Mutación para pasar de etapa (desde Visita Técnica)
+  const pasarEtapaMutation = useMutation({
+    mutationFn: ({
+      proyectoId,
+      destino,
+    }: {
+      proyectoId: string;
+      destino: DestinoEstado;
+    }) =>
+      axios.put(`/api/proyectos/${proyectoId}`, {
+        etapaACompletar: "visitaTecnica",
+        datosFormulario: {},
+        forzarEstado: destino,
+      }),
+    onSuccess: (_data, variables) => {
+      toast.success(`Proyecto pasado a ${variables.destino}`);
+      queryClient.invalidateQueries({ queryKey: ["proyectos-visita-tecnica"] });
+      setProyectoAPasar(null);
     },
     onError: (error: unknown) => {
       let message = "Error desconocido";
-
       if (axios.isAxiosError(error)) {
         message = error.response?.data?.error || error.message;
       } else if (error instanceof Error) {
         message = error.message;
       }
-
-      toast.error("Error al eliminar el proyecto: " + message);
-      setProyectoAEliminar(null); // Cerrar el modal
+      toast.error("Error al cambiar de estado: " + message);
+      setProyectoAPasar(null);
     },
   });
 
-  // --- OPCIONES ÚNICAS PARA LOS SELECTS ---
-  const { estadoOptions, vendedorOptions, clienteOptions } = useMemo(() => {
-    const estados = new Set<string>();
-    const vendedores = new Set<string>();
-    const clientes = new Set<string>();
-
-    (proyectos || []).forEach((p) => {
-      if (p.estadoActual) estados.add(p.estadoActual);
-
-      const vendedor = p.vendedor as VendedorPopulado | string | null;
-      const vendedorName =
-        vendedor && typeof vendedor === "object" ? vendedor.name : undefined;
-      if (vendedorName) vendedores.add(vendedorName);
-
-      const cliente = p.cliente as ClientePopulado | string | null;
-      const clienteName =
-        cliente && typeof cliente === "object"
-          ? cliente.nombreCompleto
-          : undefined;
-      if (clienteName) clientes.add(clienteName);
-    });
-
-    return {
-      estadoOptions: Array.from(estados).sort((a, b) =>
-        a.localeCompare(b, "es"),
-      ),
-      vendedorOptions: Array.from(vendedores).sort((a, b) =>
-        a.localeCompare(b, "es"),
-      ),
-      clienteOptions: Array.from(clientes).sort((a, b) =>
-        a.localeCompare(b, "es"),
-      ),
-    };
-  }, [proyectos]);
-
-  const clearFilters = () => {
-    setEstadoFilter(ALL_VALUE);
-    setVendedorFilter(ALL_VALUE);
-    setClienteFilter(ALL_VALUE);
-  };
-
-  // --- APLICAR BUSCADOR + FILTROS ---
-  const filteredProyectos: IProyecto[] = useMemo(() => {
-    if (!proyectos) return [];
-
-    const q = searchTerm.trim().toLowerCase();
-
-    return proyectos.filter((p) => {
-      const clienteRef = (p.cliente ??
-        null) as ClientePopulado | string | null;
-      const vendedorRef = (p.vendedor ??
-        null) as VendedorPopulado | string | null;
-
-      const clienteNombre =
-        clienteRef && typeof clienteRef === "object"
-          ? clienteRef.nombreCompleto ?? ""
-          : "";
-      const clienteTelefono =
-        clienteRef && typeof clienteRef === "object"
-          ? clienteRef.telefono ?? ""
-          : "";
-      const clienteDireccion =
-        clienteRef && typeof clienteRef === "object"
-          ? clienteRef.direccion ?? ""
-          : "";
-      const vendedorNombre =
-        vendedorRef && typeof vendedorRef === "object"
-          ? vendedorRef.name ?? ""
-          : "";
-
-      const estadoActual = p.estadoActual || "";
-      const numeroOrden = p.numeroOrden || "";
-
-      // 🎛️ Filtro por Estado Actual
-      if (estadoFilter !== ALL_VALUE && estadoActual !== estadoFilter) {
-        return false;
-      }
-
-      // 🎛️ Filtro por Vendedor
-      if (
-        vendedorFilter !== ALL_VALUE &&
-        vendedorNombre &&
-        vendedorNombre !== vendedorFilter
-      ) {
-        return false;
-      }
-
-      // 🎛️ Filtro por Cliente
-      if (
-        clienteFilter !== ALL_VALUE &&
-        clienteNombre &&
-        clienteNombre !== clienteFilter
-      ) {
-        return false;
-      }
-
-      // 🔍 Buscador global
-      if (q) {
-        const textoBuscable = [
-          clienteNombre,
-          clienteTelefono,
-          clienteDireccion,
-          estadoActual,
-          vendedorNombre,
-          numeroOrden?.toString(),
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-
-        if (!textoBuscable.includes(q)) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [proyectos, searchTerm, estadoFilter, vendedorFilter, clienteFilter]);
-
-  // --- DEFINICIÓN DE COLUMNAS ---
   const columns = useMemo<ColumnDef<IProyecto>[]>(
     () => [
       {
@@ -293,71 +388,88 @@ export default function ProyectosDashboardPage() {
           </Button>
         ),
         cell: ({ row }) => (
-          <div className="font-medium">{row.original.numeroOrden}</div>
+          <span className="font-semibold">{row.original.numeroOrden}</span>
         ),
       },
       {
         accessorKey: "cliente.nombreCompleto",
         header: "Cliente",
         cell: ({ row }) => {
-          const cliente = row.original.cliente as
-            | ClientePopulado
-            | string
-            | null
-            | undefined;
-
-          if (!cliente) return "N/A";
-          if (typeof cliente === "string") return "N/A";
-
-          return cliente.nombreCompleto || "N/A";
+          const clienteLite = toClienteLite(
+            (row.original as ProyectoLite).cliente,
+          );
+          return clienteLite.nombreCompleto || "N/A";
+        },
+      },
+      {
+        accessorKey: "visitaTecnica.asignadoA",
+        header: "Técnico Asignado",
+        cell: ({ row }) => {
+          const vt = (row.original as ProyectoLite).visitaTecnica;
+          if (!vt) return "Sin asignar";
+          const label = getTecnicoLabel(vt.asignadoA);
+          return label || "Sin asignar";
+        },
+      },
+      {
+        accessorKey: "visitaTecnica.fechaVisita",
+        header: "Fecha Visita",
+        cell: ({ row }) => {
+          const vt = (row.original as ProyectoLite).visitaTecnica;
+          if (!vt?.fechaVisita) return "-";
+          const fecha = new Date(vt.fechaVisita);
+          if (Number.isNaN(fecha.getTime())) return "-";
+          return fecha.toLocaleDateString();
+        },
+      },
+      {
+        accessorKey: "visitaTecnica.horaVisita",
+        header: "Hora Visita",
+        cell: ({ row }) => {
+          const vt = (row.original as ProyectoLite).visitaTecnica;
+          return vt?.horaVisita || "-";
+        },
+      },
+      {
+        accessorKey: "visitaTecnica.direccion",
+        header: "Dirección",
+        cell: ({ row }) => {
+          const vt = (row.original as ProyectoLite).visitaTecnica;
+          return vt?.direccion || "-";
+        },
+      },
+      {
+        accessorKey: "visitaTecnica.estadoObra",
+        header: "Estado Obra",
+        cell: ({ row }) => {
+          const vt = (row.original as ProyectoLite).visitaTecnica;
+          return vt?.estadoObra || "-";
+        },
+      },
+      {
+        accessorKey: "visitaTecnica.tipoVisita",
+        header: "Tipo Visita",
+        cell: ({ row }) => {
+          const vt = (row.original as ProyectoLite).visitaTecnica;
+          return vt?.tipoVisita || "-";
         },
       },
       {
         accessorKey: "estadoActual",
-        header: "Estado Actual",
-        cell: ({ row }) => {
-          const estado = row.original.estadoActual;
-          return (
-            <Badge className={getEstadoBadgeColor(estado)}>{estado}</Badge>
-          );
-        },
+        header: "Estado",
+        cell: ({ row }) => (
+          <Badge className={getEstadoBadgeColor(row.original.estadoActual)}>
+            {row.original.estadoActual}
+          </Badge>
+        ),
       },
       {
-        accessorKey: "vendedor.name",
-        header: "Vendedor",
+        id: "acciones",
+        header: "Acciones",
+        enableSorting: false,
         cell: ({ row }) => {
-          const vendedor = row.original.vendedor as
-            | VendedorPopulado
-            | string
-            | null
-            | undefined;
+          const proyecto = row.original as IProyecto;
 
-          if (!vendedor) return "N/A";
-          if (typeof vendedor === "string") return "N/A";
-
-          return vendedor.name || "N/A";
-        },
-      },
-      {
-        accessorKey: "createdAt",
-        header: "Fecha de Creación",
-        cell: ({ row }) => {
-          const { createdAt, fecha } = row.original as IProyecto & {
-            createdAt?: string | Date;
-            fecha?: string | Date;
-          };
-
-          const dateField = createdAt ?? fecha;
-
-          return dateField
-            ? new Date(dateField).toLocaleDateString()
-            : "N/A";
-        },
-      },
-      {
-        id: "actions",
-        cell: ({ row }) => {
-          const proyecto = row.original;
           return (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -366,18 +478,102 @@ export default function ProyectosDashboardPage() {
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
+
               <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                <Link href={`/dashboard/proyectos/${proyecto._id}`}>
-                  <DropdownMenuItem className="cursor-pointer">
-                    Ver / Editar Proyecto
-                  </DropdownMenuItem>
-                </Link>
+                <DropdownMenuLabel>Ver formularios</DropdownMenuLabel>
+
                 <DropdownMenuItem
-                  className="text-red-600 cursor-pointer"
-                  onClick={() => setProyectoAEliminar(proyecto)}
+                  onClick={() => {
+                    setProyectoSeleccionado(proyecto);
+                    setViewStage("visitaTecnica");
+                  }}
                 >
-                  Eliminar Proyecto
+                  Ver visita técnica
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={() => {
+                    setProyectoSeleccionado(proyecto);
+                    setViewStage("medicion");
+                  }}
+                >
+                  Ver medición
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={() => {
+                    setProyectoSeleccionado(proyecto);
+                    setViewStage("verificacion");
+                  }}
+                >
+                  Ver verificación
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={() => {
+                    setProyectoSeleccionado(proyecto);
+                    setViewStage("taller");
+                  }}
+                >
+                  Ver taller
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={() => {
+                    setProyectoSeleccionado(proyecto);
+                    setViewStage("deposito");
+                  }}
+                >
+                  Ver depósito
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={() => {
+                    setProyectoSeleccionado(proyecto);
+                    setViewStage("logistica");
+                  }}
+                >
+                  Ver logística
+                </DropdownMenuItem>
+
+                <DropdownMenuLabel className="mt-2">
+                  Editar formularios
+                </DropdownMenuLabel>
+
+                <DropdownMenuItem
+                  onClick={() => setProyectoEditandoVisita(proyecto)}
+                >
+                  Editar visita técnica
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={() => setProyectoEditandoMedicion(proyecto)}
+                >
+                  Editar medición
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={() => setProyectoEditandoVerificacion(proyecto)}
+                >
+                  Editar verificación
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={() => setProyectoEditandoTaller(proyecto)}
+                >
+                  Editar taller
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={() => setProyectoEditandoDeposito(proyecto)}
+                >
+                  Editar depósito
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={() => setProyectoEditandoLogistica(proyecto)}
+                >
+                  Editar logística
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -386,9 +582,96 @@ export default function ProyectosDashboardPage() {
       },
     ],
     [],
-  ); // El array vacío asegura que 'columns' no se recalcule innecesariamente
+  );
 
-  // --- RENDER ---
+  // Aplicar filtros + buscador
+  const filteredData: IProyecto[] = useMemo(() => {
+    if (!proyectos) return [];
+
+    const q = searchTerm.trim().toLowerCase();
+
+    return (proyectos as ProyectoLite[]).filter((p) => {
+      const vt = p.visitaTecnica ?? {};
+      const cliente = toClienteLite(p.cliente);
+      const vendedor = toVendedorLite(p.vendedor);
+
+      if (
+        filters.recomendacionTecnica &&
+        vt.recomendacionTecnica !== filters.recomendacionTecnica
+      ) {
+        return false;
+      }
+
+      if (filters.tecnico) {
+        const tecnicoLabel = getTecnicoLabel(vt.asignadoA);
+        if (tecnicoLabel !== filters.tecnico) return false;
+      }
+
+      if (filters.estadoObra && vt.estadoObra !== filters.estadoObra) {
+        return false;
+      }
+
+      if (filters.tipoVisita && vt.tipoVisita !== filters.tipoVisita) {
+        return false;
+      }
+
+      if (filters.condicionVano) {
+        const arr = vt.condicionVanos ?? [];
+        if (!arr.includes(filters.condicionVano)) return false;
+      }
+
+      if (
+        filters.tipoAbertura &&
+        vt.tipoAberturaMedida !== filters.tipoAbertura
+      ) {
+        return false;
+      }
+
+      if (
+        filters.materialSolicitado &&
+        vt.materialSolicitado !== filters.materialSolicitado
+      ) {
+        return false;
+      }
+
+      if (filters.estado && p.estadoActual !== filters.estado) {
+        return false;
+      }
+
+      if (filters.vendedor) {
+        const vendedorLabel =
+          vendedor.name ||
+          (typeof p.vendedor === "string" ? p.vendedor : "");
+        if (vendedorLabel !== filters.vendedor) return false;
+      }
+
+      if (q) {
+        const vendedorLabel =
+          vendedor.name ||
+          (typeof p.vendedor === "string" ? p.vendedor : "");
+
+        const textoBusqueda = [
+          cliente.nombreCompleto,
+          cliente.telefono,
+          cliente.email,
+          cliente.direccion,
+          vt.direccion,
+          vt.entrecalles,
+          p.numeroOrden,
+          p.estadoActual,
+          vendedorLabel,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        if (!textoBusqueda.includes(q)) return false;
+      }
+
+      return true;
+    });
+  }, [proyectos, filters, searchTerm]);
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -399,185 +682,677 @@ export default function ProyectosDashboardPage() {
 
   if (isError) {
     return (
-      <div className="p-10 text-red-500">Error al cargar los proyectos.</div>
+      <div className="p-10 text-red-500">
+        Error al cargar las visitas técnicas.
+      </div>
     );
   }
 
+  const stageLabel =
+    viewStage === "medicion"
+      ? "Medición"
+      : viewStage === "verificacion"
+      ? "Verificación"
+      : viewStage === "taller"
+      ? "Taller"
+      : viewStage === "deposito"
+      ? "Depósito"
+      : viewStage === "logistica"
+      ? "Logística"
+      : "Visita Técnica";
+
+  const stageDescription =
+    viewStage === "medicion"
+      ? "Vista general del proyecto y de la medición. Desde aquí podés revisar los datos y luego editar si es necesario."
+      : viewStage === "verificacion"
+      ? "Vista general del proyecto y de la verificación. Desde aquí podés revisar los datos y luego editar si es necesario."
+      : viewStage === "taller"
+      ? "Vista general del proyecto y del trabajo de taller. Desde aquí podés revisar los datos y luego editar si es necesario."
+      : viewStage === "deposito"
+      ? "Vista general del proyecto y del depósito. Desde aquí podés revisar los datos y luego editar si es necesario."
+      : viewStage === "logistica"
+      ? "Vista general del proyecto y de la logística. Desde aquí podés revisar los datos y luego editar si es necesario."
+      : "Vista general del proyecto y de la visita técnica. Desde aquí podés revisar los datos y luego editar si es necesario.";
+
   return (
     <div className="container mx-auto py-10">
-      {/* MODAL DE CREAR */}
-      <CreateProjectModal
-        isOpen={isCreateModalOpen}
-        onOpenChange={setIsCreateModalOpen}
-      />
-
-      {/* MODAL DE ELIMINAR */}
+      {/* Modal para confirmar cambio de estado */}
       <AlertDialog
-        open={!!proyectoAEliminar}
-        onOpenChange={() => setProyectoAEliminar(null)}
+        open={!!proyectoAPasar}
+        onOpenChange={() => setProyectoAPasar(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
+            <AlertDialogTitle>Cambiar estado del proyecto</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Esto eliminará permanentemente
-              el proyecto
-              <strong className="mx-1">
-                {proyectoAEliminar?.numeroOrden}
-              </strong>
-              de tus servidores.
+              Vas a marcar la etapa de <strong>Visita Técnica</strong> como
+              completada y el proyecto{" "}
+              <strong>{proyectoAPasar?.proyecto.numeroOrden}</strong> pasará al
+              estado <strong>{proyectoAPasar?.destino}</strong>.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-purple-600 hover:bg-purple-700"
               onClick={() => {
-                if (proyectoAEliminar) {
-                  deleteMutation.mutate(proyectoAEliminar._id as string);
+                if (proyectoAPasar) {
+                  pasarEtapaMutation.mutate({
+                    proyectoId: proyectoAPasar.proyecto._id as string,
+                    destino: proyectoAPasar.destino,
+                  });
                 }
               }}
-              disabled={deleteMutation.isPending}
+              disabled={pasarEtapaMutation.isPending}
             >
-              {deleteMutation.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {pasarEtapaMutation.isPending ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Procesando...
+                </div>
               ) : (
-                "Sí, eliminar"
+                "Sí, cambiar estado"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* HEADER + ACCIONES */}
-      <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-center md:justify-between">
+      {/* Modal de vista del proyecto (abre view según estadoActual) */}
+      <Dialog
+        open={!!proyectoSeleccionado}
+        onOpenChange={(open) => {
+          if (!open) {
+            setProyectoSeleccionado(null);
+            setViewStage(null);
+          }
+        }}
+      >
+        {proyectoSeleccionado && (
+          <StandardDialogShell>
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold">
+                  {proyectoSeleccionado.numeroOrden} – {stageLabel}
+                </h2>
+                <p className="text-sm text-muted-foreground">{stageDescription}</p>
+              </div>
+
+              <div>
+                {viewStage === "medicion" ? (
+                  <MedicionView
+                    proyecto={proyectoSeleccionado}
+                    onDeleted={() => {
+                      setProyectoSeleccionado(null);
+                      setViewStage(null);
+                      queryClient.invalidateQueries({
+                        queryKey: ["proyectos-visita-tecnica"],
+                      });
+                    }}
+                  />
+                ) : viewStage === "verificacion" ? (
+                  <VerificacionView
+                    proyecto={proyectoSeleccionado}
+                    onDeleted={() => {
+                      setProyectoSeleccionado(null);
+                      setViewStage(null);
+                      queryClient.invalidateQueries({
+                        queryKey: ["proyectos-visita-tecnica"],
+                      });
+                    }}
+                  />
+                ) : viewStage === "taller" ? (
+                  <TallerView proyecto={proyectoSeleccionado} />
+                ) : viewStage === "deposito" ? (
+                  <DepositoView proyecto={proyectoSeleccionado} />
+                ) : viewStage === "logistica" ? (
+                  <LogisticaView proyecto={proyectoSeleccionado} />
+                ) : (
+                  <VisitaTecnicaView
+                    proyecto={proyectoSeleccionado}
+                    onDeleted={() => {
+                      setProyectoSeleccionado(null);
+                      setViewStage(null);
+                      queryClient.invalidateQueries({
+                        queryKey: ["proyectos-visita-tecnica"],
+                      });
+                    }}
+                  />
+                )}
+              </div>
+
+              <div className="flex justify-between gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setProyectoSeleccionado(null);
+                    setViewStage(null);
+                  }}
+                >
+                  Cerrar
+                </Button>
+
+                {viewStage === "medicion" ? (
+                  <Button
+                    onClick={() => {
+                      setProyectoEditandoMedicion(proyectoSeleccionado);
+                      setProyectoSeleccionado(null);
+                      setViewStage(null);
+                    }}
+                  >
+                    Editar medición
+                  </Button>
+                ) : viewStage === "verificacion" ? (
+                  <Button
+                    onClick={() => {
+                      setProyectoEditandoVerificacion(proyectoSeleccionado);
+                      setProyectoSeleccionado(null);
+                      setViewStage(null);
+                    }}
+                  >
+                    Editar verificación
+                  </Button>
+                ) : viewStage === "taller" ? (
+                  <Button
+                    onClick={() => {
+                      setProyectoEditandoTaller(proyectoSeleccionado);
+                      setProyectoSeleccionado(null);
+                      setViewStage(null);
+                    }}
+                  >
+                    Editar taller
+                  </Button>
+                ) : viewStage === "deposito" ? (
+                  <Button
+                    onClick={() => {
+                      setProyectoEditandoDeposito(proyectoSeleccionado);
+                      setProyectoSeleccionado(null);
+                      setViewStage(null);
+                    }}
+                  >
+                    Editar depósito
+                  </Button>
+                ) : viewStage === "logistica" ? (
+                  <Button
+                    onClick={() => {
+                      setProyectoEditandoLogistica(proyectoSeleccionado);
+                      setProyectoSeleccionado(null);
+                      setViewStage(null);
+                    }}
+                  >
+                    Editar logística
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => {
+                      setProyectoEditandoVisita(proyectoSeleccionado);
+                      setProyectoSeleccionado(null);
+                      setViewStage(null);
+                    }}
+                  >
+                    Editar visita técnica
+                  </Button>
+                )}
+              </div>
+            </div>
+          </StandardDialogShell>
+        )}
+      </Dialog>
+
+      {/* Modal para editar VISITA TÉCNICA */}
+      <Dialog
+        open={!!proyectoEditandoVisita}
+        onOpenChange={(open) => {
+          if (!open) {
+            setProyectoEditandoVisita(null);
+            queryClient.invalidateQueries({
+              queryKey: ["proyectos-visita-tecnica"],
+            });
+          }
+        }}
+      >
+        {proyectoEditandoVisita && (
+          <VisitaTecnicaForm
+            proyecto={proyectoEditandoVisita}
+            onClose={() => setProyectoEditandoVisita(null)}
+            onSaved={() => {
+              queryClient.invalidateQueries({
+                queryKey: ["proyectos-visita-tecnica"],
+              });
+            }}
+          />
+        )}
+      </Dialog>
+
+      {/* Modal para editar MEDICIÓN */}
+      <Dialog
+        open={!!proyectoEditandoMedicion}
+        onOpenChange={(open) => {
+          if (!open) {
+            setProyectoEditandoMedicion(null);
+            queryClient.invalidateQueries({
+              queryKey: ["proyectos-visita-tecnica"],
+            });
+          }
+        }}
+      >
+        {proyectoEditandoMedicion && (
+          <MedicionFormModal
+            proyecto={proyectoEditandoMedicion}
+            onClose={() => setProyectoEditandoMedicion(null)}
+            onSaved={() => {
+              queryClient.invalidateQueries({
+                queryKey: ["proyectos-visita-tecnica"],
+              });
+            }}
+          />
+        )}
+      </Dialog>
+
+      {/* Modal para editar VERIFICACIÓN */}
+      <Dialog
+        open={!!proyectoEditandoVerificacion}
+        onOpenChange={(open) => {
+          if (!open) {
+            setProyectoEditandoVerificacion(null);
+            queryClient.invalidateQueries({
+              queryKey: ["proyectos-visita-tecnica"],
+            });
+          }
+        }}
+      >
+        {proyectoEditandoVerificacion && (
+          <VerificacionFormModal
+            proyecto={proyectoEditandoVerificacion}
+            onClose={() => setProyectoEditandoVerificacion(null)}
+            onSaved={() => {
+              queryClient.invalidateQueries({
+                queryKey: ["proyectos-visita-tecnica"],
+              });
+            }}
+          />
+        )}
+      </Dialog>
+
+      {/* Modal para editar TALLER */}
+      <Dialog
+        open={!!proyectoEditandoTaller}
+        onOpenChange={(open) => {
+          if (!open) {
+            setProyectoEditandoTaller(null);
+            queryClient.invalidateQueries({
+              queryKey: ["proyectos-visita-tecnica"],
+            });
+          }
+        }}
+      >
+        {proyectoEditandoTaller && (
+          <TallerFormModal
+            proyecto={proyectoEditandoTaller}
+            onClose={() => setProyectoEditandoTaller(null)}
+            onSaved={() => {
+              queryClient.invalidateQueries({
+                queryKey: ["proyectos-visita-tecnica"],
+              });
+            }}
+          />
+        )}
+      </Dialog>
+
+      {/* Modal para editar DEPÓSITO */}
+      <Dialog
+        open={!!proyectoEditandoDeposito}
+        onOpenChange={(open) => {
+          if (!open) {
+            setProyectoEditandoDeposito(null);
+            queryClient.invalidateQueries({
+              queryKey: ["proyectos-visita-tecnica"],
+            });
+          }
+        }}
+      >
+        {proyectoEditandoDeposito && (
+          <DepositoFormModal
+            proyecto={proyectoEditandoDeposito}
+            onClose={() => setProyectoEditandoDeposito(null)}
+            onSaved={() => {
+              queryClient.invalidateQueries({
+                queryKey: ["proyectos-visita-tecnica"],
+              });
+            }}
+          />
+        )}
+      </Dialog>
+
+      {/* Modal para editar LOGÍSTICA */}
+      <Dialog
+        open={!!proyectoEditandoLogistica}
+        onOpenChange={(open) => {
+          if (!open) {
+            setProyectoEditandoLogistica(null);
+            queryClient.invalidateQueries({
+              queryKey: ["proyectos-visita-tecnica"],
+            });
+          }
+        }}
+      >
+        {proyectoEditandoLogistica && (
+          <LogisticaFormModal
+            proyecto={proyectoEditandoLogistica}
+            onClose={() => setProyectoEditandoLogistica(null)}
+            onSaved={() => {
+              queryClient.invalidateQueries({
+                queryKey: ["proyectos-visita-tecnica"],
+              });
+            }}
+          />
+        )}
+      </Dialog>
+
+      {/* Header + buscador + filtros */}
+      <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Tablero de Proyectos</h1>
-          <p className="text-sm text-muted-foreground">
-            Gestioná todos los proyectos y filtralos por estado, vendedor o
-            cliente.
+          <h1 className="text-3xl font-bold">Mis Tareas</h1>
+          <p className="text-muted-foreground">
+            Proyectos en etapas de visita técnica, medición, verificación,
+            taller, depósito y logística. Podés ver el detalle, editar los
+            formularios o pasarlos directamente a la siguiente etapa del flujo.
           </p>
         </div>
-        <Button onClick={() => setIsCreateModalOpen(true)}>
-          + Nuevo Proyecto
-        </Button>
-      </div>
 
-      {/* BUSCADOR + BOTÓN DE FILTROS (popover) */}
-      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        {/* Buscador global */}
-        <div className="relative w-full md:max-w-lg">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por cliente, número de orden, estado, vendedor..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+        <div className="flex flex-col gap-3 md:items-end">
+          <div className="relative w-full md:w-80">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por cliente, estado, vendedor o N° de orden..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
 
-        {/* Filtros avanzados en dropdown */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="inline-flex items-center gap-2">
-              <Filter className="h-4 w-4" />
-              Filtros avanzados
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[360px] sm:w-[520px]" align="end">
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <p className="font-semibold text-sm">Filtros de proyectos</p>
-                <p className="text-xs text-muted-foreground">
-                  Filtrá por estado actual, vendedor y cliente.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="text-xs font-medium text-primary hover:underline"
+          <div className="flex items-center gap-3">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={hasActiveFilters ? "default" : "outline"}
+                  size="sm"
+                  className="inline-flex items-center gap-2"
+                >
+                  <Filter className="h-4 w-4" />
+                  <span>Filtros</span>
+                  {activeFilterCount > 0 && (
+                    <span className="rounded-full bg-primary-foreground/10 px-2 py-0.5 text-xs">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+
+              <PopoverContent
+                align="end"
+                className="w-[320px] sm:w-[520px] p-4 space-y-4"
               >
-                Limpiar
-              </button>
-            </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Filtros avanzados</p>
+                    <p className="text-xs text-muted-foreground">
+                      Filtrá las visitas por técnico, estado, tipo de visita,
+                      vendedor y más.
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() =>
+                      setFilters({
+                        recomendacionTecnica: "",
+                        tecnico: "",
+                        estadoObra: "",
+                        tipoVisita: "",
+                        condicionVano: "",
+                        tipoAbertura: "",
+                        materialSolicitado: "",
+                        estado: "",
+                        vendedor: "",
+                      })
+                    }
+                    disabled={!hasActiveFilters}
+                  >
+                    Limpiar
+                  </Button>
+                </div>
 
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Estado Actual */}
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Estado actual</p>
-                <Select
-                  value={estadoFilter}
-                  onValueChange={(val) =>
-                    setEstadoFilter(val as string | typeof ALL_VALUE)
-                  }
-                >
-                  <SelectTrigger className="h-8 w-full text-xs">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL_VALUE}>Todos</SelectItem>
-                    {estadoOptions.map((estado) => (
-                      <SelectItem key={estado} value={estado}>
-                        {estado}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                <div className="grid w-full grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Select
+                    value={filters.recomendacionTecnica || ""}
+                    onValueChange={(val) =>
+                      setFilters((f) => ({
+                        ...f,
+                        recomendacionTecnica: val === ALL_VALUE ? "" : val,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Recomendación técnica" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL_VALUE}>Todas</SelectItem>
+                      {filterOptions.recomendacionTecnica.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-              {/* Vendedor */}
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Vendedor</p>
-                <Select
-                  value={vendedorFilter}
-                  onValueChange={(val) =>
-                    setVendedorFilter(val as string | typeof ALL_VALUE)
-                  }
-                >
-                  <SelectTrigger className="h-8 w-full text-xs">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL_VALUE}>Todos</SelectItem>
-                    {vendedorOptions.map((vend) => (
-                      <SelectItem key={vend} value={vend}>
-                        {vend}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                  <Select
+                    value={filters.tecnico || ""}
+                    onValueChange={(val) =>
+                      setFilters((f) => ({
+                        ...f,
+                        tecnico: val === ALL_VALUE ? "" : val,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Técnico" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL_VALUE}>Todos</SelectItem>
+                      {filterOptions.tecnico.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-              {/* Cliente */}
-              <div className="space-y-1 sm:col-span-2">
-                <p className="text-xs text-muted-foreground">Cliente</p>
-                <Select
-                  value={clienteFilter}
-                  onValueChange={(val) =>
-                    setClienteFilter(val as string | typeof ALL_VALUE)
-                  }
-                >
-                  <SelectTrigger className="h-8 w-full text-xs">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL_VALUE}>Todos</SelectItem>
-                    {clienteOptions.map((cli) => (
-                      <SelectItem key={cli} value={cli}>
-                        {cli}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
+                  <Select
+                    value={filters.vendedor || ""}
+                    onValueChange={(val) =>
+                      setFilters((f) => ({
+                        ...f,
+                        vendedor: val === ALL_VALUE ? "" : val,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Vendedor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL_VALUE}>Todos</SelectItem>
+                      {filterOptions.vendedor.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select
+                    value={filters.estadoObra || ""}
+                    onValueChange={(val) =>
+                      setFilters((f) => ({
+                        ...f,
+                        estadoObra: val === ALL_VALUE ? "" : val,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Estado de la obra" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL_VALUE}>Todos</SelectItem>
+                      {filterOptions.estadoObra.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select
+                    value={filters.tipoVisita || ""}
+                    onValueChange={(val) =>
+                      setFilters((f) => ({
+                        ...f,
+                        tipoVisita: val === ALL_VALUE ? "" : val,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Tipo de visita" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL_VALUE}>Todas</SelectItem>
+                      {filterOptions.tipoVisita.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select
+                    value={filters.condicionVano || ""}
+                    onValueChange={(val) =>
+                      setFilters((f) => ({
+                        ...f,
+                        condicionVano: val === ALL_VALUE ? "" : val,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Condición de vanos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL_VALUE}>Todas</SelectItem>
+                      {filterOptions.condicionVano.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select
+                    value={filters.tipoAbertura || ""}
+                    onValueChange={(val) =>
+                      setFilters((f) => ({
+                        ...f,
+                        tipoAbertura: val === ALL_VALUE ? "" : val,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Tipo de abertura" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL_VALUE}>Todas</SelectItem>
+                      {filterOptions.tipoAbertura.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select
+                    value={filters.materialSolicitado || ""}
+                    onValueChange={(val) =>
+                      setFilters((f) => ({
+                        ...f,
+                        materialSolicitado: val === ALL_VALUE ? "" : val,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Material solicitado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL_VALUE}>Todos</SelectItem>
+                      {filterOptions.materialSolicitado.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select
+                    value={filters.estado || ""}
+                    onValueChange={(val) =>
+                      setFilters((f) => ({
+                        ...f,
+                        estado: val === ALL_VALUE ? "" : val,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Estado del proyecto" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL_VALUE}>Todos</SelectItem>
+                      {filterOptions.estado.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <Button
+              variant="outline"
+              onClick={() => router.push("/dashboard/proyectos")}
+            >
+              Volver al Tablero General
+            </Button>
+          </div>
+        </div>
       </div>
 
-      {/* TABLA */}
-      {filteredProyectos && (
-        <DataTable columns={columns} data={filteredProyectos} />
+      {filteredData && filteredData.length > 0 ? (
+        <DataTable
+          columns={columns}
+          data={filteredData}
+          onRowClick={(row) => {
+            const proyecto = row.original as IProyecto;
+            setProyectoSeleccionado(proyecto);
+
+            // ✅ acá está lo que pedís: abre el view según estadoActual (Deposito/Depósito, etc.)
+            setViewStage(getViewStageFromEstado(proyecto.estadoActual));
+          }}
+        />
+      ) : (
+        <div className="border rounded-md p-8 text-center text-muted-foreground">
+          No hay proyectos que coincidan con los filtros seleccionados en estado{" "}
+          <strong>Mis Tareas</strong>.
+        </div>
       )}
     </div>
   );

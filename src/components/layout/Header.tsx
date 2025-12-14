@@ -141,10 +141,10 @@ export function Header() {
                             Clientes
                         </Link>
                         <Link
-                            href="/dashboard/tareas"
+                            href="/dashboard/notificaciones"
                             className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
                         >
-                            Mis Tareas
+                            Notificaciones
                         </Link>
                         
                         {/* SERVICIOS (como ya lo tenías) */}

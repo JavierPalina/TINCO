@@ -364,113 +364,117 @@ export default function MedicionFormModal({
   // ------------ SUBMIT ------------ //
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+  e.preventDefault();
+  setIsSubmitting(true);
 
-    try {
-      // Validación mínima de fotos (mínimo 3)
-      if (form.fotosMedicion.length < 3) {
-        toast.error("Cargá al menos 3 fotos de medición.");
-        setIsSubmitting(false);
-        return;
-      }
-
-      const medidasNormalizadas = (form.medidasTomadas || [])
-        .map((m) => ({
-          alto: m.alto.trim(),
-          ancho: m.ancho.trim(),
-        }))
-        .filter((m) => Object.values(m).some((v) => v !== ""));
-
-      const payload = {
-        datosFormulario: {
-          medicion: {
-            numeroOrdenMedicion:
-              form.numeroOrdenMedicion || proyecto.numeroOrden || undefined,
-
-            clienteObraEmpresa: form.clienteObraEmpresa || undefined,
-            direccionObra: form.direccionObra || undefined,
-
-            asignadoA: form.asignadoA || undefined,
-            fechaMedicion: form.fechaMedicion
-              ? new Date(form.fechaMedicion)
-              : undefined,
-            tipoAberturaMedida: form.tipoAberturaMedida || undefined,
-
-            cantidadAberturasMedidas:
-              form.cantidadAberturasMedidas || undefined,
-            medidasTomadas:
-              medidasNormalizadas.length ? medidasNormalizadas : undefined,
-
-            toleranciasRecomendadas:
-              form.toleranciasRecomendadas || undefined,
-
-            condicionVanos:
-              form.condicionVanos && form.condicionVanos.length
-                ? form.condicionVanos
-                : undefined,
-            estadoObraMedicion: form.estadoObraMedicion || undefined,
-
-            tipoPerfilPrevisto: form.tipoPerfilPrevisto || undefined,
-            color: form.color || undefined,
-            tipoVidrioSolicitado: form.tipoVidrioSolicitado || undefined,
-
-            planosAdjuntos:
-              form.planosAdjuntos && form.planosAdjuntos.length
-                ? form.planosAdjuntos
-                : undefined,
-            fotosMedicion:
-              form.fotosMedicion && form.fotosMedicion.length
-                ? form.fotosMedicion
-                : undefined,
-
-            observacionesMedicion:
-              form.observacionesMedicion || undefined,
-            firmaValidacionTecnico:
-              form.firmaValidacionTecnico || undefined,
-
-            estadoFinalMedicion: form.estadoFinalMedicion || undefined,
-            enviarAVerificacion: form.enviarAVerificacion || undefined,
-          },
-        },
-      } as {
-        datosFormulario: { medicion: Record<string, unknown> };
-        estadoActual?: string;
-      };
-
-      // Si debe pasar a Verificación
-      if (form.enviarAVerificacion === "Sí") {
-        payload.estadoActual = "Verificación";
-      }
-
-      await axios.put(`/api/proyectos/${proyecto._id}`, payload);
-
-      toast.success(
-        form.enviarAVerificacion === "Sí"
-          ? "Medición guardada y enviada a Verificación."
-          : "Medición actualizada correctamente.",
-      );
-
-      onSaved?.();
-      onClose?.();
-    } catch (error: unknown) {
-      console.error(error);
-
-      if (axios.isAxiosError(error)) {
-        const errorMessage =
-          (error.response?.data as { error?: string } | undefined)?.error ||
-          error.message;
-        toast.error("Error al guardar la medición: " + errorMessage);
-      } else {
-        toast.error(
-          "Error al guardar la medición: " +
-            (error instanceof Error ? error.message : "Error desconocido"),
-        );
-      }
-    } finally {
+  try {
+    // Validación mínima de fotos (mínimo 3)
+    if (form.fotosMedicion.length < 3) {
+      toast.error("Cargá al menos 3 fotos de medición.");
       setIsSubmitting(false);
+      return;
     }
-  };
+
+    const medidasNormalizadas = (form.medidasTomadas || [])
+      .map((m) => ({
+        alto: m.alto.trim(),
+        ancho: m.ancho.trim(),
+      }))
+      .filter((m) => Object.values(m).some((v) => v !== ""));
+
+    // 💡 Armamos los datos de medición una sola vez
+    const datosMedicion = {
+      numeroOrdenMedicion:
+        form.numeroOrdenMedicion || proyecto.numeroOrden || undefined,
+
+      clienteObraEmpresa: form.clienteObraEmpresa || undefined,
+      direccionObra: form.direccionObra || undefined,
+
+      asignadoA: form.asignadoA || undefined,
+      fechaMedicion: form.fechaMedicion
+        ? new Date(form.fechaMedicion)
+        : undefined,
+      tipoAberturaMedida: form.tipoAberturaMedida || undefined,
+
+      cantidadAberturasMedidas: form.cantidadAberturasMedidas || undefined,
+      medidasTomadas:
+        medidasNormalizadas.length ? medidasNormalizadas : undefined,
+
+      toleranciasRecomendadas: form.toleranciasRecomendadas || undefined,
+
+      condicionVanos:
+        form.condicionVanos && form.condicionVanos.length
+          ? form.condicionVanos
+          : undefined,
+      estadoObraMedicion: form.estadoObraMedicion || undefined,
+
+      tipoPerfilPrevisto: form.tipoPerfilPrevisto || undefined,
+      color: form.color || undefined,
+      tipoVidrioSolicitado: form.tipoVidrioSolicitado || undefined,
+
+      planosAdjuntos:
+        form.planosAdjuntos && form.planosAdjuntos.length
+          ? form.planosAdjuntos
+          : undefined,
+      fotosMedicion:
+        form.fotosMedicion && form.fotosMedicion.length
+          ? form.fotosMedicion
+          : undefined,
+
+      observacionesMedicion: form.observacionesMedicion || undefined,
+      firmaValidacionTecnico: form.firmaValidacionTecnico || undefined,
+
+      estadoFinalMedicion: form.estadoFinalMedicion || undefined,
+      enviarAVerificacion: form.enviarAVerificacion || undefined,
+    };
+
+    // 👇 Acá definimos el payload según si se pasa o no a Verificación
+    let payload: any;
+
+    if (form.enviarAVerificacion === "Sí") {
+      // ✅ Completar etapa de medición y forzar estado a Verificación
+      payload = {
+        etapaACompletar: "medicion",
+        datosFormulario: datosMedicion,
+        forzarEstado: "Verificación",
+      };
+    } else {
+      // ✅ Solo guardar datos de medición sin avanzar de estado
+      payload = {
+        datosFormulario: {
+          medicion: datosMedicion,
+        },
+      };
+    }
+
+    await axios.put(`/api/proyectos/${proyecto._id}`, payload);
+
+    toast.success(
+      form.enviarAVerificacion === "Sí"
+        ? "Medición guardada y proyecto pasado a Verificación."
+        : "Medición actualizada correctamente.",
+    );
+
+    onSaved?.();
+    onClose?.();
+  } catch (error: unknown) {
+    console.error(error);
+
+    if (axios.isAxiosError(error)) {
+      const errorMessage =
+        (error.response?.data as { error?: string } | undefined)?.error ||
+        error.message;
+      toast.error("Error al guardar la medición: " + errorMessage);
+    } else {
+      toast.error(
+        "Error al guardar la medición: " +
+          (error instanceof Error ? error.message : "Error desconocido"),
+      );
+    }
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   // ------------ LABELS DE COMBOS ------------ //
 

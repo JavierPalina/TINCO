@@ -40,7 +40,7 @@ export default function MisTareasPage() {
   return (
     <div className="h-screen mx-auto flex flex-col">
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6 p-4 border-b">
-        <h1 className="text-3xl font-bold">Mis Tareas</h1>
+        <h1 className="text-3xl font-bold">Notificaciones</h1>
         <div className="flex items-center gap-2 ">
           <Popover>
             <PopoverTrigger asChild>

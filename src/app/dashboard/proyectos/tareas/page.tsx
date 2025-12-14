@@ -67,6 +67,10 @@ import { VisitaTecnicaView } from "@/components/proyectos/VisitaTecnicaView";
 import VerificacionFormModal from "@/components/proyectos/FormVerificacion";
 import { VerificacionView } from "@/components/proyectos/VerificacionView";
 
+// 🔹 TALLER
+import TallerFormModal from "@/components/proyectos/FormTaller";
+import { TallerView } from "@/components/proyectos/TallerView";
+
 // --- Tipos auxiliares para evitar any ---
 
 type DestinoEstado =
@@ -145,6 +149,8 @@ const getEstadoBadgeColor = (estado: string) => {
       return "bg-purple-600 hover:bg-purple-700";
     case "Verificación":
       return "bg-yellow-600 hover:bg-yellow-700 text-black";
+    case "Depósito":
+      return "bg-slate-600 hover:bg-slate-700";
     default:
       return "bg-gray-400 hover:bg-gray-500";
   }
@@ -162,17 +168,23 @@ function toVendedorLite(
   return ref && typeof ref === "object" ? ref : {};
 }
 
+interface TecnicoRef {
+  name?: string;
+  _id?: string;
+}
+
 function getTecnicoLabel(asignadoA: AsignadoARef): string {
   if (!asignadoA) return "";
   if (typeof asignadoA === "string") return asignadoA;
   return asignadoA.name ?? "";
 }
 
-// --- FETCH SOLO VISITA TÉCNICA / MEDICIÓN / VERIFICACIÓN ---
+// --- FETCH VISITA TÉCNICA / MEDICIÓN / VERIFICACIÓN / TALLER / DEPÓSITO / LOGÍSTICA ---
 async function fetchProyectosVisitaTecnica(): Promise<IProyecto[]> {
   const { data } = await axios.get("/api/proyectos", {
     params: {
-      estados: "Visita Técnica,Medición,Verificación",
+      estados:
+        "Visita Técnica,Medición,Verificación,Taller,Depósito,Logística",
     },
   });
   return data.data;
@@ -194,7 +206,7 @@ export default function VisitaTecnicaPage() {
 
   // qué etapa se ve en el view
   const [viewStage, setViewStage] = useState<
-    "visitaTecnica" | "medicion" | "verificacion" | null
+    "visitaTecnica" | "medicion" | "verificacion" | "taller" | null
   >(null);
 
   // Modales de edición
@@ -203,6 +215,8 @@ export default function VisitaTecnicaPage() {
   const [proyectoEditandoMedicion, setProyectoEditandoMedicion] =
     useState<IProyecto | null>(null);
   const [proyectoEditandoVerificacion, setProyectoEditandoVerificacion] =
+    useState<IProyecto | null>(null);
+  const [proyectoEditandoTaller, setProyectoEditandoTaller] =
     useState<IProyecto | null>(null);
 
   // 🔎 Buscador global
@@ -531,6 +545,24 @@ export default function VisitaTecnicaPage() {
     );
   }
 
+  const stageLabel =
+    viewStage === "medicion"
+      ? "Medición"
+      : viewStage === "verificacion"
+      ? "Verificación"
+      : viewStage === "taller"
+      ? "Taller"
+      : "Visita Técnica";
+
+  const stageDescription =
+    viewStage === "medicion"
+      ? "Vista general del proyecto y de la medición. Desde aquí podés revisar los datos y luego editar si es necesario."
+      : viewStage === "verificacion"
+      ? "Vista general del proyecto y de la verificación. Desde aquí podés revisar los datos y luego editar si es necesario."
+      : viewStage === "taller"
+      ? "Vista general del proyecto y del trabajo de taller. Desde aquí podés revisar los datos y luego editar si es necesario."
+      : "Vista general del proyecto y de la visita técnica. Desde aquí podés revisar los datos y luego editar si es necesario.";
+
   return (
     <div className="container mx-auto py-10">
       {/* Modal para confirmar cambio de estado */}
@@ -589,20 +621,9 @@ export default function VisitaTecnicaPage() {
           <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
-                {proyectoSeleccionado.numeroOrden} –{" "}
-                {viewStage === "medicion"
-                  ? "Medición"
-                  : viewStage === "verificacion"
-                  ? "Verificación"
-                  : "Visita Técnica"}
+                {proyectoSeleccionado.numeroOrden} – {stageLabel}
               </DialogTitle>
-              <DialogDescription>
-                {viewStage === "medicion"
-                  ? "Vista general del proyecto y de la medición. Desde aquí podés revisar los datos y luego editar si es necesario."
-                  : viewStage === "verificacion"
-                  ? "Vista general del proyecto y de la verificación. Desde aquí podés revisar los datos y luego editar si es necesario."
-                  : "Vista general del proyecto y de la visita técnica. Desde aquí podés revisar los datos y luego editar si es necesario."}
-              </DialogDescription>
+              <DialogDescription>{stageDescription}</DialogDescription>
             </DialogHeader>
 
             <div className="mt-4">
@@ -628,6 +649,8 @@ export default function VisitaTecnicaPage() {
                     });
                   }}
                 />
+              ) : viewStage === "taller" ? (
+                <TallerView proyecto={proyectoSeleccionado} />
               ) : (
                 <VisitaTecnicaView
                   proyecto={proyectoSeleccionado}
@@ -672,6 +695,16 @@ export default function VisitaTecnicaPage() {
                   }}
                 >
                   Editar verificación
+                </Button>
+              ) : viewStage === "taller" ? (
+                <Button
+                  onClick={() => {
+                    setProyectoEditandoTaller(proyectoSeleccionado);
+                    setProyectoSeleccionado(null);
+                    setViewStage(null);
+                  }}
+                >
+                  Editar taller
                 </Button>
               ) : (
                 <Button
@@ -764,16 +797,41 @@ export default function VisitaTecnicaPage() {
         )}
       </Dialog>
 
+      {/* Modal para editar TALLER */}
+      <Dialog
+        open={!!proyectoEditandoTaller}
+        onOpenChange={(open) => {
+          if (!open) {
+            setProyectoEditandoTaller(null);
+            queryClient.invalidateQueries({
+              queryKey: ["proyectos-visita-tecnica"],
+            });
+          }
+        }}
+      >
+        {proyectoEditandoTaller && (
+          <TallerFormModal
+            proyecto={proyectoEditandoTaller}
+            onClose={() => setProyectoEditandoTaller(null)}
+            onSaved={() => {
+              queryClient.invalidateQueries({
+                queryKey: ["proyectos-visita-tecnica"],
+              });
+            }}
+          />
+        )}
+      </Dialog>
+
       {/* Header + buscador + filtros */}
       <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-start md:justify-between">
         <div>
           <h1 className="text-3xl font-bold">
-            Visita Técnica / Medición / Verificación
+            Mis Tareas
           </h1>
           <p className="text-muted-foreground">
-            Proyectos en etapas de visita técnica, medición y verificación.
-            Podés ver el detalle, editar los formularios o pasarlos directamente
-            a la siguiente etapa del flujo.
+            Proyectos en etapas de visita técnica, medición, verificación,
+            taller, depósito y logística. Podés ver el detalle, editar los
+            formularios o pasarlos directamente a la siguiente etapa del flujo.
           </p>
         </div>
 
@@ -1063,11 +1121,16 @@ export default function VisitaTecnicaPage() {
             const proyecto = row.original as IProyecto;
             setProyectoSeleccionado(proyecto);
 
-            if (proyecto.estadoActual === "Medición") {
+            const estado = proyecto.estadoActual;
+
+            if (estado === "Medición") {
               setViewStage("medicion");
-            } else if (proyecto.estadoActual === "Verificación") {
+            } else if (estado === "Verificación") {
               setViewStage("verificacion");
+            } else if (estado === "Taller") {
+              setViewStage("taller");
             } else {
+              // Para Depósito / Logística seguimos mostrando la vista de Visita Técnica
               setViewStage("visitaTecnica");
             }
           }}
@@ -1075,7 +1138,11 @@ export default function VisitaTecnicaPage() {
       ) : (
         <div className="border rounded-md p-8 text-center text-muted-foreground">
           No hay proyectos que coincidan con los filtros seleccionados en estado{" "}
-          <strong>Visita Técnica / Medición / Verificación</strong>.
+          <strong>
+            Visita Técnica / Medición / Verificación / Taller / Depósito /
+            Logística
+          </strong>
+          .
         </div>
       )}
     </div>
