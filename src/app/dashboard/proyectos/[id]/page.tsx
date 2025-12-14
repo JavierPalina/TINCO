@@ -12,9 +12,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // import { FormVisitaTecnica } from '@/components/proyectos/FormVisitaTecnica';
 import MedicionFormModal from "@/components/proyectos/FormMedicion";
 import VerificacionFormModal from "@/components/proyectos/FormVerificacion";
-import { FormTaller } from "@/components/proyectos/FormTaller";
-import { FormDeposito } from "@/components/proyectos/FormDeposito";
-import { FormLogistica } from "@/components/proyectos/FormLogistica";
+import FormTaller from "@/components/proyectos/FormTaller"
+import FormDeposito from "@/components/proyectos/FormDeposito";
+import FormLogistica from "@/components/proyectos/FormLogistica";
 
 async function fetchProyecto(id: string): Promise<IProyecto> {
   const { data } = await axios.get(`/api/proyectos/${id}`);
@@ -134,9 +134,9 @@ export default function ProyectoDetallePage() {
           <FormTaller proyecto={proyecto} />
         </TabsContent>
 
-        <TabsContent value="deposito" className="mt-4">
+        {/* <TabsContent value="deposito" className="mt-4">
           <FormDeposito proyecto={proyecto} />
-        </TabsContent>
+        </TabsContent> */}
 
         <TabsContent value="logistica" className="mt-4">
           <FormLogistica proyecto={proyecto} />
