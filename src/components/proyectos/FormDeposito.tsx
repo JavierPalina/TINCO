@@ -1,3 +1,4 @@
+// ./src/components/proyectos/FormDeposito.tsx
 "use client";
 
 import { useState } from "react";
@@ -18,7 +19,6 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Loader2, Plus, X } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type FormDepositoProps = {
@@ -27,7 +27,7 @@ type FormDepositoProps = {
   onSaved: () => void;
 };
 
-type DepositoFormValues = {
+export type DepositoFormValues = {
   numeroOrdenDeposito: string;
   fechaIngresoDeposito: string; // ISO (yyyy-mm-dd)
   responsableRecepcion: string;
@@ -52,19 +52,21 @@ type DepositoFormValues = {
 
   condicionVidrio: string;
 
-  // Por ahora solo guardamos URLs/paths de fotos; la integración de subida real la hacés con tu uploader
+  // URLs/paths
   fotosIngreso: string[];
 
   fechaSalidaEntrega: string; // ISO (yyyy-mm-dd) opcional ("" si no hay)
-
   estadoActualPedido: string;
 
   observacionesDeposito: string;
-
   usuarioEncargado: string;
 
   // flags para lógica de negocio
   crearTareaReposicion: boolean;
+};
+
+type ProyectoConDeposito = IProyecto & {
+  deposito?: Partial<DepositoFormValues> | null;
 };
 
 export default function FormDeposito({
@@ -73,36 +75,41 @@ export default function FormDeposito({
   onSaved,
 }: FormDepositoProps) {
   const depositoPrevio: Partial<DepositoFormValues> =
-    (proyecto.deposito as Partial<DepositoFormValues>) || {};
+    (proyecto as ProyectoConDeposito).deposito || {};
 
   const todayISO = new Date().toISOString().slice(0, 10);
 
-  const [ubicaciones, setUbicaciones] = useState<string[]>([
-    "Sector A – Perfiles / Estantería 1 – Nivel 1",
-    "Sector B – Herrajes / Estantería 3 – Nivel 2",
-    "Sector C – Vidrios / Estantería 2 – Nivel 3",
-    "Sector D – Terminados / Estantería 1 – Nivel 4",
-    depositoPrevio.ubicacionSeleccion || "",
-  ].filter(Boolean));
+  const [ubicaciones, setUbicaciones] = useState<string[]>(
+    [
+      "Sector A – Perfiles / Estantería 1 – Nivel 1",
+      "Sector B – Herrajes / Estantería 3 – Nivel 2",
+      "Sector C – Vidrios / Estantería 2 – Nivel 3",
+      "Sector D – Terminados / Estantería 1 – Nivel 4",
+      depositoPrevio.ubicacionSeleccion || "",
+    ].filter(Boolean),
+  );
 
   const [nuevaUbicacion, setNuevaUbicacion] = useState("");
   const [nuevaVerificacionEmbalaje, setNuevaVerificacionEmbalaje] =
     useState("");
+
   const [verificacionesEmbalaje, setVerificacionesEmbalaje] = useState<
     string[]
-  >([
-    "Correcto",
-    "Incompleto",
-    "Dañado",
-    "Requiere refuerzo",
-    "Mal rotulado",
-    "Sucio o con polvo",
-    "Reembalado",
-    "Pendiente de revisión",
-    "No corresponde al pedido",
-    "Listo para entregar",
-    depositoPrevio.verificacionEmbalaje || "",
-  ].filter(Boolean));
+  >(
+    [
+      "Correcto",
+      "Incompleto",
+      "Dañado",
+      "Requiere refuerzo",
+      "Mal rotulado",
+      "Sucio o con polvo",
+      "Reembalado",
+      "Pendiente de revisión",
+      "No corresponde al pedido",
+      "Listo para entregar",
+      depositoPrevio.verificacionEmbalaje || "",
+    ].filter(Boolean),
+  );
 
   const {
     register,
@@ -115,30 +122,36 @@ export default function FormDeposito({
       numeroOrdenDeposito:
         depositoPrevio.numeroOrdenDeposito ||
         `${proyecto.numeroOrden ?? ""}-DEP`,
-      fechaIngresoDeposito:
-        depositoPrevio.fechaIngresoDeposito || todayISO,
+      fechaIngresoDeposito: depositoPrevio.fechaIngresoDeposito || todayISO,
       responsableRecepcion: depositoPrevio.responsableRecepcion || "",
+
       origenPedido: depositoPrevio.origenPedido || "Taller",
-      estadoProductoRecibido:
-        depositoPrevio.estadoProductoRecibido || "Correcto",
+      estadoProductoRecibido: depositoPrevio.estadoProductoRecibido || "Correcto",
+
       cantidadUnidades: depositoPrevio.cantidadUnidades ?? null,
+
       ubicacionSeleccion: depositoPrevio.ubicacionSeleccion || "",
       ubicacionDetalle: depositoPrevio.ubicacionDetalle || "",
-      verificacionEmbalaje:
-        depositoPrevio.verificacionEmbalaje || "Correcto",
+
+      verificacionEmbalaje: depositoPrevio.verificacionEmbalaje || "Correcto",
       identificacion: depositoPrevio.identificacion || "",
+
       materialAlmacenado: depositoPrevio.materialAlmacenado || "Aluminio",
       materialAlmacenadoOtro: depositoPrevio.materialAlmacenadoOtro || "",
+
       controlMedidasOk: depositoPrevio.controlMedidasOk ?? false,
-      cantidadPiezasControladas:
-        depositoPrevio.cantidadPiezasControladas ?? null,
+      cantidadPiezasControladas: depositoPrevio.cantidadPiezasControladas ?? null,
+
       condicionVidrio: depositoPrevio.condicionVidrio || "Sin daño",
+
       fotosIngreso: depositoPrevio.fotosIngreso || [],
+
       fechaSalidaEntrega: depositoPrevio.fechaSalidaEntrega || "",
-      estadoActualPedido:
-        depositoPrevio.estadoActualPedido || "En depósito",
+      estadoActualPedido: depositoPrevio.estadoActualPedido || "En depósito",
+
       observacionesDeposito: depositoPrevio.observacionesDeposito || "",
       usuarioEncargado: depositoPrevio.usuarioEncargado || "",
+
       crearTareaReposicion: depositoPrevio.crearTareaReposicion ?? false,
     },
   });
@@ -146,10 +159,9 @@ export default function FormDeposito({
   const estadoProductoRecibido = watch("estadoProductoRecibido");
   const condicionVidrio = watch("condicionVidrio");
   const materialAlmacenado = watch("materialAlmacenado");
-  const estadoActualPedido = watch("estadoActualPedido");
 
   const hayFaltante =
-    estadoProductoRecibido.toLowerCase().includes("faltante") ||
+    (estadoProductoRecibido || "").toLowerCase().includes("faltante") ||
     condicionVidrio === "Faltante";
 
   const onSubmit = async (values: DepositoFormValues) => {
@@ -162,26 +174,24 @@ export default function FormDeposito({
       await axios.put(`/api/proyectos/${proyecto._id}`, {
         etapaACompletar: "deposito",
         datosFormulario: payload,
-        // Podés usar esto para avanzar al siguiente estado si querés:
-        // forzarEstado:
-        //   values.estadoActualPedido === "Listo para entrega"
-        //     ? "Logística"
-        //     : proyecto.estadoActual,
       });
-
-      // 🔔 Hints de negocio para el backend:
-      // - Si estadoActualPedido === "Listo para entrega" -> notificar Logística.
-      // - Si estadoActualPedido === "En revisión" o producto con daño -> notificar Taller / Verificación.
-      // - Si crearTareaReposicion === true -> generar tarea en "Pedidos de reposición".
 
       toast.success("Formulario de Depósito guardado correctamente");
       onSaved();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
+
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data as { error?: string } | undefined;
+        toast.error(apiError?.error ?? error.message ?? "Error al guardar Depósito");
+        return;
+      }
+
       toast.error(
-        error?.response?.data?.error ||
-          "Error al guardar el formulario de Depósito",
+        error instanceof Error
+          ? error.message
+          : "Error al guardar el formulario de Depósito",
       );
     }
   };
@@ -228,19 +238,14 @@ export default function FormDeposito({
         <div className="grid gap-4 md:grid-cols-3">
           <div className="space-y-1">
             <Label htmlFor="numeroOrdenDeposito">N° Orden de Depósito</Label>
-            <Input
-              id="numeroOrdenDeposito"
-              {...register("numeroOrdenDeposito")}
-            />
+            <Input id="numeroOrdenDeposito" {...register("numeroOrdenDeposito")} />
             <p className="text-[11px] text-muted-foreground">
               Se vincula con Taller y Logística.
             </p>
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="fechaIngresoDeposito">
-              Fecha de ingreso al depósito
-            </Label>
+            <Label htmlFor="fechaIngresoDeposito">Fecha de ingreso al depósito</Label>
             <Input
               id="fechaIngresoDeposito"
               type="date"
@@ -249,10 +254,7 @@ export default function FormDeposito({
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="responsableRecepcion">
-              Responsable de recepción
-            </Label>
-            {/* Podés reemplazar esto por un selector de usuarios del sistema */}
+            <Label htmlFor="responsableRecepcion">Responsable de recepción</Label>
             <Input
               id="responsableRecepcion"
               placeholder="Usuario encargado del depósito"
@@ -269,10 +271,7 @@ export default function FormDeposito({
               name="origenPedido"
               control={control}
               render={({ field }) => (
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar origen" />
                   </SelectTrigger>
@@ -293,10 +292,7 @@ export default function FormDeposito({
               name="estadoProductoRecibido"
               control={control}
               render={({ field }) => (
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar estado" />
                   </SelectTrigger>
@@ -304,21 +300,15 @@ export default function FormDeposito({
                     <SelectItem value="Correcto">Correcto</SelectItem>
                     <SelectItem value="Incompleto">Incompleto</SelectItem>
                     <SelectItem value="Dañado">Dañado</SelectItem>
-                    <SelectItem value="Con faltantes">
-                      Con faltantes
-                    </SelectItem>
+                    <SelectItem value="Con faltantes">Con faltantes</SelectItem>
                     <SelectItem value="En revisión">En revisión</SelectItem>
                     <SelectItem value="En reparación">En reparación</SelectItem>
-                    <SelectItem value="Pendiente de control">
-                      Pendiente de control
-                    </SelectItem>
+                    <SelectItem value="Pendiente de control">Pendiente de control</SelectItem>
                     <SelectItem value="Rechazado">Rechazado</SelectItem>
                     <SelectItem value="En cuarentena">
                       En cuarentena (espera de autorización)
                     </SelectItem>
-                    <SelectItem value="Listo para entregar">
-                      Listo para entregar
-                    </SelectItem>
+                    <SelectItem value="Listo para entregar">Listo para entregar</SelectItem>
                   </SelectContent>
                 </Select>
               )}
@@ -331,9 +321,7 @@ export default function FormDeposito({
               id="cantidadUnidades"
               type="number"
               min={0}
-              {...register("cantidadUnidades", {
-                valueAsNumber: true,
-              })}
+              {...register("cantidadUnidades", { valueAsNumber: true })}
             />
           </div>
         </div>
@@ -341,19 +329,15 @@ export default function FormDeposito({
         {/* Ubicación */}
         <div className="space-y-2 border rounded-md p-3">
           <Label>Ubicación en el depósito</Label>
+
           <div className="grid gap-4 md:grid-cols-[2fr,3fr]">
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">
-                Selección rápida
-              </Label>
+              <Label className="text-xs text-muted-foreground">Selección rápida</Label>
               <Controller
                 name="ubicacionSeleccion"
                 control={control}
                 render={({ field }) => (
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar ubicación" />
                     </SelectTrigger>
@@ -375,12 +359,7 @@ export default function FormDeposito({
                   onChange={(e) => setNuevaUbicacion(e.target.value)}
                   className="text-xs"
                 />
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  onClick={handleAgregarUbicacion}
-                >
+                <Button type="button" size="icon" variant="outline" onClick={handleAgregarUbicacion}>
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
@@ -416,8 +395,7 @@ export default function FormDeposito({
                 {...register("ubicacionDetalle")}
               />
               <p className="text-[11px] text-muted-foreground">
-                Podés usar códigos internos (A01, B03, C07) o un código QR
-                físico del depósito.
+                Podés usar códigos internos (A01, B03, C07) o un código QR físico del depósito.
               </p>
             </div>
           </div>
@@ -426,19 +404,15 @@ export default function FormDeposito({
         {/* Verificación de embalaje */}
         <div className="space-y-2 border rounded-md p-3">
           <Label>Verificación de embalaje</Label>
+
           <div className="grid gap-4 md:grid-cols-[2fr,3fr]">
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">
-                Estado del embalaje
-              </Label>
+              <Label className="text-xs text-muted-foreground">Estado del embalaje</Label>
               <Controller
                 name="verificacionEmbalaje"
                 control={control}
                 render={({ field }) => (
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar estado" />
                     </SelectTrigger>
@@ -457,9 +431,7 @@ export default function FormDeposito({
                 <Input
                   placeholder="Agregar nuevo estado de embalaje"
                   value={nuevaVerificacionEmbalaje}
-                  onChange={(e) =>
-                    setNuevaVerificacionEmbalaje(e.target.value)
-                  }
+                  onChange={(e) => setNuevaVerificacionEmbalaje(e.target.value)}
                   className="text-xs"
                 />
                 <Button
@@ -482,9 +454,7 @@ export default function FormDeposito({
                       {v}
                       <button
                         type="button"
-                        onClick={() =>
-                          handleEliminarVerificacionEmbalaje(v)
-                        }
+                        onClick={() => handleEliminarVerificacionEmbalaje(v)}
                         className="hover:text-red-500"
                       >
                         <X className="h-3 w-3" />
@@ -510,17 +480,13 @@ export default function FormDeposito({
 
         {/* Material / medidas / vidrio */}
         <div className="grid gap-4 md:grid-cols-3">
-          {/* Material almacenado */}
           <div className="space-y-1">
             <Label>Material almacenado</Label>
             <Controller
               name="materialAlmacenado"
               control={control}
               render={({ field }) => (
-                <Select
-                  onValueChange={field.onChange}
-                  value={field.value}
-                >
+                <Select onValueChange={field.onChange} value={field.value}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar material" />
                   </SelectTrigger>
@@ -543,7 +509,6 @@ export default function FormDeposito({
             )}
           </div>
 
-          {/* Control de medidas */}
           <div className="space-y-1">
             <Label>Control de medidas y piezas</Label>
             <div className="flex items-center gap-2 mt-1">
@@ -551,38 +516,27 @@ export default function FormDeposito({
                 name="controlMedidasOk"
                 control={control}
                 render={({ field }) => (
-                  <Checkbox
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
+                  <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                 )}
               />
-              <span className="text-sm">
-                Confirmar que coincide con la orden
-              </span>
+              <span className="text-sm">Confirmar que coincide con la orden</span>
             </div>
             <Input
               className="mt-2"
               type="number"
               min={0}
               placeholder="Cantidad de piezas controladas"
-              {...register("cantidadPiezasControladas", {
-                valueAsNumber: true,
-              })}
+              {...register("cantidadPiezasControladas", { valueAsNumber: true })}
             />
           </div>
 
-          {/* Condición del vidrio */}
           <div className="space-y-1">
             <Label>Condición del vidrio</Label>
             <Controller
               name="condicionVidrio"
               control={control}
               render={({ field }) => (
-                <Select
-                  onValueChange={field.onChange}
-                  value={field.value}
-                >
+                <Select onValueChange={field.onChange} value={field.value}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar condición" />
                   </SelectTrigger>
@@ -604,13 +558,11 @@ export default function FormDeposito({
         <div className="space-y-1">
           <Label>Fotos de ingreso al depósito</Label>
           <p className="text-[11px] text-muted-foreground mb-1">
-            Mínimo 2 fotos (bulto y etiqueta visible). Integrá acá tu
-            componente de subida de imágenes / Cloudinary.
+            Mínimo 2 fotos (bulto y etiqueta visible). Integrá acá tu componente de subida.
           </p>
-          {/* Placeholder simple, para que vos reemplaces con tu uploader */}
           <Textarea
             rows={2}
-            placeholder="Por ahora podés pegar URLs de las fotos (separadas por línea)."
+            placeholder="Pegá URLs (una por línea)."
             {...register("fotosIngreso", {
               setValueAs: (val: string) =>
                 typeof val === "string"
@@ -626,17 +578,9 @@ export default function FormDeposito({
         {/* Fecha salida / estado actual / usuario */}
         <div className="grid gap-4 md:grid-cols-3">
           <div className="space-y-1">
-            <Label htmlFor="fechaSalidaEntrega">
-              Fecha de salida / entrega
-            </Label>
-            <Input
-              id="fechaSalidaEntrega"
-              type="date"
-              {...register("fechaSalidaEntrega")}
-            />
-            <p className="text-[11px] text-muted-foreground">
-              Para logística o retiro por cliente.
-            </p>
+            <Label htmlFor="fechaSalidaEntrega">Fecha de salida / entrega</Label>
+            <Input id="fechaSalidaEntrega" type="date" {...register("fechaSalidaEntrega")} />
+            <p className="text-[11px] text-muted-foreground">Para logística o retiro por cliente.</p>
           </div>
 
           <div className="space-y-1">
@@ -645,18 +589,13 @@ export default function FormDeposito({
               name="estadoActualPedido"
               control={control}
               render={({ field }) => (
-                <Select
-                  onValueChange={field.onChange}
-                  value={field.value}
-                >
+                <Select onValueChange={field.onChange} value={field.value}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar estado" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="En depósito">En depósito</SelectItem>
-                    <SelectItem value="Listo para entrega">
-                      Listo para entrega
-                    </SelectItem>
+                    <SelectItem value="Listo para entrega">Listo para entrega</SelectItem>
                     <SelectItem value="En revisión">En revisión</SelectItem>
                     <SelectItem value="Devolución">Devolución</SelectItem>
                   </SelectContent>
@@ -664,14 +603,12 @@ export default function FormDeposito({
               )}
             />
             <p className="text-[11px] text-muted-foreground mt-1">
-              El backend puede usar este estado para notificar a Logística o
-              Taller/Verificación automáticamente.
+              El backend puede usar este estado para notificar a Logística o Taller/Verificación.
             </p>
           </div>
 
           <div className="space-y-1">
             <Label htmlFor="usuarioEncargado">Usuario encargado</Label>
-            {/* Igual que responsableRecepcion, podés reemplazar por un selector de usuarios */}
             <Input
               id="usuarioEncargado"
               placeholder="Usuario responsable del caso"
@@ -682,31 +619,8 @@ export default function FormDeposito({
 
         {/* Observaciones / flags */}
         <div className="space-y-2">
-          <Label htmlFor="observacionesDeposito">
-            Observaciones o Informe de Depósito
-          </Label>
-          <Textarea
-            id="observacionesDeposito"
-            rows={3}
-            {...register("observacionesDeposito")}
-          />
-
-          <div className="mt-2 flex flex-col gap-1 text-xs text-muted-foreground">
-            <p>
-              • Si el Estado actual = <strong>“Listo para entrega”</strong>,
-              el backend debería notificar automáticamente a Logística.
-            </p>
-            <p>
-              • Si el Estado actual = <strong>“En revisión”</strong> o producto{" "}
-              <strong>“Dañado / En reparación”</strong>, notificar a
-              Taller / Verificación.
-            </p>
-            <p>
-              • Si hay <strong>faltantes</strong> o vidrio en{" "}
-              <strong>“Faltante / Reposición solicitada”</strong>, generar
-              tarea de Pedidos de reposición.
-            </p>
-          </div>
+          <Label htmlFor="observacionesDeposito">Observaciones o Informe de Depósito</Label>
+          <Textarea id="observacionesDeposito" rows={3} {...register("observacionesDeposito")} />
 
           <div className="mt-3 flex items-center gap-2">
             <Controller
@@ -720,27 +634,20 @@ export default function FormDeposito({
               )}
             />
             <span className="text-sm">
-              Marcar para generar tarea de{" "}
-              <strong>Pedidos de reposición</strong>.
+              Marcar para generar tarea de <strong>Pedidos de reposición</strong>.
             </span>
           </div>
 
           {hayFaltante && (
             <p className="text-[11px] text-amber-600 mt-1">
-              Detectado estado con faltantes o vidrio faltante: se sugerirá
-              crear tarea de reposición al guardar.
+              Detectado estado con faltantes/vidrio faltante: se sugerirá crear tarea de reposición.
             </p>
           )}
         </div>
 
         {/* Footer */}
         <div className="flex justify-between items-center pt-4 border-t">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            disabled={isSubmitting}
-          >
+          <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
             Cancelar
           </Button>
           <Button type="submit" disabled={isSubmitting}>

@@ -1,3 +1,4 @@
+// ./src/components/proyectos/LogisticaView.tsx
 "use client";
 
 import { useState } from "react";
@@ -75,9 +76,13 @@ type CotizacionRef =
   | null
   | undefined;
 
-interface ProyectoConCotizacion {
+type ClienteLite = { nombreCompleto?: string } | string | null | undefined;
+
+type ProyectoConExtras = IProyecto & {
+  logistica?: LogisticaData | null;
+  cliente?: ClienteLite;
   cotizacion?: CotizacionRef;
-}
+};
 
 // estados a los que se puede pasar con el botón "Finalizar"
 const NEXT_ESTADOS: string[] = [
@@ -117,12 +122,18 @@ function getEstadoEntregaColor(estado?: string) {
   }
 }
 
+function getClienteNombre(cliente: ClienteLite): string {
+  if (!cliente) return "";
+  if (typeof cliente === "string") return "";
+  return cliente.nombreCompleto ?? "";
+}
+
 /**
  * Obtiene el ObjectId de la cotización asociada al proyecto,
  * ya sea que venga populado o como string.
  */
 const getCotizacionIdFromProyecto = (
-  proyecto: ProyectoConCotizacion | null | undefined,
+  proyecto: { cotizacion?: CotizacionRef } | null | undefined,
 ): string | null => {
   if (!proyecto?.cotizacion) return null;
 
@@ -139,8 +150,10 @@ const getCotizacionIdFromProyecto = (
 };
 
 export function LogisticaView({ proyecto, onDeleted }: LogisticaViewProps) {
-  const logistica: LogisticaData | undefined =
-    (proyecto as any).logistica || undefined;
+  const p = proyecto as ProyectoConExtras;
+
+  // ✅ sin any
+  const logistica: LogisticaData | undefined = p.logistica ?? undefined;
 
   // --- Estados para las acciones ---
   const [deleteLogisticaOpen, setDeleteLogisticaOpen] = useState(false);
@@ -179,7 +192,7 @@ export function LogisticaView({ proyecto, onDeleted }: LogisticaViewProps) {
    * ("Proyecto Finalizado", "Proyectos no realizados", etc.).
    */
   const moveCotizacionToEtapa = async (nombreEtapa: string) => {
-    const cotizacionId = getCotizacionIdFromProyecto(proyecto);
+    const cotizacionId = getCotizacionIdFromProyecto(p);
     if (!cotizacionId) {
       toast.error("Este proyecto no tiene una cotización asociada.");
       return;
@@ -384,9 +397,7 @@ export function LogisticaView({ proyecto, onDeleted }: LogisticaViewProps) {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              ¿Eliminar datos de logística?
-            </AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar datos de logística?</AlertDialogTitle>
             <AlertDialogDescription>
               Esta acción eliminará todos los datos cargados en{" "}
               <strong>Logística</strong> del proyecto{" "}
@@ -422,19 +433,13 @@ export function LogisticaView({ proyecto, onDeleted }: LogisticaViewProps) {
       </AlertDialog>
 
       {/* Alert: eliminar proyecto */}
-      <AlertDialog
-        open={deleteProjectOpen}
-        onOpenChange={setDeleteProjectOpen}
-      >
+      <AlertDialog open={deleteProjectOpen} onOpenChange={setDeleteProjectOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              ¿Marcar proyecto como no realizado?
-            </AlertDialogTitle>
+            <AlertDialogTitle>¿Marcar proyecto como no realizado?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esto marcará el proyecto{" "}
-              <strong>{proyecto.numeroOrden}</strong> como{" "}
-              <strong>Rechazado</strong> y moverá la cotización asociada a la
+              Esto marcará el proyecto <strong>{proyecto.numeroOrden}</strong>{" "}
+              como <strong>Rechazado</strong> y moverá la cotización asociada a la
               etapa <strong>&quot;Proyectos no realizados&quot;</strong> en el
               pipeline de cotizaciones.
             </AlertDialogDescription>
@@ -547,53 +552,35 @@ export function LogisticaView({ proyecto, onDeleted }: LogisticaViewProps) {
             )}
           </CardTitle>
         </CardHeader>
+
         <CardContent className="grid gap-3 text-sm md:grid-cols-3">
           <div>
-            <p className="text-xs text-muted-foreground">
-              N° de Orden de logística
-            </p>
+            <p className="text-xs text-muted-foreground">N° de Orden de logística</p>
             <p className="font-medium">
               {numeroOrdenLogistica || `${proyecto.numeroOrden ?? "-"}-LOG`}
             </p>
           </div>
 
           <div>
-            <p className="text-xs text-muted-foreground">
-              Cliente / Obra / Empresa
-            </p>
+            <p className="text-xs text-muted-foreground">Cliente / Obra / Empresa</p>
             <p className="font-medium">
-              {clienteObraEmpresa ||
-                (typeof (proyecto as any).cliente === "object"
-                  ? (proyecto as any).cliente?.nombreCompleto ?? "-"
-                  : "-")}
+              {clienteObraEmpresa || getClienteNombre(p.cliente) || "-"}
             </p>
           </div>
 
           <div>
-            <p className="text-xs text-muted-foreground">
-              Fecha programada de entrega
-            </p>
-            <p className="font-medium">
-              {formatDate(fechaProgramadaEntrega)}
-            </p>
+            <p className="text-xs text-muted-foreground">Fecha programada de entrega</p>
+            <p className="font-medium">{formatDate(fechaProgramadaEntrega)}</p>
           </div>
 
           <div>
-            <p className="text-xs text-muted-foreground">
-              Dirección de entrega / obra
-            </p>
-            <p className="font-medium whitespace-pre-line">
-              {direccionEntregaObra || "-"}
-            </p>
+            <p className="text-xs text-muted-foreground">Dirección de entrega / obra</p>
+            <p className="font-medium whitespace-pre-line">{direccionEntregaObra || "-"}</p>
           </div>
 
           <div>
-            <p className="text-xs text-muted-foreground">
-              Responsable de logística / chofer
-            </p>
-            <p className="font-medium">
-              {responsableLogistica || "-"}
-            </p>
+            <p className="text-xs text-muted-foreground">Responsable de logística / chofer</p>
+            <p className="font-medium">{responsableLogistica || "-"}</p>
           </div>
 
           <div>
@@ -610,24 +597,16 @@ export function LogisticaView({ proyecto, onDeleted }: LogisticaViewProps) {
             <p className="text-xs text-muted-foreground">
               Estado pedido recibido del taller
             </p>
-            <p className="font-medium">
-              {estadoPedidoRecibidoTaller || "-"}
-            </p>
+            <p className="font-medium">{estadoPedidoRecibidoTaller || "-"}</p>
           </div>
 
           <div>
-            <p className="text-xs text-muted-foreground">
-              Verificación de embalaje
-            </p>
-            <p className="font-medium">
-              {verificacionEmbalaje || "-"}
-            </p>
+            <p className="text-xs text-muted-foreground">Verificación de embalaje</p>
+            <p className="font-medium">{verificacionEmbalaje || "-"}</p>
           </div>
 
           <div>
-            <p className="text-xs text-muted-foreground">
-              Cantidad de bultos / aberturas
-            </p>
+            <p className="text-xs text-muted-foreground">Cantidad de bultos / aberturas</p>
             <p className="font-medium">
               {typeof cantidadBultos === "number" ? cantidadBultos : "-"}
             </p>
@@ -642,9 +621,7 @@ export function LogisticaView({ proyecto, onDeleted }: LogisticaViewProps) {
         </CardHeader>
         <CardContent className="grid gap-4 text-sm md:grid-cols-3">
           <div>
-            <p className="text-xs text-muted-foreground">
-              Hora de salida (taller / depósito)
-            </p>
+            <p className="text-xs text-muted-foreground">Hora de salida (taller / depósito)</p>
             <p className="font-medium">{horaSalida || "-"}</p>
           </div>
 
@@ -671,9 +648,7 @@ export function LogisticaView({ proyecto, onDeleted }: LogisticaViewProps) {
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           {!evidenciasEntrega || evidenciasEntrega.length === 0 ? (
-            <p className="text-muted-foreground">
-              No hay evidencias cargadas.
-            </p>
+            <p className="text-muted-foreground">No hay evidencias cargadas.</p>
           ) : (
             <>
               <p className="text-xs text-muted-foreground">
@@ -682,7 +657,7 @@ export function LogisticaView({ proyecto, onDeleted }: LogisticaViewProps) {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
                 {evidenciasEntrega.map((url, idx) => (
                   <a
-                    key={idx}
+                    key={`${url}-${idx}`}
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -720,9 +695,7 @@ export function LogisticaView({ proyecto, onDeleted }: LogisticaViewProps) {
         </CardHeader>
         <CardContent className="grid gap-4 text-sm md:grid-cols-3">
           <div className="md:col-span-3">
-            <p className="text-xs text-muted-foreground">
-              Informe de logística
-            </p>
+            <p className="text-xs text-muted-foreground">Informe de logística</p>
             <p className="font-medium whitespace-pre-line mt-1">
               {informeLogistica || "Sin informe registrado."}
             </p>
@@ -732,28 +705,20 @@ export function LogisticaView({ proyecto, onDeleted }: LogisticaViewProps) {
             <p className="text-xs text-muted-foreground">
               Firma / comprobante del cliente / obra
             </p>
-            <p className="font-medium whitespace-pre-line">
-              {firmaCliente || "-"}
-            </p>
+            <p className="font-medium whitespace-pre-line">{firmaCliente || "-"}</p>
           </div>
 
           <div>
             <p className="text-xs text-muted-foreground">
               Firma del chofer / responsable
             </p>
-            <p className="font-medium whitespace-pre-line">
-              {firmaChofer || "-"}
-            </p>
+            <p className="font-medium whitespace-pre-line">{firmaChofer || "-"}</p>
           </div>
 
           <div>
-            <p className="text-xs text-muted-foreground">
-              Fecha de cierre de entrega
-            </p>
+            <p className="text-xs text-muted-foreground">Fecha de cierre de entrega</p>
             <p className="font-medium">
-              {fechaCierreEntrega
-                ? formatDateTime(fechaCierreEntrega)
-                : "-"}
+              {fechaCierreEntrega ? formatDateTime(fechaCierreEntrega) : "-"}
             </p>
           </div>
         </CardContent>
@@ -765,9 +730,7 @@ export function LogisticaView({ proyecto, onDeleted }: LogisticaViewProps) {
           <CardTitle>Notificaciones</CardTitle>
         </CardHeader>
         <CardContent className="text-sm">
-          <p className="text-xs text-muted-foreground mb-1">
-            Áreas a notificar:
-          </p>
+          <p className="text-xs text-muted-foreground mb-1">Áreas a notificar:</p>
           {notificarA && notificarA.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {notificarA.map((dest) => (

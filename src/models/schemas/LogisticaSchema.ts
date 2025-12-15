@@ -1,92 +1,52 @@
-import { Schema, Types } from 'mongoose';
+import { Schema, Types } from "mongoose";
+
+const TIPO_ENTREGA = ["Entrega a obra", "Retiro en fábrica", "Instalación directa"] as const;
+const MEDIO_TRANSPORTE = ["Camión propio", "Flete externo", "Vehículo utilitario"] as const;
+const ESTADO_PEDIDO_TALLER = ["Completo", "Parcial", "Con faltantes", "En revisión"] as const;
+const VERIFICACION_EMBALAJE = ["Correcto", "Incompleto", "Daños leves", "Daños graves"] as const;
+const ESTADO_ENTREGA = ["Entregado", "Parcial", "Rechazado", "Reprogramado", "Pendiente"] as const;
 
 export const LogisticaSchema = new Schema(
   {
-    // --- Metadatos de la Etapa ---
     estadoEntrega: {
       type: String,
-      enum: ['Entregado', 'Parcial', 'Rechazado', 'Reprogramado', 'Pendiente'],
-      default: 'Pendiente',
+      enum: ESTADO_ENTREGA,
+      default: "Pendiente",
     },
 
-    // Usuario / chofer asignado (ref a User)
-    asignadoA: { type: Types.ObjectId, ref: 'User' },
+    asignadoA: { type: Types.ObjectId, ref: "User" },
 
-    // N° de Orden de logística (se vincula con el proyecto / taller / depósito)
-    numeroOrdenLogistica: {
-      type: String,
-    },
+    numeroOrdenLogistica: { type: String },
 
-    // Cliente / Obra / Empresa (texto)
-    clienteObraEmpresa: {
-      type: String,
-    },
+    clienteObraEmpresa: { type: String, trim: true },
+    direccionEntregaObra: { type: String, trim: true },
 
-    // Dirección de entrega / obra
-    direccionEntregaObra: {
-      type: String,
-    },
-
-    // Fecha programada de entrega
-    // (en el form: fechaProgramadaEntrega)
     fechaProgramadaEntrega: { type: Date },
 
-    // Responsable de logística / chofer (nombre mostrado en el form)
-    responsableLogistica: {
-      type: String,
-    },
+    responsableLogistica: { type: String, trim: true },
 
-    // Fecha de cierre de entrega (se setea al completar, p.ej. estado = Entregado)
     fechaCierreEntrega: { type: Date },
 
-    // --- Datos del Formulario ---
+    tipoEntrega: { type: String, enum: TIPO_ENTREGA },
+    medioTransporte: { type: String, enum: MEDIO_TRANSPORTE },
+    estadoPedidoRecibidoTaller: { type: String, enum: ESTADO_PEDIDO_TALLER },
+    verificacionEmbalaje: { type: String, enum: VERIFICACION_EMBALAJE },
 
-    // Tipo de entrega: Entrega a obra / Retiro en fábrica / Instalación directa
-    tipoEntrega: { type: String },
+    cantidadBultos: { type: Number, min: 0 },
 
-    // Medio de transporte: Camión propio / Flete externo / Vehículo utilitario
-    medioTransporte: { type: String },
-
-    // Estado del pedido recibido del taller:
-    // Completo / Parcial / Con faltantes / En revisión
-    estadoPedidoRecibidoTaller: { type: String },
-
-    // Verificación de embalaje: Correcto / Incompleto / Daños leves / Daños graves
-    verificacionEmbalaje: { type: String },
-
-    // Cantidad de bultos / aberturas
-    cantidadBultos: { type: Number },
-    
-    // Hora de salida del Taller / Depósito
     horaSalida: { type: String },
-
-    // Hora de llegada a domicilio / empresa / obra
     horaLlegada: { type: String },
-    
-    // Responsable que recibe en obra / cliente (nombre completo)
-    responsableQueRecibe: { type: String },
 
-    // Firma / comprobante del cliente / obra (URL de firma o referencia)
+    responsableQueRecibe: { type: String, trim: true },
+
     firmaCliente: { type: String },
-
-    // Firma del chofer / responsable de entrega (URL de firma o referencia)
     firmaChofer: { type: String },
-    
-    // Evidencias de entrega / instalación (fotos / videos)
-    // En el form usamos evidenciasRaw -> evidenciasEntrega (array de strings)
+
     evidenciasEntrega: { type: [String], default: [] },
 
-    // (Opcional) campo legacy si ya venías usando 'evidenciaEntrega'
-    // evidenciaEntrega: { type: [String], default: [] },
-
-    // Informe de logística (texto)
     informeLogistica: { type: String },
 
-    // Áreas a notificar: Administración / Facturación / Vendedores / Postventa
-    notificarA: {
-      type: [String],
-      default: [],
-    },
+    notificarA: { type: [String], default: [] },
   },
   { _id: false, timestamps: true },
 );

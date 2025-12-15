@@ -164,6 +164,49 @@ type MedicionData = {
   enviarAVerificacion?: EnviarAVerificacion;
 };
 
+type DatosMedicion = {
+  numeroOrdenMedicion?: string | number;
+  clienteObraEmpresa?: string;
+  direccionObra?: string;
+
+  asignadoA?: string;
+  fechaMedicion?: Date;
+  tipoAberturaMedida?: string;
+
+  cantidadAberturasMedidas?: string;
+  medidasTomadas?: { alto: string; ancho: string }[];
+
+  toleranciasRecomendadas?: string;
+
+  condicionVanos?: string[];
+  estadoObraMedicion?: string;
+
+  tipoPerfilPrevisto?: string;
+  color?: string;
+  tipoVidrioSolicitado?: string;
+
+  planosAdjuntos?: string[];
+  fotosMedicion?: string[];
+
+  observacionesMedicion?: string;
+  firmaValidacionTecnico?: string;
+
+  estadoFinalMedicion?: string;
+  enviarAVerificacion?: EnviarAVerificacion;
+};
+
+type UpdateProyectoPayload =
+  | {
+      etapaACompletar: "medicion";
+      datosFormulario: DatosMedicion;
+      forzarEstado: "Verificación";
+    }
+  | {
+      datosFormulario: {
+        medicion: DatosMedicion;
+      };
+    };
+
 export default function MedicionFormModal({
   proyecto,
   onClose,
@@ -253,7 +296,6 @@ export default function MedicionFormModal({
           : proyecto.numeroOrden?.toString() || "",
 
       clienteObraEmpresa: md.clienteObraEmpresa || clienteNombre || "",
-
       direccionObra: direccionBase,
 
       asignadoA:
@@ -286,9 +328,9 @@ export default function MedicionFormModal({
     };
   });
 
-  const updateField = (
-    field: keyof FormState,
-    value: FormState[keyof FormState],
+  const updateField = <K extends keyof FormState>(
+    field: K,
+    value: FormState[K],
   ) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
@@ -364,117 +406,113 @@ export default function MedicionFormModal({
   // ------------ SUBMIT ------------ //
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-  e.preventDefault();
-  setIsSubmitting(true);
+    e.preventDefault();
+    setIsSubmitting(true);
 
-  try {
-    // Validación mínima de fotos (mínimo 3)
-    if (form.fotosMedicion.length < 3) {
-      toast.error("Cargá al menos 3 fotos de medición.");
-      setIsSubmitting(false);
-      return;
-    }
+    try {
+      // Validación mínima de fotos (mínimo 3)
+      if (form.fotosMedicion.length < 3) {
+        toast.error("Cargá al menos 3 fotos de medición.");
+        setIsSubmitting(false);
+        return;
+      }
 
-    const medidasNormalizadas = (form.medidasTomadas || [])
-      .map((m) => ({
-        alto: m.alto.trim(),
-        ancho: m.ancho.trim(),
-      }))
-      .filter((m) => Object.values(m).some((v) => v !== ""));
+      const medidasNormalizadas = (form.medidasTomadas || [])
+        .map((m) => ({
+          alto: m.alto.trim(),
+          ancho: m.ancho.trim(),
+        }))
+        .filter((m) => Object.values(m).some((v) => v !== ""));
 
-    // 💡 Armamos los datos de medición una sola vez
-    const datosMedicion = {
-      numeroOrdenMedicion:
-        form.numeroOrdenMedicion || proyecto.numeroOrden || undefined,
+      const datosMedicion: DatosMedicion = {
+        numeroOrdenMedicion:
+          form.numeroOrdenMedicion || proyecto.numeroOrden || undefined,
 
-      clienteObraEmpresa: form.clienteObraEmpresa || undefined,
-      direccionObra: form.direccionObra || undefined,
+        clienteObraEmpresa: form.clienteObraEmpresa || undefined,
+        direccionObra: form.direccionObra || undefined,
 
-      asignadoA: form.asignadoA || undefined,
-      fechaMedicion: form.fechaMedicion
-        ? new Date(form.fechaMedicion)
-        : undefined,
-      tipoAberturaMedida: form.tipoAberturaMedida || undefined,
-
-      cantidadAberturasMedidas: form.cantidadAberturasMedidas || undefined,
-      medidasTomadas:
-        medidasNormalizadas.length ? medidasNormalizadas : undefined,
-
-      toleranciasRecomendadas: form.toleranciasRecomendadas || undefined,
-
-      condicionVanos:
-        form.condicionVanos && form.condicionVanos.length
-          ? form.condicionVanos
+        asignadoA: form.asignadoA || undefined,
+        fechaMedicion: form.fechaMedicion
+          ? new Date(form.fechaMedicion)
           : undefined,
-      estadoObraMedicion: form.estadoObraMedicion || undefined,
+        tipoAberturaMedida: form.tipoAberturaMedida || undefined,
 
-      tipoPerfilPrevisto: form.tipoPerfilPrevisto || undefined,
-      color: form.color || undefined,
-      tipoVidrioSolicitado: form.tipoVidrioSolicitado || undefined,
+        cantidadAberturasMedidas: form.cantidadAberturasMedidas || undefined,
+        medidasTomadas: medidasNormalizadas.length ? medidasNormalizadas : undefined,
 
-      planosAdjuntos:
-        form.planosAdjuntos && form.planosAdjuntos.length
-          ? form.planosAdjuntos
-          : undefined,
-      fotosMedicion:
-        form.fotosMedicion && form.fotosMedicion.length
-          ? form.fotosMedicion
-          : undefined,
+        toleranciasRecomendadas: form.toleranciasRecomendadas || undefined,
 
-      observacionesMedicion: form.observacionesMedicion || undefined,
-      firmaValidacionTecnico: form.firmaValidacionTecnico || undefined,
+        condicionVanos:
+          form.condicionVanos && form.condicionVanos.length
+            ? form.condicionVanos
+            : undefined,
+        estadoObraMedicion: form.estadoObraMedicion || undefined,
 
-      estadoFinalMedicion: form.estadoFinalMedicion || undefined,
-      enviarAVerificacion: form.enviarAVerificacion || undefined,
-    };
+        tipoPerfilPrevisto: form.tipoPerfilPrevisto || undefined,
+        color: form.color || undefined,
+        tipoVidrioSolicitado: form.tipoVidrioSolicitado || undefined,
 
-    // 👇 Acá definimos el payload según si se pasa o no a Verificación
-    let payload: any;
+        planosAdjuntos:
+          form.planosAdjuntos && form.planosAdjuntos.length
+            ? form.planosAdjuntos
+            : undefined,
+        fotosMedicion:
+          form.fotosMedicion && form.fotosMedicion.length
+            ? form.fotosMedicion
+            : undefined,
 
-    if (form.enviarAVerificacion === "Sí") {
-      // ✅ Completar etapa de medición y forzar estado a Verificación
-      payload = {
-        etapaACompletar: "medicion",
-        datosFormulario: datosMedicion,
-        forzarEstado: "Verificación",
+        observacionesMedicion: form.observacionesMedicion || undefined,
+        firmaValidacionTecnico: form.firmaValidacionTecnico || undefined,
+
+        estadoFinalMedicion: form.estadoFinalMedicion || undefined,
+        enviarAVerificacion: form.enviarAVerificacion || undefined,
       };
-    } else {
-      // ✅ Solo guardar datos de medición sin avanzar de estado
-      payload = {
-        datosFormulario: {
-          medicion: datosMedicion,
-        },
-      };
-    }
 
-    await axios.put(`/api/proyectos/${proyecto._id}`, payload);
+      // 👇 Payload tipado (sin any)
+      let payload: UpdateProyectoPayload;
 
-    toast.success(
-      form.enviarAVerificacion === "Sí"
-        ? "Medición guardada y proyecto pasado a Verificación."
-        : "Medición actualizada correctamente.",
-    );
+      if (form.enviarAVerificacion === "Sí") {
+        payload = {
+          etapaACompletar: "medicion",
+          datosFormulario: datosMedicion,
+          forzarEstado: "Verificación",
+        };
+      } else {
+        payload = {
+          datosFormulario: {
+            medicion: datosMedicion,
+          },
+        };
+      }
 
-    onSaved?.();
-    onClose?.();
-  } catch (error: unknown) {
-    console.error(error);
+      await axios.put(`/api/proyectos/${proyecto._id}`, payload);
 
-    if (axios.isAxiosError(error)) {
-      const errorMessage =
-        (error.response?.data as { error?: string } | undefined)?.error ||
-        error.message;
-      toast.error("Error al guardar la medición: " + errorMessage);
-    } else {
-      toast.error(
-        "Error al guardar la medición: " +
-          (error instanceof Error ? error.message : "Error desconocido"),
+      toast.success(
+        form.enviarAVerificacion === "Sí"
+          ? "Medición guardada y proyecto pasado a Verificación."
+          : "Medición actualizada correctamente.",
       );
+
+      onSaved?.();
+      onClose?.();
+    } catch (error: unknown) {
+      console.error(error);
+
+      if (axios.isAxiosError(error)) {
+        const errorMessage =
+          (error.response?.data as { error?: string } | undefined)?.error ||
+          error.message;
+        toast.error("Error al guardar la medición: " + errorMessage);
+      } else {
+        toast.error(
+          "Error al guardar la medición: " +
+            (error instanceof Error ? error.message : "Error desconocido"),
+        );
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
   // ------------ LABELS DE COMBOS ------------ //
 
@@ -529,9 +567,7 @@ export default function MedicionFormModal({
           <div className="flex flex-col gap-8 py-4">
             {/* NÚMERO DE ORDEN DE MEDICIÓN */}
             <div className="flex flex-col gap-2">
-              <Label htmlFor="numero-medicion">
-                N° de orden de medición
-              </Label>
+              <Label htmlFor="numero-medicion">N° de orden de medición</Label>
               <Input
                 id="numero-medicion"
                 value={form.numeroOrdenMedicion}
@@ -544,15 +580,10 @@ export default function MedicionFormModal({
 
             {/* CLIENTE / OBRA / EMPRESA + DIRECCIÓN */}
             <div className="flex flex-col gap-4">
-              <h3 className="text-lg font-semibold">
-                Cliente / Obra / Empresa
-              </h3>
+              <h3 className="text-lg font-semibold">Cliente / Obra / Empresa</h3>
 
               <div className="flex flex-col gap-2">
-                <Label htmlFor="cliente-obra">
-                  Cliente / Obra / Empresa
-                </Label>
-                {/* Vista desde proyecto ya creado */}
+                <Label htmlFor="cliente-obra">Cliente / Obra / Empresa</Label>
                 <Input
                   id="cliente-obra"
                   value={form.clienteObraEmpresa}
@@ -566,9 +597,7 @@ export default function MedicionFormModal({
                 <Input
                   id="direccion-obra"
                   value={form.direccionObra}
-                  onChange={(e) =>
-                    updateField("direccionObra", e.target.value)
-                  }
+                  onChange={(e) => updateField("direccionObra", e.target.value)}
                   placeholder="Dirección donde se realizó la medición"
                 />
               </div>
@@ -578,7 +607,6 @@ export default function MedicionFormModal({
             <div className="flex flex-col gap-4">
               <h3 className="text-lg font-semibold">Datos de medición</h3>
 
-              {/* Técnico */}
               <div className="flex flex-col gap-2">
                 <Label>Técnico</Label>
                 <UserSelect
@@ -587,22 +615,16 @@ export default function MedicionFormModal({
                 />
               </div>
 
-              {/* Fecha */}
               <div className="flex flex-col gap-2">
-                <Label htmlFor="fecha-medicion">
-                  Fecha de medición
-                </Label>
+                <Label htmlFor="fecha-medicion">Fecha de medición</Label>
                 <Input
                   id="fecha-medicion"
                   type="date"
                   value={form.fechaMedicion}
-                  onChange={(e) =>
-                    updateField("fechaMedicion", e.target.value)
-                  }
+                  onChange={(e) => updateField("fechaMedicion", e.target.value)}
                 />
               </div>
 
-              {/* Tipo de abertura medida */}
               <div className="flex flex-col gap-2">
                 <Label>Tipo de abertura medida</Label>
                 <Popover
@@ -624,9 +646,7 @@ export default function MedicionFormModal({
                     <Command>
                       <CommandInput placeholder="Buscar tipo de abertura..." />
                       <CommandList>
-                        <CommandEmpty>
-                          No se encontraron opciones.
-                        </CommandEmpty>
+                        <CommandEmpty>No se encontraron opciones.</CommandEmpty>
                         <CommandGroup>
                           {TIPOS_ABERTURA.map((opt) => (
                             <CommandItem
@@ -655,7 +675,6 @@ export default function MedicionFormModal({
                 </Popover>
               </div>
 
-              {/* Cantidad de aberturas medidas */}
               <div className="flex flex-col gap-2">
                 <Label htmlFor="cantidad-aberturas">
                   Cantidad de aberturas medidas
@@ -665,9 +684,7 @@ export default function MedicionFormModal({
                   type="number"
                   min={1}
                   value={form.cantidadAberturasMedidas}
-                  onChange={(e) =>
-                    handleCantidadAberturasChange(e.target.value)
-                  }
+                  onChange={(e) => handleCantidadAberturasChange(e.target.value)}
                   placeholder="Total de unidades medidas"
                 />
               </div>
@@ -741,7 +758,6 @@ export default function MedicionFormModal({
                 Agregar abertura
               </Button>
 
-              {/* Tolerancias / ajustes */}
               <div className="flex flex-col gap-2">
                 <Label htmlFor="tolerancias">
                   Tolerancias o ajustes recomendados
@@ -764,7 +780,6 @@ export default function MedicionFormModal({
                 Condición de vanos y estado de la obra
               </h3>
 
-              {/* Condición de vanos */}
               <div className="flex flex-col gap-2">
                 <Label>Condición de los vanos</Label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -783,13 +798,9 @@ export default function MedicionFormModal({
                 </div>
               </div>
 
-              {/* Estado de la obra al medir */}
               <div className="flex flex-col gap-2">
                 <Label>Estado de la obra al medir</Label>
-                <Popover
-                  open={estadoObraOpen}
-                  onOpenChange={setEstadoObraOpen}
-                >
+                <Popover open={estadoObraOpen} onOpenChange={setEstadoObraOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       type="button"
@@ -805,9 +816,7 @@ export default function MedicionFormModal({
                     <Command>
                       <CommandInput placeholder="Buscar estado..." />
                       <CommandList>
-                        <CommandEmpty>
-                          No se encontraron estados.
-                        </CommandEmpty>
+                        <CommandEmpty>No se encontraron estados.</CommandEmpty>
                         <CommandGroup>
                           {ESTADO_OBRA_MEDICION.map((opt) => (
                             <CommandItem
@@ -843,13 +852,9 @@ export default function MedicionFormModal({
                 Configuración de carpintería y vidrio
               </h3>
 
-              {/* Tipo de perfil previsto */}
               <div className="flex flex-col gap-2">
                 <Label>Tipo de perfil previsto</Label>
-                <Popover
-                  open={tipoPerfilOpen}
-                  onOpenChange={setTipoPerfilOpen}
-                >
+                <Popover open={tipoPerfilOpen} onOpenChange={setTipoPerfilOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       type="button"
@@ -865,9 +870,7 @@ export default function MedicionFormModal({
                     <Command>
                       <CommandInput placeholder="Buscar perfil..." />
                       <CommandList>
-                        <CommandEmpty>
-                          No se encontraron perfiles.
-                        </CommandEmpty>
+                        <CommandEmpty>No se encontraron perfiles.</CommandEmpty>
                         <CommandGroup>
                           {TIPOS_PERFIL_PREVISTO.map((opt) => (
                             <CommandItem
@@ -896,7 +899,6 @@ export default function MedicionFormModal({
                 </Popover>
               </div>
 
-              {/* Color con memoria de opciones */}
               <div className="flex flex-col gap-2">
                 <Label>Color</Label>
                 <Popover
@@ -922,9 +924,7 @@ export default function MedicionFormModal({
                         onValueChange={setColorSearch}
                       />
                       <CommandList>
-                        <CommandEmpty>
-                          No hay colores guardados.
-                        </CommandEmpty>
+                        <CommandEmpty>No hay colores guardados.</CommandEmpty>
                         <CommandGroup heading="Colores guardados">
                           {colorOptions.map((opt) => (
                             <CommandItem
@@ -963,9 +963,7 @@ export default function MedicionFormModal({
                                 value={colorSearch.trim()}
                                 onSelect={handleCreateColor}
                               >
-                                Crear &quot;
-                                {colorSearch.trim()}
-                                &quot;
+                                Crear &quot;{colorSearch.trim()}&quot;
                               </CommandItem>
                             </CommandGroup>
                           )}
@@ -975,13 +973,9 @@ export default function MedicionFormModal({
                 </Popover>
               </div>
 
-              {/* Tipo de vidrio solicitado */}
               <div className="flex flex-col gap-2">
                 <Label>Tipo de vidrio solicitado</Label>
-                <Popover
-                  open={tipoVidrioOpen}
-                  onOpenChange={setTipoVidrioOpen}
-                >
+                <Popover open={tipoVidrioOpen} onOpenChange={setTipoVidrioOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       type="button"
@@ -1032,11 +1026,8 @@ export default function MedicionFormModal({
             {/* PLANOS / FOTOS / OBS / FIRMA */}
             <div className="flex flex-col gap-6">
               <div className="flex flex-col gap-4">
-                <h3 className="text-lg font-semibold">
-                  Documentación gráfica
-                </h3>
+                <h3 className="text-lg font-semibold">Documentación gráfica</h3>
 
-                {/* Referencia de plano o croquis */}
                 <CloudinaryMultiUpload
                   label="Referencia del plano o croquis"
                   helper="Subí hasta 3 archivos (imágenes o PDFs) como referencia de plano o croquis."
@@ -1046,7 +1037,6 @@ export default function MedicionFormModal({
                   folder="tinco/medicion/planos"
                 />
 
-                {/* Fotos de medición */}
                 <CloudinaryMultiUpload
                   label="Fotos de medición"
                   helper="Subí mínimo 3 fotos de cada vano, detalle de marco y referencia de nivel."
@@ -1058,9 +1048,7 @@ export default function MedicionFormModal({
               </div>
 
               <div className="flex flex-col gap-4">
-                <h3 className="text-lg font-semibold">
-                  Observaciones y firma
-                </h3>
+                <h3 className="text-lg font-semibold">Observaciones y firma</h3>
 
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="obs-medicion">
@@ -1093,13 +1081,9 @@ export default function MedicionFormModal({
             <div className="flex flex-col gap-4">
               <h3 className="text-lg font-semibold">Cierre de medición</h3>
 
-              {/* Estado final de la medición */}
               <div className="flex flex-col gap-2">
                 <Label>Estado final de la medición</Label>
-                <Popover
-                  open={estadoFinalOpen}
-                  onOpenChange={setEstadoFinalOpen}
-                >
+                <Popover open={estadoFinalOpen} onOpenChange={setEstadoFinalOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       type="button"
@@ -1115,9 +1099,7 @@ export default function MedicionFormModal({
                     <Command>
                       <CommandInput placeholder="Seleccionar estado..." />
                       <CommandList>
-                        <CommandEmpty>
-                          No se encontraron estados.
-                        </CommandEmpty>
+                        <CommandEmpty>No se encontraron estados.</CommandEmpty>
                         <CommandGroup>
                           {ESTADOS_FINALES_MEDICION.map((opt) => (
                             <CommandItem
@@ -1146,13 +1128,9 @@ export default function MedicionFormModal({
                 </Popover>
               </div>
 
-              {/* Enviar a verificación */}
               <div className="flex flex-col gap-2">
                 <Label>Enviar a verificación</Label>
-                <Popover
-                  open={enviarVerifOpen}
-                  onOpenChange={setEnviarVerifOpen}
-                >
+                <Popover open={enviarVerifOpen} onOpenChange={setEnviarVerifOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       type="button"
@@ -1168,9 +1146,7 @@ export default function MedicionFormModal({
                     <Command>
                       <CommandInput placeholder="Seleccionar opción..." />
                       <CommandList>
-                        <CommandEmpty>
-                          No se encontraron opciones.
-                        </CommandEmpty>
+                        <CommandEmpty>No se encontraron opciones.</CommandEmpty>
                         <CommandGroup>
                           {OPCIONES_ENVIAR_VERIFICACION.map((opt) => (
                             <CommandItem
@@ -1198,9 +1174,8 @@ export default function MedicionFormModal({
                   </PopoverContent>
                 </Popover>
                 <p className="text-xs text-muted-foreground">
-                  Si seleccionás <strong>Sí</strong>, el proyecto pasará
-                  automáticamente al estado <strong>Verificación</strong> al
-                  guardar.
+                  Si seleccionás <strong>Sí</strong>, el proyecto pasará automáticamente al estado{" "}
+                  <strong>Verificación</strong> al guardar.
                 </p>
               </div>
             </div>

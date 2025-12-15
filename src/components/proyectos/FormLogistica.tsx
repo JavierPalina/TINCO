@@ -1,3 +1,4 @@
+// ./src/components/proyectos/FormLogistica.tsx
 "use client";
 
 import { useMemo } from "react";
@@ -66,62 +67,152 @@ const NOTIFICAR_A_OPTS = [
   { value: "Facturación", label: "Facturación" },
   { value: "Vendedores", label: "Vendedores" },
   { value: "Postventa", label: "Postventa" },
-];
+] as const;
 
+// ✅ Ojo: no usamos transform/coerce acá para evitar el “Control<...>” mismatch.
+// Convertimos “cantidadBultos” manualmente en el onChange del input (a number|undefined).
 const LogisticaSchema = z.object({
   numeroOrdenLogistica: z.string().optional(),
-  clienteObraEmpresa: z.string().min(1, "Cliente / Obra / Empresa es obligatorio"),
-  direccionEntregaObra: z.string().min(1, "La dirección de entrega es obligatoria"),
-  fechaProgramadaEntrega: z.string().min(1, "La fecha programada es obligatoria"),
 
-  responsableLogistica: z.string().min(1, "Responsable de logística es obligatorio"),
+  clienteObraEmpresa: z
+    .string()
+    .min(1, { message: "Cliente / Obra / Empresa es obligatorio" }),
+
+  direccionEntregaObra: z
+    .string()
+    .min(1, { message: "La dirección de entrega es obligatoria" }),
+
+  fechaProgramadaEntrega: z
+    .string()
+    .min(1, { message: "La fecha programada es obligatoria" }),
+
+  responsableLogistica: z
+    .string()
+    .min(1, { message: "Responsable de logística es obligatorio" }),
 
   tipoEntrega: z.enum(TIPO_ENTREGA_OPTS, {
-    errorMap: () => ({ message: "Tipo de entrega obligatorio" }),
+    message: "Tipo de entrega obligatorio",
   }),
+
   medioTransporte: z.enum(MEDIO_TRANSPORTE_OPTS, {
-    errorMap: () => ({ message: "Medio de transporte obligatorio" }),
+    message: "Medio de transporte obligatorio",
   }),
 
   estadoPedidoRecibidoTaller: z.enum(ESTADO_PEDIDO_TALLER_OPTS, {
-    errorMap: () => ({ message: "Estado del pedido recibido es obligatorio" }),
+    message: "Estado del pedido recibido es obligatorio",
   }),
 
   verificacionEmbalaje: z.enum(VERIFICACION_EMBALAJE_OPTS, {
-    errorMap: () => ({ message: "Verificación de embalaje obligatoria" }),
+    message: "Verificación de embalaje obligatoria",
   }),
 
   cantidadBultos: z
-    .union([z.string(), z.number()])
-    .transform((val) => (val === "" ? undefined : Number(val)))
-    .refine(
-      (val) => val === undefined || (!Number.isNaN(val) && val >= 0),
-      "Cantidad de bultos inválida",
-    )
-    .optional(),
+  .number({ message: "Cantidad de bultos inválida" })
+  .min(0, { message: "Cantidad de bultos inválida" })
+  .optional(),
 
   horaSalida: z.string().optional(),
   horaLlegada: z.string().optional(),
   responsableQueRecibe: z.string().optional(),
 
-  // Textarea donde pegás/ponés una URL por línea
+  // Textarea donde pegás una URL por línea (solo UI; lo convertimos a array en submit)
   evidenciasRaw: z.string().optional(),
 
   informeLogistica: z.string().optional(),
 
   estadoEntrega: z.enum(ESTADO_ENTREGA_OPTS, {
-    errorMap: () => ({ message: "Estado de la entrega obligatorio" }),
+    message: "Estado de la entrega obligatorio",
   }),
 
   firmaCliente: z.string().optional(),
   firmaChofer: z.string().optional(),
 
+  // datetime-local (string). Si querés ISO estricto, convertimos al guardar.
   fechaCierreEntrega: z.string().optional(),
 
   notificarA: z.array(z.string()).optional(),
 });
 
 export type LogisticaFormValues = z.infer<typeof LogisticaSchema>;
+
+// ✅ Tipos locales (para NO usar any)
+type ClienteLite = { nombreCompleto?: string } | string | null | undefined;
+type VisitaTecnicaLite = { direccion?: string | null } | null | undefined;
+
+type TipoEntrega = (typeof TIPO_ENTREGA_OPTS)[number];
+type MedioTransporte = (typeof MEDIO_TRANSPORTE_OPTS)[number];
+type EstadoPedidoTaller = (typeof ESTADO_PEDIDO_TALLER_OPTS)[number];
+type VerificacionEmbalaje = (typeof VERIFICACION_EMBALAJE_OPTS)[number];
+type EstadoEntrega = (typeof ESTADO_ENTREGA_OPTS)[number];
+
+type LogisticaDataLite = Partial<{
+  numeroOrdenLogistica: string;
+  clienteObraEmpresa: string;
+  direccionEntregaObra: string;
+  fechaProgramadaEntrega: string;
+  responsableLogistica: string;
+
+  tipoEntrega: TipoEntrega;
+  medioTransporte: MedioTransporte;
+  estadoPedidoRecibidoTaller: EstadoPedidoTaller;
+  verificacionEmbalaje: VerificacionEmbalaje;
+
+  cantidadBultos: number;
+
+  horaSalida: string;
+  horaLlegada: string;
+  responsableQueRecibe: string;
+
+  evidenciasEntrega: string[];
+
+  informeLogistica: string;
+
+  estadoEntrega: EstadoEntrega;
+
+  firmaCliente: string;
+  firmaChofer: string;
+
+  fechaCierreEntrega: string;
+
+  notificarA: string[];
+}>;
+
+type ProyectoConLogistica = IProyecto & {
+  logistica?: LogisticaDataLite | null;
+  cliente?: ClienteLite;
+  visitaTecnica?: VisitaTecnicaLite;
+};
+
+function getClienteNombre(cliente: ClienteLite): string {
+  if (!cliente) return "";
+  if (typeof cliente === "string") return "";
+  return cliente.nombreCompleto ?? "";
+}
+
+function getVisitaDireccion(visita: VisitaTecnicaLite): string {
+  if (!visita) return "";
+  return visita.direccion ?? "";
+}
+
+function safeToDateTimeLocal(value?: string): string {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value; // si ya viene “YYYY-MM-DDTHH:mm”
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const mm = pad(d.getMonth() + 1);
+  const dd = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const mi = pad(d.getMinutes());
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+}
+
+function toISOIfPossible(value?: string): string | undefined {
+  if (!value) return undefined;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value; // deja el string tal cual si no parsea
+  return d.toISOString();
+}
 
 interface FormLogisticaProps {
   proyecto: IProyecto;
@@ -134,10 +225,11 @@ export default function FormLogistica({
   onClose,
   onSaved,
 }: FormLogisticaProps) {
-  const logisticaData = (proyecto as any).logistica || {};
+  const p = proyecto as ProyectoConLogistica;
+  const logisticaData: LogisticaDataLite = p.logistica ?? {};
 
   const defaultEvidenciasRaw = useMemo(() => {
-    const arr: string[] = logisticaData.evidenciasEntrega || [];
+    const arr = logisticaData.evidenciasEntrega ?? [];
     return arr.join("\n");
   }, [logisticaData.evidenciasEntrega]);
 
@@ -145,40 +237,44 @@ export default function FormLogistica({
     resolver: zodResolver(LogisticaSchema),
     defaultValues: {
       numeroOrdenLogistica:
-        logisticaData.numeroOrdenLogistica ||
-        `${proyecto.numeroOrden ?? ""}-LOG`,
+        logisticaData.numeroOrdenLogistica || `${proyecto.numeroOrden ?? ""}-LOG`,
       clienteObraEmpresa:
-        logisticaData.clienteObraEmpresa ||
-        (typeof (proyecto as any).cliente === "object"
-          ? (proyecto as any).cliente?.nombreCompleto ?? ""
-          : ""),
+        logisticaData.clienteObraEmpresa || getClienteNombre(p.cliente),
       direccionEntregaObra:
-        logisticaData.direccionEntregaObra ||
-        (proyecto as any).visitaTecnica?.direccion ||
-        "",
+        logisticaData.direccionEntregaObra || getVisitaDireccion(p.visitaTecnica),
       fechaProgramadaEntrega: logisticaData.fechaProgramadaEntrega || "",
       responsableLogistica: logisticaData.responsableLogistica || "",
-      tipoEntrega: logisticaData.tipoEntrega || undefined,
-      medioTransporte: logisticaData.medioTransporte || undefined,
-      estadoPedidoRecibidoTaller:
-        logisticaData.estadoPedidoRecibidoTaller || undefined,
-      verificacionEmbalaje: logisticaData.verificacionEmbalaje || undefined,
+
+      tipoEntrega: logisticaData.tipoEntrega,
+      medioTransporte: logisticaData.medioTransporte,
+      estadoPedidoRecibidoTaller: logisticaData.estadoPedidoRecibidoTaller,
+      verificacionEmbalaje: logisticaData.verificacionEmbalaje,
+
       cantidadBultos:
         typeof logisticaData.cantidadBultos === "number"
           ? logisticaData.cantidadBultos
           : undefined,
+
       horaSalida: logisticaData.horaSalida || "",
       horaLlegada: logisticaData.horaLlegada || "",
       responsableQueRecibe: logisticaData.responsableQueRecibe || "",
+
       evidenciasRaw: defaultEvidenciasRaw,
+
       informeLogistica: logisticaData.informeLogistica || "",
-      estadoEntrega: logisticaData.estadoEntrega || undefined,
+
+      estadoEntrega: logisticaData.estadoEntrega,
+
       firmaCliente: logisticaData.firmaCliente || "",
       firmaChofer: logisticaData.firmaChofer || "",
-      fechaCierreEntrega: logisticaData.fechaCierreEntrega || "",
+
+      fechaCierreEntrega: safeToDateTimeLocal(logisticaData.fechaCierreEntrega),
+
       notificarA: logisticaData.notificarA || [],
     },
   });
+
+  const selectedNotificarA = form.watch("notificarA") || [];
 
   const onSubmit = async (values: LogisticaFormValues) => {
     try {
@@ -188,17 +284,21 @@ export default function FormLogistica({
           .map((s) => s.trim())
           .filter(Boolean) || [];
 
-      const fechaCierreEntregaFinal =
-        values.estadoEntrega === "Entregado" &&
-        !values.fechaCierreEntrega &&
-        typeof window !== "undefined"
+      const fechaProgramadaEntregaISO = toISOIfPossible(values.fechaProgramadaEntrega);
+
+      const fechaCierreEntregaISO =
+        values.estadoEntrega === "Entregado" && !values.fechaCierreEntrega
           ? new Date().toISOString()
-          : values.fechaCierreEntrega;
+          : toISOIfPossible(values.fechaCierreEntrega);
+
+      // ✅ No mandamos evidenciasRaw al backend (solo UI)
+      const { evidenciasRaw, ...rest } = values;
 
       const payload = {
-        ...values,
+        ...rest,
+        fechaProgramadaEntrega: fechaProgramadaEntregaISO ?? values.fechaProgramadaEntrega,
+        fechaCierreEntrega: fechaCierreEntregaISO ?? values.fechaCierreEntrega,
         evidenciasEntrega,
-        fechaCierreEntrega: fechaCierreEntregaFinal,
       };
 
       await axios.put(`/api/proyectos/${proyecto._id}`, {
@@ -209,24 +309,26 @@ export default function FormLogistica({
       toast.success("Información de logística guardada correctamente.");
       onSaved?.();
       onClose?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
+
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data as { error?: string } | undefined;
+        toast.error(apiError?.error ?? error.message ?? "Error al guardar logística");
+        return;
+      }
+
       toast.error(
-        error?.response?.data?.error ||
-          "Error al guardar la información de logística",
+        error instanceof Error
+          ? error.message
+          : "Error al guardar la información de logística",
       );
     }
   };
 
-  const selectedNotificarA = form.watch("notificarA") || [];
-
   return (
     <Form {...form}>
-      <form
-        className="space-y-6"
-        onSubmit={form.handleSubmit(onSubmit)}
-        noValidate
-      >
+      <form className="space-y-6" onSubmit={form.handleSubmit(onSubmit)} noValidate>
         {/* Bloque principal */}
         <div className="grid gap-4 md:grid-cols-2">
           <FormField
@@ -250,10 +352,7 @@ export default function FormLogistica({
               <FormItem>
                 <FormLabel>Cliente / Obra / Empresa</FormLabel>
                 <FormControl>
-                  <Input
-                    placeholder="Nombre del cliente, obra o empresa"
-                    {...field}
-                  />
+                  <Input placeholder="Nombre del cliente, obra o empresa" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -267,10 +366,7 @@ export default function FormLogistica({
               <FormItem className="md:col-span-2">
                 <FormLabel>Dirección de entrega / obra</FormLabel>
                 <FormControl>
-                  <Input
-                    placeholder="Dirección completa de la entrega / obra"
-                    {...field}
-                  />
+                  <Input placeholder="Dirección completa de la entrega / obra" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -298,10 +394,7 @@ export default function FormLogistica({
               <FormItem>
                 <FormLabel>Responsable de logística / chofer</FormLabel>
                 <FormControl>
-                  <Input
-                    placeholder="Seleccioná o escribí el responsable"
-                    {...field}
-                  />
+                  <Input placeholder="Seleccioná o escribí el responsable" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -318,10 +411,7 @@ export default function FormLogistica({
               <FormItem>
                 <FormLabel>Tipo de entrega</FormLabel>
                 <FormControl>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value || ""}
-                  >
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
@@ -346,10 +436,7 @@ export default function FormLogistica({
               <FormItem>
                 <FormLabel>Medio de transporte</FormLabel>
                 <FormControl>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value || ""}
-                  >
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
@@ -374,10 +461,7 @@ export default function FormLogistica({
               <FormItem>
                 <FormLabel>Estado del pedido recibido del taller</FormLabel>
                 <FormControl>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value || ""}
-                  >
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
@@ -405,10 +489,7 @@ export default function FormLogistica({
               <FormItem>
                 <FormLabel>Verificación de embalaje</FormLabel>
                 <FormControl>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value || ""}
-                  >
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
@@ -438,7 +519,10 @@ export default function FormLogistica({
                     min={0}
                     placeholder="Total cargado en el camión"
                     value={field.value ?? ""}
-                    onChange={field.onChange}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      field.onChange(v === "" ? undefined : Number(v));
+                    }}
                   />
                 </FormControl>
                 <FormMessage />
@@ -465,9 +549,7 @@ export default function FormLogistica({
               name="horaLlegada"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>
-                    Hora de llegada (obra / cliente / empresa)
-                  </FormLabel>
+                  <FormLabel>Hora de llegada (obra / cliente / empresa)</FormLabel>
                   <FormControl>
                     <Input type="time" {...field} />
                   </FormControl>
@@ -485,14 +567,9 @@ export default function FormLogistica({
             name="responsableQueRecibe"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>
-                  Responsable que recibe en obra / cliente (nombre completo)
-                </FormLabel>
+                <FormLabel>Responsable que recibe en obra / cliente</FormLabel>
                 <FormControl>
-                  <Input
-                    placeholder="Nombre de quien recibe la abertura"
-                    {...field}
-                  />
+                  <Input placeholder="Nombre de quien recibe la abertura" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -507,7 +584,7 @@ export default function FormLogistica({
                 <FormLabel>Evidencia de entrega / instalación</FormLabel>
                 <FormControl>
                   <Textarea
-                    placeholder="Pegá aquí URLs de fotos/videos, una por línea. Mínimo: 3 (carga, transporte, entrega en obra)."
+                    placeholder="Pegá URLs (una por línea). Mínimo sugerido: 3 (carga, transporte, entrega)."
                     rows={4}
                     {...field}
                   />
@@ -518,7 +595,7 @@ export default function FormLogistica({
           />
         </div>
 
-        {/* Informe, estado, firmas */}
+        {/* Informe */}
         <div className="grid gap-4 md:grid-cols-2">
           <FormField
             control={form.control}
@@ -528,7 +605,7 @@ export default function FormLogistica({
                 <FormLabel>Informe de logística</FormLabel>
                 <FormControl>
                   <Textarea
-                    placeholder="Detalle de incidencias, demoras, desvíos, observaciones de la ruta, etc."
+                    placeholder="Incidencias, demoras, desvíos, observaciones de la ruta, etc."
                     rows={4}
                     {...field}
                   />
@@ -539,6 +616,7 @@ export default function FormLogistica({
           />
         </div>
 
+        {/* Estado, firmas */}
         <div className="grid gap-4 md:grid-cols-3">
           <FormField
             control={form.control}
@@ -547,10 +625,7 @@ export default function FormLogistica({
               <FormItem>
                 <FormLabel>Estado de la entrega</FormLabel>
                 <FormControl>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value || ""}
-                  >
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
@@ -564,8 +639,8 @@ export default function FormLogistica({
                   </Select>
                 </FormControl>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  Si está en <strong>Entregado</strong>, se marcará automáticamente
-                  la fecha de cierre (si no la completás).
+                  Si está en <strong>Entregado</strong>, se completa automáticamente la fecha de cierre
+                  (si no la completás).
                 </p>
                 <FormMessage />
               </FormItem>
@@ -579,10 +654,7 @@ export default function FormLogistica({
               <FormItem>
                 <FormLabel>Firma / comprobante del cliente / obra</FormLabel>
                 <FormControl>
-                  <Input
-                    placeholder="URL de firma digital o referencia de comprobante"
-                    {...field}
-                  />
+                  <Input placeholder="URL de firma digital o referencia" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -596,10 +668,7 @@ export default function FormLogistica({
               <FormItem>
                 <FormLabel>Firma del chofer / responsable</FormLabel>
                 <FormControl>
-                  <Input
-                    placeholder="URL de firma digital o referencia de comprobante"
-                    {...field}
-                  />
+                  <Input placeholder="URL de firma digital o referencia" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -607,7 +676,7 @@ export default function FormLogistica({
           />
         </div>
 
-        {/* Notificaciones y fecha cierre (solo lectura si querés) */}
+        {/* Notificar y fecha cierre */}
         <div className="grid gap-4 md:grid-cols-2">
           <FormField
             control={form.control}
@@ -617,25 +686,19 @@ export default function FormLogistica({
                 <FormLabel>Notificar a</FormLabel>
                 <div className="mt-2 space-y-2">
                   {NOTIFICAR_A_OPTS.map((opt) => (
-                    <div
-                      key={opt.value}
-                      className="flex items-center space-x-2"
-                    >
+                    <div key={opt.value} className="flex items-center space-x-2">
                       <Checkbox
                         checked={selectedNotificarA.includes(opt.value)}
                         onCheckedChange={(checked) => {
+                          const isChecked = checked === true;
                           const current = selectedNotificarA;
-                          if (checked) {
-                            form.setValue("notificarA", [
-                              ...current,
-                              opt.value,
-                            ]);
-                          } else {
-                            form.setValue(
-                              "notificarA",
-                              current.filter((v) => v !== opt.value),
-                            );
-                          }
+
+                          form.setValue(
+                            "notificarA",
+                            isChecked
+                              ? Array.from(new Set([...current, opt.value]))
+                              : current.filter((v) => v !== opt.value),
+                          );
                         }}
                       />
                       <span className="text-sm">{opt.label}</span>
@@ -643,9 +706,7 @@ export default function FormLogistica({
                   ))}
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  Estas áreas recibirán la notificación cuando se registre o
-                  actualice la entrega (por ejemplo, para que Facturación
-                  genere la factura).
+                  Estas áreas pueden recibir la notificación al registrar/actualizar la entrega.
                 </p>
                 <FormMessage />
               </FormItem>
@@ -659,15 +720,10 @@ export default function FormLogistica({
               <FormItem>
                 <FormLabel>Fecha de cierre de entrega</FormLabel>
                 <FormControl>
-                  <Input
-                    type="datetime-local"
-                    {...field}
-                  />
+                  <Input type="datetime-local" {...field} />
                 </FormControl>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  Si está vacío y el estado es{" "}
-                  <strong>Entregado</strong>, se completará automáticamente al
-                  guardar.
+                  Si está vacío y el estado es <strong>Entregado</strong>, se completa automáticamente al guardar.
                 </p>
                 <FormMessage />
               </FormItem>

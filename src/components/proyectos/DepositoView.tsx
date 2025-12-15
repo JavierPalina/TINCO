@@ -1,3 +1,4 @@
+// ./src/components/proyectos/DepositoView.tsx
 "use client";
 
 import { useState } from "react";
@@ -81,6 +82,11 @@ interface ProyectoConCotizacion {
   cotizacion?: CotizacionRef;
 }
 
+/** ✅ Evita any: extendemos el proyecto con el campo deposito */
+type ProyectoConDeposito = IProyecto & {
+  deposito?: DepositoData | null;
+};
+
 // Estados posibles a donde pasar con el botón "Finalizar"
 const NEXT_ESTADOS: string[] = [
   "Medición",
@@ -134,8 +140,8 @@ const getCotizacionIdFromProyecto = (
 };
 
 export function DepositoView({ proyecto, onDeleted }: DepositoViewProps) {
-  const deposito: DepositoData | undefined =
-    (proyecto as any).deposito || undefined;
+  /** ✅ Sin any */
+  const deposito = (proyecto as ProyectoConDeposito).deposito ?? undefined;
 
   // --- Estados de UI para acciones ---
   const [deleteDepositoOpen, setDeleteDepositoOpen] = useState(false);
@@ -378,9 +384,7 @@ export function DepositoView({ proyecto, onDeleted }: DepositoViewProps) {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              ¿Eliminar datos de depósito?
-            </AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar datos de depósito?</AlertDialogTitle>
             <AlertDialogDescription>
               Esta acción eliminará todos los datos cargados en{" "}
               <strong>Depósito</strong> del proyecto{" "}
@@ -416,15 +420,10 @@ export function DepositoView({ proyecto, onDeleted }: DepositoViewProps) {
       </AlertDialog>
 
       {/* Alert: eliminar proyecto */}
-      <AlertDialog
-        open={deleteProjectOpen}
-        onOpenChange={setDeleteProjectOpen}
-      >
+      <AlertDialog open={deleteProjectOpen} onOpenChange={setDeleteProjectOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              ¿Marcar proyecto como no realizado?
-            </AlertDialogTitle>
+            <AlertDialogTitle>¿Marcar proyecto como no realizado?</AlertDialogTitle>
             <AlertDialogDescription>
               Esto marcará el proyecto{" "}
               <strong>{proyecto.numeroOrden}</strong> como{" "}
@@ -543,9 +542,7 @@ export function DepositoView({ proyecto, onDeleted }: DepositoViewProps) {
         </CardHeader>
         <CardContent className="grid gap-3 text-sm md:grid-cols-3">
           <div>
-            <p className="text-xs text-muted-foreground">
-              N° Orden de Depósito
-            </p>
+            <p className="text-xs text-muted-foreground">N° Orden de Depósito</p>
             <p className="font-medium">
               {numeroOrdenDeposito || `${proyecto.numeroOrden ?? "-"}-DEP`}
             </p>
@@ -578,9 +575,7 @@ export function DepositoView({ proyecto, onDeleted }: DepositoViewProps) {
           </div>
 
           <div>
-            <p className="text-xs text-muted-foreground">
-              Cantidad de unidades
-            </p>
+            <p className="text-xs text-muted-foreground">Cantidad de unidades</p>
             <p className="font-medium">
               {typeof cantidadUnidades === "number" ? cantidadUnidades : "-"}
             </p>
@@ -657,9 +652,7 @@ export function DepositoView({ proyecto, onDeleted }: DepositoViewProps) {
           </div>
 
           <div>
-            <p className="text-xs text-muted-foreground">
-              Condición del vidrio
-            </p>
+            <p className="text-xs text-muted-foreground">Condición del vidrio</p>
             <p className="font-medium">{condicionVidrio || "-"}</p>
           </div>
         </CardContent>
