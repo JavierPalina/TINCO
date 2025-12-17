@@ -4,6 +4,15 @@ import Cliente from '@/models/Cliente';
 import { getServerSession } from 'next-auth';
 import { authOptions } from "@/lib/authOptions";
 
+const normalizePrioridad = (value: unknown) => {
+  const s = String(value ?? "").trim().toLowerCase();
+  if (!s) return "Media";
+  if (s === "alta") return "Alta";
+  if (s === "media") return "Media";
+  if (s === "baja") return "Baja";
+  return s.charAt(0).toUpperCase() + s.slice(1);
+};
+
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return new NextResponse('No autorizado', { status: 401 });
@@ -14,19 +23,25 @@ export async function POST(request: NextRequest) {
     const clientesParaImportar = body.clientes;
 
     if (!Array.isArray(clientesParaImportar) || clientesParaImportar.length === 0) {
-      return NextResponse.json({ success: false, error: "No se proporcionaron clientes para importar." }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "No se proporcionaron clientes para importar." },
+        { status: 400 }
+      );
     }
 
-    const clientesConVendedor = clientesParaImportar.map(cliente => ({
+    const clientesConVendedor = clientesParaImportar.map((cliente) => ({
       ...cliente,
       vendedorAsignado: session.user.id,
-      etapa: cliente.etapa || 'Nuevo',
-      prioridad: cliente.prioridad || 'Media',
+      etapa: (cliente?.etapa && String(cliente.etapa).trim()) || "Nuevo",
+      prioridad: normalizePrioridad(cliente?.prioridad),
     }));
 
     const resultado = await Cliente.insertMany(clientesConVendedor, { ordered: false });
 
-    return NextResponse.json({ success: true, message: `${resultado.length} clientes importados con éxito.` });
+    return NextResponse.json({
+      success: true,
+      message: `${resultado.length} clientes importados con éxito.`,
+    });
   } catch (error: unknown) {
     if (
       typeof error === "object" &&
@@ -36,12 +51,16 @@ export async function POST(request: NextRequest) {
     ) {
       const mongoError = error as { writeErrors: unknown[]; result: { nInserted: number } };
       const successfulCount = mongoError.result.nInserted;
+
       return NextResponse.json({
         success: true,
         message: `${successfulCount} clientes importados. Algunos registros fallaron (ej. duplicados).`,
       });
     }
 
-    return NextResponse.json({ success: false, error: "Error en la importación masiva." }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: "Error en la importación masiva." },
+      { status: 500 }
+    );
   }
 }
