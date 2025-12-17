@@ -6,6 +6,10 @@ import { authOptions } from "@/lib/authOptions";
 
 const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+type MatchFilter = Record<string, unknown> & {
+  $or?: Array<Record<string, unknown>>;
+};
+
 export async function GET(request: NextRequest) {
   await dbConnect();
 
@@ -15,7 +19,7 @@ export async function GET(request: NextRequest) {
     const etapaRaw = (searchParams.get("etapa") || "").trim();
     const prioridadRaw = (searchParams.get("prioridad") || "").trim();
 
-    const matchFilter: Record<string, any> = {};
+    const matchFilter: MatchFilter = {};
 
     // --- Search ---
     if (searchTermRaw) {
