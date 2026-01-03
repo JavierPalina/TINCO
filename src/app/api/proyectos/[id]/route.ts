@@ -35,12 +35,16 @@ interface ProyectoUpdateBody {
   estadoActual?: EstadoProyecto;
 }
 
-// ✅ GET: traer un proyecto por ID (para la vista detalle)
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params;
+// ✅ helper: toma el último segmento de la URL como id
+function getIdFromRequest(request: NextRequest): string {
+  const pathname = request.nextUrl.pathname; // e.g. /api/proyectos/65a...
+  const parts = pathname.split("/").filter(Boolean);
+  return parts[parts.length - 1] ?? "";
+}
+
+// ✅ GET: traer un proyecto por ID
+export async function GET(request: NextRequest) {
+  const id = getIdFromRequest(request);
 
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse("No autorizado", { status: 401 });
@@ -66,11 +70,8 @@ export async function GET(
 }
 
 // 🔹 PUT: actualizar etapas / formularios / forzar estado
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } },
-) {
-  const { id } = params;
+export async function PUT(request: NextRequest) {
+  const id = getIdFromRequest(request);
 
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse("No autorizado", { status: 401 });
@@ -95,7 +96,6 @@ export async function PUT(
 
     console.log("🟡 Estado actual antes de modificar:", proyecto.estadoActual);
 
-    // ✅ Si estadoActual viene null, arrancamos proximoEstado en null y sólo lo cambiamos si corresponde.
     let proximoEstado: EstadoProyecto | null =
       (proyecto.estadoActual as EstadoProyecto) ?? null;
 
@@ -107,7 +107,7 @@ export async function PUT(
       datosFormulario !== null &&
       !Array.isArray(datosFormulario);
 
-    // ✅ Caso A: si viene forzarEstado, lo aplicamos SIEMPRE (ideal para tu dialog)
+    // ✅ Caso A: forzar estado
     if (forzarEstado && ESTADOS_PROYECTO.includes(forzarEstado)) {
       console.log("🟠 Override manual de estado a:", forzarEstado);
       proyecto.estadoActual = forzarEstado;
@@ -115,11 +115,10 @@ export async function PUT(
       return NextResponse.json({ success: true, data: proyectoActualizado });
     }
 
-    // 🔸 Caso 1: completar etapa del workflow (visitaTecnica, medicion, etc.)
+    // 🔸 Caso 1: workflow por etapa
     if (etapaACompletar && isDatosObject) {
       console.log("🟢 Caso workflow, etapaACompletar:", etapaACompletar);
 
-      // Aseguramos que exista el subdoc
       if (!proyectoDynamic[etapaACompletar]) {
         proyectoDynamic[etapaACompletar] = {};
       }
@@ -131,7 +130,6 @@ export async function PUT(
         etapa.fechaCompletado = new Date();
       }
 
-      // Workflow: decidir próximo estado
       switch (etapaACompletar) {
         case "visitaTecnica":
           proximoEstado = "Medición";
@@ -139,17 +137,13 @@ export async function PUT(
 
         case "medicion": {
           const datosMedicion = datosFormulario as { enviarAVerificacion?: string };
-          if (datosMedicion.enviarAVerificacion === "Sí") {
-            proximoEstado = "Verificación";
-          }
+          if (datosMedicion.enviarAVerificacion === "Sí") proximoEstado = "Verificación";
           break;
         }
 
         case "verificacion": {
           const datosVerificacion = datosFormulario as { aprobadoParaProduccion?: string };
-          if (datosVerificacion.aprobadoParaProduccion === "Sí") {
-            proximoEstado = "Taller";
-          }
+          if (datosVerificacion.aprobadoParaProduccion === "Sí") proximoEstado = "Taller";
           break;
         }
 
@@ -166,17 +160,13 @@ export async function PUT(
 
         case "deposito": {
           const datosDeposito = datosFormulario as { estadoInterno?: string };
-          if (datosDeposito.estadoInterno === "Listo para entrega") {
-            proximoEstado = "Logística";
-          }
+          if (datosDeposito.estadoInterno === "Listo para entrega") proximoEstado = "Logística";
           break;
         }
 
         case "logistica": {
           const datosLogistica = datosFormulario as { estadoEntrega?: string };
-          if (datosLogistica.estadoEntrega === "Entregado") {
-            proximoEstado = "Completado";
-          }
+          if (datosLogistica.estadoEntrega === "Entregado") proximoEstado = "Completado";
           break;
         }
       }
@@ -190,7 +180,7 @@ export async function PUT(
       return NextResponse.json({ success: true, data: proyectoActualizado });
     }
 
-    // 🔸 Caso 2: actualización genérica de una sub-doc sin workflow
+    // 🔸 Caso 2: sub-doc genérico
     if (isDatosObject) {
       const datosGenericos = datosFormulario as Record<string, unknown>;
       const [etapaKey] = Object.keys(datosGenericos) as string[];
@@ -213,7 +203,7 @@ export async function PUT(
       }
     }
 
-    // 🟢 Caso 3: cambio directo de estadoActual (si te llega explícito)
+    // 🟢 Caso 3: set directo estadoActual
     if (estadoActual && ESTADOS_PROYECTO.includes(estadoActual)) {
       console.log("🟢 Seteando estadoActual directo:", estadoActual);
       proyecto.estadoActual = estadoActual;
@@ -221,25 +211,18 @@ export async function PUT(
       return NextResponse.json({ success: true, data: proyectoActualizado });
     }
 
-    // ✅ Si no hubo nada que cambiar, devolvemos el proyecto actual (sin inventar estado)
     const proyectoActualizado = await proyecto.save();
     return NextResponse.json({ success: true, data: proyectoActualizado });
   } catch (error) {
     console.error("❌ Error en PUT /api/proyectos/[id]:", error);
     const errorMessage = error instanceof Error ? error.message : "Error";
-    return NextResponse.json(
-      { success: false, error: errorMessage },
-      { status: 400 },
-    );
+    return NextResponse.json({ success: false, error: errorMessage }, { status: 400 });
   }
 }
 
 // --- DELETE: BORRAR UN PROYECTO COMPLETO ---
-export async function DELETE(
-  _request: NextRequest,
-  { params }: { params: { id: string } },
-) {
-  const { id } = params;
+export async function DELETE(request: NextRequest) {
+  const id = getIdFromRequest(request);
 
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse("No autorizado", { status: 401 });
@@ -260,9 +243,6 @@ export async function DELETE(
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Error";
-    return NextResponse.json(
-      { success: false, error: errorMessage },
-      { status: 500 },
-    );
+    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   }
 }
