@@ -149,8 +149,8 @@ type ViewStage =
   | "logistica"
   | null;
 
-const getViewStageFromEstado = (estadoActual: string): ViewStage => {
-  const e = normalize(estadoActual);
+const getViewStageFromEstado = (estadoActual?: string | null): ViewStage => {
+  const e = normalize(estadoActual ?? "");
 
   if (e === "medicion") return "medicion";
   if (e === "verificacion") return "verificacion";
@@ -158,12 +158,16 @@ const getViewStageFromEstado = (estadoActual: string): ViewStage => {
   if (e === "deposito") return "deposito";
   if (e === "logistica") return "logistica";
 
-  // Por defecto, todo lo demás se ve como Visita Técnica
   return "visitaTecnica";
 };
 
 // Helpers reutilizables
-const getEstadoBadgeColor = (estado: string) => {
+const getEstadoBadgeColor = (estado?: string | null) => {
+  // ✅ sin estado
+  if (!estado || estado.trim() === "") {
+    return "bg-primary/15 text-primary hover:bg-primary/20";
+  }
+
   const e = normalize(estado);
 
   switch (e) {
@@ -457,11 +461,14 @@ export default function VisitaTecnicaPage() {
       {
         accessorKey: "estadoActual",
         header: "Estado",
-        cell: ({ row }) => (
-          <Badge className={getEstadoBadgeColor(row.original.estadoActual)}>
-            {row.original.estadoActual}
-          </Badge>
-        ),
+        cell: ({ row }) => {
+          const estado = row.original.estadoActual;
+          return (
+            <Badge className={getEstadoBadgeColor(estado)}>
+              {estado && estado.trim() !== "" ? estado : "Sin estado"}
+            </Badge>
+          );
+        },
       },
       {
         id: "acciones",
