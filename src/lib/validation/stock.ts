@@ -29,7 +29,7 @@ export const zCreateItem = z.object({
       serial: z.boolean().default(false),
     })
     .default({ lot: false, serial: false }),
-  attributes: z.record(z.any()).optional(),
+    attributes: z.record(z.string(), z.any()).optional(),
   minStockByWarehouse: z
     .array(z.object({ warehouseId: zObjectId, min: z.number().min(0) }))
     .default([]),
