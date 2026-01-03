@@ -114,19 +114,28 @@ const getEstadoBadgeColor = (estado?: string | null) => {
  * Obtiene el ObjectId de la cotización asociada al proyecto,
  * ya sea que venga populado o como string suelto.
  */
+type CotizacionRefLike =
+  | string
+  | { _id?: string | { toString: () => string } }
+  | null
+  | undefined;
+
 const getCotizacionIdFromProyecto = (
-  proyecto: Pick<ProyectoWithExtras, "cotizacion"> | null | undefined,
+  proyecto: { cotizacion?: CotizacionRefLike } | null | undefined,
 ): string | null => {
   if (!proyecto) return null;
 
-  const { cotizacion } = proyecto;
+  const cot = proyecto.cotizacion;
 
-  if (cotizacion && typeof cotizacion === "object") {
-    return cotizacion._id?.toString() ?? null;
-  }
+  if (typeof cot === "string") return cot;
 
-  if (typeof cotizacion === "string") {
-    return cotizacion;
+  if (cot && typeof cot === "object") {
+    const id = (cot as { _id?: unknown })._id;
+
+    if (typeof id === "string") return id;
+    if (id && typeof id === "object" && "toString" in id) return (id as any).toString();
+
+    return null;
   }
 
   return null;
