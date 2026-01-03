@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import StockReservation from "@/models/StockReservation";
 import { applyReservation } from "@/lib/stock/ledger";
@@ -7,6 +7,10 @@ type ReservationLineShape = {
   itemId: { toString(): string } | string;
   qty: number;
   uom: string;
+};
+
+type RouteContext = {
+  params: Promise<{ id: string }>;
 };
 
 function errorMessage(e: unknown) {
@@ -19,10 +23,12 @@ function errorMessage(e: unknown) {
   }
 }
 
-export async function POST(_req: Request, ctx: { params: { id: string } }) {
+export async function POST(_req: NextRequest, { params }: RouteContext) {
   await dbConnect();
 
-  const reservation = await StockReservation.findById(ctx.params.id);
+  const { id } = await params;
+
+  const reservation = await StockReservation.findById(id);
   if (!reservation) return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   if (reservation.status !== "ACTIVE") {
     return NextResponse.json({ ok: false, error: "Reservation is not ACTIVE" }, { status: 400 });
