@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { IProyecto } from "@/models/Proyecto";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +41,6 @@ type ClientePopulado = {
 };
 
 function getDefaultTab(estadoActual: unknown): string {
-  // estado puede venir null/undefined o incluso con espacios
   const key =
     typeof estadoActual === "string" && estadoActual.trim() !== ""
       ? estadoActual.trim()
@@ -52,6 +51,7 @@ function getDefaultTab(estadoActual: unknown): string {
 
 export default function ProyectoDetallePage() {
   const params = useParams();
+  const router = useRouter();
   const projectId = params.id as string;
 
   const { data: proyecto, isLoading, isError } = useQuery({
@@ -78,7 +78,6 @@ export default function ProyectoDetallePage() {
 
   const defaultTab = getDefaultTab(proyecto.estadoActual);
 
-  // casteamos el cliente a un tipo seguro (sin any)
   const cliente = proyecto.cliente as ClientePopulado | null;
 
   return (
@@ -140,7 +139,14 @@ export default function ProyectoDetallePage() {
         </TabsContent>
 
         <TabsContent value="deposito" className="mt-4">
-          <FormDeposito proyecto={proyecto} />
+          <FormDeposito
+            proyecto={proyecto}
+            onClose={() => router.back()}
+            onSaved={() => {
+              // si querés, acá podés invalidar queries o refrescar la página
+              // router.refresh() en App Router a veces ayuda si dependés de server components
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="logistica" className="mt-4">
