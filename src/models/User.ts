@@ -1,10 +1,12 @@
-import mongoose, { Schema, Document } from 'mongoose';
+// src/models/User.ts
+import mongoose, { Schema, Document } from "mongoose";
+import { ROLES, type UserRole } from "@/lib/roles";
 
 export interface IPersonalData {
   cuil?: string;
   fechaNacimiento?: Date;
   nacionalidad?: string;
-  estadoCivil?: 'soltero' | 'casado' | 'divorciado' | 'viudo';
+  estadoCivil?: "soltero" | "casado" | "divorciado" | "viudo";
   direccion?: {
     calle?: string;
     numero?: string;
@@ -45,60 +47,77 @@ export interface IUser extends Document {
   name?: string;
   email?: string;
   password?: string;
-  rol: 'vendedor' | 'admin';
+  rol: UserRole;
   activo: boolean;
+
+  image?: string | null;
+
   personalData?: IPersonalData;
   contactData?: IContactData;
   laboralData?: ILaboralData;
   financieraLegalData?: IFinancieraLegalData;
 }
 
-const UserSchema: Schema = new Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, select: false },
-  rol: { type: String, required: true, enum: ['vendedor', 'admin'], default: 'vendedor' },
-  activo: { type: Boolean, default: true },
-  
-  personalData: {
-    cuil: String,
-    fechaNacimiento: Date,
-    nacionalidad: String,
-    estadoCivil: String,
-    direccion: {
-      calle: String,
-      numero: String,
-      piso: String,
-      depto: String,
-      ciudad: String,
-      provincia: String,
-      codigoPostal: String,
-    }
-  },
-  contactData: {
-    telefonoPrincipal: String,
-    telefonoSecundario: String,
-    emailPersonal: String,
-    contactoEmergencia: {
-      nombre: String,
-      parentesco: String,
-      telefono: String,
-    }
-  },
-  laboralData: {
-    puesto: String,
-    fechaIngreso: Date,
-    equipo: String,
-    reportaA: String,
-  },
-  financieraLegalData: {
-    cbu: String,
-    banco: String,
-    obraSocial: String,
-    numeroAfiliado: String,
-  }
-}, {
-  timestamps: true
-});
+const UserSchema: Schema = new Schema(
+  {
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, select: false },
 
-export default mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
+    rol: {
+      type: String,
+      required: true,
+      enum: ROLES,
+      default: "vendedor",
+    },
+
+    activo: { type: Boolean, default: true },
+
+    // ✅ NUEVO: avatar / foto perfil
+    image: { type: String, default: null },
+
+    personalData: {
+      cuil: String,
+      fechaNacimiento: Date,
+      nacionalidad: String,
+      estadoCivil: String,
+      direccion: {
+        calle: String,
+        numero: String,
+        piso: String,
+        depto: String,
+        ciudad: String,
+        provincia: String,
+        codigoPostal: String,
+      },
+    },
+
+    contactData: {
+      telefonoPrincipal: String,
+      telefonoSecundario: String,
+      emailPersonal: String,
+      contactoEmergencia: {
+        nombre: String,
+        parentesco: String,
+        telefono: String,
+      },
+    },
+
+    laboralData: {
+      puesto: String,
+      fechaIngreso: Date,
+      equipo: String,
+      reportaA: String,
+    },
+
+    financieraLegalData: {
+      cbu: String,
+      banco: String,
+      obraSocial: String,
+      numeroAfiliado: String,
+    },
+  },
+  { timestamps: true },
+);
+
+export default mongoose.models.User || mongoose.model<IUser>("User", UserSchema);

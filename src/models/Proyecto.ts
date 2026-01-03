@@ -19,7 +19,7 @@ export const ESTADOS_PROYECTO = [
   'Completado',
   'Pausado',
   'Rechazado',
-];
+] as const;
 
 // Tipos genéricos para las otras etapas (si no tenés interfaces específicas)
 export interface IEtapaGenerica {
@@ -31,7 +31,9 @@ export interface IProyecto extends Document {
   cliente: Types.ObjectId;
   cotizacion?: Types.ObjectId;
   vendedor?: Types.ObjectId;
-  estadoActual: string;
+
+  // ✅ ahora puede arrancar vacío
+  estadoActual?: (typeof ESTADOS_PROYECTO)[number] | null;
 
   visitaTecnica: IVisitaTecnica;
   medicion: IEtapaGenerica;
@@ -48,10 +50,12 @@ const ProyectoSchema: Schema = new Schema(
     cliente: { type: Types.ObjectId, ref: 'Cliente', required: true },
     cotizacion: { type: Types.ObjectId, ref: 'Cotizacion' },
     vendedor: { type: Types.ObjectId, ref: 'User' },
+
+    // ✅ arranca sin estado
     estadoActual: {
       type: String,
-      enum: ESTADOS_PROYECTO,
-      default: 'Visita Técnica',
+      enum: [...ESTADOS_PROYECTO, null],
+      default: null,
     },
 
     visitaTecnica: { type: VisitaTecnicaSchema, default: () => ({}) },
@@ -61,9 +65,7 @@ const ProyectoSchema: Schema = new Schema(
     deposito: { type: DepositoSchema, default: () => ({}) },
     logistica: { type: LogisticaSchema, default: () => ({}) },
   },
-  {
-    timestamps: true,
-  },
+  { timestamps: true },
 );
 
 ProyectoSchema.pre('save', async function (next) {
@@ -83,7 +85,6 @@ ProyectoSchema.pre('save', async function (next) {
       this.numeroOrden = `OT-${nuevoNumero.toString().padStart(5, '0')}`;
       next();
     } catch (error) {
-      // `error` es `unknown`, lo casteamos para pasarlo a next
       next(error as Error);
     }
   } else {

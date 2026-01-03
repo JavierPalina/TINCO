@@ -1,4 +1,3 @@
-// /components/proyectos/VerificacionFormModal.tsx
 "use client";
 
 import { useState } from "react";
@@ -20,7 +19,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CloudinaryMultiUpload } from "@/components/ui/CloudinaryMultiUpload";
-import { UserSelect } from "@/components/ui/UserSelect";
 import {
   Popover,
   PopoverTrigger,
@@ -44,7 +42,6 @@ type Props = {
 };
 
 // Opciones fijas
-
 const MEDIDAS_VERIFICADAS_OPTIONS = ["Sí", "No", "Observaciones"] as const;
 
 const FUENTE_MEDIDAS_OPTIONS = [
@@ -212,7 +209,7 @@ type FormState = {
 
   archivosPlanosCroquis: string[];
 
-  usuarioVerifico: string;
+  // Se mantiene solo la fecha. Se eliminó usuarioVerifico.
   fechaVerificacionCompleta: string;
 
   observacionesVerificacion: string;
@@ -255,7 +252,7 @@ type VerificacionData = {
 
   archivosPlanosCroquis?: string[];
 
-  usuarioVerifico?: { _id?: string } | string;
+  // Eliminado: usuarioVerifico
   fechaVerificacionCompleta?: string | Date;
 
   observacionesVerificacion?: string;
@@ -329,8 +326,7 @@ export default function VerificacionFormModal({
       direccionObra: direccionBase,
 
       medidasVerificadas: v.medidasVerificadas || "",
-      medidasVerificadasObservaciones:
-        v.medidasVerificadasObservaciones || "",
+      medidasVerificadasObservaciones: v.medidasVerificadasObservaciones || "",
 
       fuenteMedidas: v.fuenteMedidas || "",
       planosRevisados: v.planosRevisados || "",
@@ -359,10 +355,6 @@ export default function VerificacionFormModal({
 
       archivosPlanosCroquis: v.archivosPlanosCroquis || [],
 
-      usuarioVerifico:
-        typeof v.usuarioVerifico === "string"
-          ? v.usuarioVerifico
-          : v.usuarioVerifico?._id || "",
       fechaVerificacionCompleta: fechaVerifCompleta,
 
       observacionesVerificacion: v.observacionesVerificacion || "",
@@ -371,10 +363,7 @@ export default function VerificacionFormModal({
     };
   });
 
-  const updateField = <K extends keyof FormState>(
-    field: K,
-    value: FormState[K],
-  ) => {
+  const updateField = <K extends keyof FormState>(field: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -426,8 +415,7 @@ export default function VerificacionFormModal({
               ? new Date(form.fechaRevisionPlano)
               : undefined,
 
-            materialesDisponiblesEstado:
-              form.materialesDisponiblesEstado || undefined,
+            materialesDisponiblesEstado: form.materialesDisponiblesEstado || undefined,
             materialesFaltantesDetalle:
               form.materialesDisponiblesEstado === "Faltan materiales"
                 ? form.materialesFaltantesDetalle || undefined
@@ -436,18 +424,15 @@ export default function VerificacionFormModal({
               form.materialesDisponiblesEstado === "Pendiente de ingreso"
                 ? form.materialesProveedorPendiente || undefined
                 : undefined,
-            listaMaterialesRevisada:
-              form.listaMaterialesRevisada || undefined,
+            listaMaterialesRevisada: form.listaMaterialesRevisada || undefined,
 
-            accesoriosCompletosEstado:
-              form.accesoriosCompletosEstado || undefined,
+            accesoriosCompletosEstado: form.accesoriosCompletosEstado || undefined,
             accesoriosFaltantesDetalle:
               form.accesoriosCompletosEstado === "Faltan accesorios"
                 ? form.accesoriosFaltantesDetalle || undefined
                 : undefined,
 
-            vidriosDisponiblesEstado:
-              form.vidriosDisponiblesEstado || undefined,
+            vidriosDisponiblesEstado: form.vidriosDisponiblesEstado || undefined,
 
             color: form.color || undefined,
             estadoColor: form.estadoColor || undefined,
@@ -457,28 +442,22 @@ export default function VerificacionFormModal({
             proveedorPerfil: form.proveedorPerfil || undefined,
 
             estadoPerfiles: form.estadoPerfiles || undefined,
-            compatibilidadHerrajes:
-              form.compatibilidadHerrajes || undefined,
-            medidasVidriosConfirmadas:
-              form.medidasVidriosConfirmadas || undefined,
+            compatibilidadHerrajes: form.compatibilidadHerrajes || undefined,
+            medidasVidriosConfirmadas: form.medidasVidriosConfirmadas || undefined,
 
             archivosPlanosCroquis:
-              form.archivosPlanosCroquis &&
-              form.archivosPlanosCroquis.length
+              form.archivosPlanosCroquis && form.archivosPlanosCroquis.length
                 ? form.archivosPlanosCroquis
                 : undefined,
 
-            usuarioVerifico: form.usuarioVerifico || undefined,
+            // Eliminado: usuarioVerifico
             fechaVerificacionCompleta: form.fechaVerificacionCompleta
               ? new Date(form.fechaVerificacionCompleta)
               : undefined,
 
-            observacionesVerificacion:
-              form.observacionesVerificacion || undefined,
-            estadoGeneralVerificacion:
-              form.estadoGeneralVerificacion || undefined,
-            aprobadoParaProduccion:
-              form.aprobadoParaProduccion || undefined,
+            observacionesVerificacion: form.observacionesVerificacion || undefined,
+            estadoGeneralVerificacion: form.estadoGeneralVerificacion || undefined,
+            aprobadoParaProduccion: form.aprobadoParaProduccion || undefined,
           },
         },
       };
@@ -511,12 +490,9 @@ export default function VerificacionFormModal({
     <DialogContent className="sm:max-w-[900px] p-0">
       <ScrollArea className="max-h-[90vh] p-6">
         <DialogHeader>
-          <DialogTitle>
-            Editar Verificación – {proyecto.numeroOrden}
-          </DialogTitle>
+          <DialogTitle>Editar Verificación – {proyecto.numeroOrden}</DialogTitle>
           <DialogDescription>
-            Completá los datos de verificación de medidas, materiales y
-            perfiles antes de pasar a taller.
+            Completá los datos de verificación de medidas, materiales y perfiles antes de pasar a taller.
           </DialogDescription>
         </DialogHeader>
 
@@ -527,9 +503,7 @@ export default function VerificacionFormModal({
               <Label>Cliente / Obra / Empresa</Label>
               <Input
                 value={form.clienteObraEmpresa}
-                onChange={(e) =>
-                  updateField("clienteObraEmpresa", e.target.value)
-                }
+                onChange={(e) => updateField("clienteObraEmpresa", e.target.value)}
                 placeholder="Nombre de cliente / obra / empresa"
               />
             </div>
@@ -539,9 +513,7 @@ export default function VerificacionFormModal({
               <Label>Dirección de la obra</Label>
               <Input
                 value={form.direccionObra}
-                onChange={(e) =>
-                  updateField("direccionObra", e.target.value)
-                }
+                onChange={(e) => updateField("direccionObra", e.target.value)}
                 placeholder="Dirección en la que se verificó el caso"
               />
             </div>
@@ -558,11 +530,7 @@ export default function VerificacionFormModal({
                       key={opt}
                       type="button"
                       size="sm"
-                      variant={
-                        form.medidasVerificadas === opt
-                          ? "default"
-                          : "outline"
-                      }
+                      variant={form.medidasVerificadas === opt ? "default" : "outline"}
                       onClick={() => updateField("medidasVerificadas", opt)}
                     >
                       {opt}
@@ -578,10 +546,7 @@ export default function VerificacionFormModal({
                     rows={3}
                     value={form.medidasVerificadasObservaciones}
                     onChange={(e) =>
-                      updateField(
-                        "medidasVerificadasObservaciones",
-                        e.target.value,
-                      )
+                      updateField("medidasVerificadasObservaciones", e.target.value)
                     }
                     placeholder="Describí las observaciones detectadas en las medidas..."
                   />
@@ -606,9 +571,7 @@ export default function VerificacionFormModal({
                     <Command>
                       <CommandInput placeholder="Buscar fuente..." />
                       <CommandList>
-                        <CommandEmpty>
-                          No se encontraron opciones.
-                        </CommandEmpty>
+                        <CommandEmpty>No se encontraron opciones.</CommandEmpty>
                         <CommandGroup>
                           {FUENTE_MEDIDAS_OPTIONS.map((opt) => (
                             <CommandItem
@@ -619,9 +582,7 @@ export default function VerificacionFormModal({
                               <Check
                                 className={cn(
                                   "mr-2 h-4 w-4",
-                                  form.fuenteMedidas === opt
-                                    ? "opacity-100"
-                                    : "opacity-0",
+                                  form.fuenteMedidas === opt ? "opacity-100" : "opacity-0",
                                 )}
                               />
                               {opt}
@@ -652,24 +613,18 @@ export default function VerificacionFormModal({
                     <Command>
                       <CommandInput placeholder="Buscar opción..." />
                       <CommandList>
-                        <CommandEmpty>
-                          No se encontraron opciones.
-                        </CommandEmpty>
+                        <CommandEmpty>No se encontraron opciones.</CommandEmpty>
                         <CommandGroup>
                           {PLANOS_REVISADOS_OPTIONS.map((opt) => (
                             <CommandItem
                               key={opt}
                               value={opt}
-                              onSelect={() =>
-                                updateField("planosRevisados", opt)
-                              }
+                              onSelect={() => updateField("planosRevisados", opt)}
                             >
                               <Check
                                 className={cn(
                                   "mr-2 h-4 w-4",
-                                  form.planosRevisados === opt
-                                    ? "opacity-100"
-                                    : "opacity-0",
+                                  form.planosRevisados === opt ? "opacity-100" : "opacity-0",
                                 )}
                               />
                               {opt}
@@ -687,18 +642,14 @@ export default function VerificacionFormModal({
                 <Input
                   type="date"
                   value={form.fechaRevisionPlano}
-                  onChange={(e) =>
-                    updateField("fechaRevisionPlano", e.target.value)
-                  }
+                  onChange={(e) => updateField("fechaRevisionPlano", e.target.value)}
                 />
               </div>
             </div>
 
             {/* Materiales y accesorios */}
             <div className="flex flex-col gap-4">
-              <h3 className="text-lg font-semibold">
-                Materiales, lista y accesorios
-              </h3>
+              <h3 className="text-lg font-semibold">Materiales, lista y accesorios</h3>
 
               <div className="flex flex-col gap-2">
                 <Label>Materiales disponibles</Label>
@@ -708,14 +659,8 @@ export default function VerificacionFormModal({
                       key={opt}
                       type="button"
                       size="sm"
-                      variant={
-                        form.materialesDisponiblesEstado === opt
-                          ? "default"
-                          : "outline"
-                      }
-                      onClick={() =>
-                        updateField("materialesDisponiblesEstado", opt)
-                      }
+                      variant={form.materialesDisponiblesEstado === opt ? "default" : "outline"}
+                      onClick={() => updateField("materialesDisponiblesEstado", opt)}
                     >
                       {opt}
                     </Button>
@@ -729,12 +674,7 @@ export default function VerificacionFormModal({
                   <Textarea
                     rows={3}
                     value={form.materialesFaltantesDetalle}
-                    onChange={(e) =>
-                      updateField(
-                        "materialesFaltantesDetalle",
-                        e.target.value,
-                      )
-                    }
+                    onChange={(e) => updateField("materialesFaltantesDetalle", e.target.value)}
                     placeholder="Especificá qué materiales faltan..."
                   />
                 </div>
@@ -745,12 +685,7 @@ export default function VerificacionFormModal({
                   <Label>Proveedor al que se pidieron los materiales</Label>
                   <Input
                     value={form.materialesProveedorPendiente}
-                    onChange={(e) =>
-                      updateField(
-                        "materialesProveedorPendiente",
-                        e.target.value,
-                      )
-                    }
+                    onChange={(e) => updateField("materialesProveedorPendiente", e.target.value)}
                     placeholder="Proveedor / distribuidor"
                   />
                 </div>
@@ -764,14 +699,8 @@ export default function VerificacionFormModal({
                       key={opt}
                       type="button"
                       size="sm"
-                      variant={
-                        form.listaMaterialesRevisada === opt
-                          ? "default"
-                          : "outline"
-                      }
-                      onClick={() =>
-                        updateField("listaMaterialesRevisada", opt)
-                      }
+                      variant={form.listaMaterialesRevisada === opt ? "default" : "outline"}
+                      onClick={() => updateField("listaMaterialesRevisada", opt)}
                     >
                       {opt}
                     </Button>
@@ -787,14 +716,8 @@ export default function VerificacionFormModal({
                       key={opt}
                       type="button"
                       size="sm"
-                      variant={
-                        form.accesoriosCompletosEstado === opt
-                          ? "default"
-                          : "outline"
-                      }
-                      onClick={() =>
-                        updateField("accesoriosCompletosEstado", opt)
-                      }
+                      variant={form.accesoriosCompletosEstado === opt ? "default" : "outline"}
+                      onClick={() => updateField("accesoriosCompletosEstado", opt)}
                     >
                       {opt}
                     </Button>
@@ -808,12 +731,7 @@ export default function VerificacionFormModal({
                   <Textarea
                     rows={3}
                     value={form.accesoriosFaltantesDetalle}
-                    onChange={(e) =>
-                      updateField(
-                        "accesoriosFaltantesDetalle",
-                        e.target.value,
-                      )
-                    }
+                    onChange={(e) => updateField("accesoriosFaltantesDetalle", e.target.value)}
                     placeholder="Especificá qué accesorios faltan..."
                   />
                 </div>
@@ -827,14 +745,8 @@ export default function VerificacionFormModal({
                       key={opt}
                       type="button"
                       size="sm"
-                      variant={
-                        form.vidriosDisponiblesEstado === opt
-                          ? "default"
-                          : "outline"
-                      }
-                      onClick={() =>
-                        updateField("vidriosDisponiblesEstado", opt)
-                      }
+                      variant={form.vidriosDisponiblesEstado === opt ? "default" : "outline"}
+                      onClick={() => updateField("vidriosDisponiblesEstado", opt)}
                     >
                       {opt}
                     </Button>
@@ -845,9 +757,7 @@ export default function VerificacionFormModal({
 
             {/* Color y material / perfiles */}
             <div className="flex flex-col gap-4">
-              <h3 className="text-lg font-semibold">
-                Color, perfiles y material
-              </h3>
+              <h3 className="text-lg font-semibold">Color, perfiles y material</h3>
 
               {/* Color */}
               <div className="flex flex-col gap-2">
@@ -872,9 +782,7 @@ export default function VerificacionFormModal({
                         onValueChange={setColorSearch}
                       />
                       <CommandList>
-                        <CommandEmpty>
-                          No se encontraron colores.
-                        </CommandEmpty>
+                        <CommandEmpty>No se encontraron colores.</CommandEmpty>
                         <CommandGroup heading="Colores">
                           {colorOptions.map((opt) => (
                             <CommandItem
@@ -888,9 +796,7 @@ export default function VerificacionFormModal({
                               <Check
                                 className={cn(
                                   "mr-2 h-4 w-4",
-                                  form.color === opt
-                                    ? "opacity-100"
-                                    : "opacity-0",
+                                  form.color === opt ? "opacity-100" : "opacity-0",
                                 )}
                               />
                               <span className="flex-1">{opt}</span>
@@ -898,9 +804,7 @@ export default function VerificacionFormModal({
                                 className="h-3 w-3 text-destructive opacity-60 hover:opacity-100"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setColorOptions((prev) =>
-                                    prev.filter((o) => o !== opt),
-                                  );
+                                  setColorOptions((prev) => prev.filter((o) => o !== opt));
                                   if (form.color === opt) {
                                     updateField("color", "");
                                   }
@@ -910,19 +814,13 @@ export default function VerificacionFormModal({
                           ))}
                         </CommandGroup>
 
-                        {colorSearch.trim() &&
-                          !colorOptions.includes(colorSearch.trim()) && (
-                            <CommandGroup heading="Acciones">
-                              <CommandItem
-                                value={colorSearch.trim()}
-                                onSelect={handleCreateColor}
-                              >
-                                Crear &quot;
-                                {colorSearch.trim()}
-                                &quot;
-                              </CommandItem>
-                            </CommandGroup>
-                          )}
+                        {colorSearch.trim() && !colorOptions.includes(colorSearch.trim()) && (
+                          <CommandGroup heading="Acciones">
+                            <CommandItem value={colorSearch.trim()} onSelect={handleCreateColor}>
+                              Crear &quot;{colorSearch.trim()}&quot;
+                            </CommandItem>
+                          </CommandGroup>
+                        )}
                       </CommandList>
                     </Command>
                   </PopoverContent>
@@ -937,9 +835,7 @@ export default function VerificacionFormModal({
                       key={opt}
                       type="button"
                       size="sm"
-                      variant={
-                        form.estadoColor === opt ? "default" : "outline"
-                      }
+                      variant={form.estadoColor === opt ? "default" : "outline"}
                       onClick={() => updateField("estadoColor", opt)}
                     >
                       {opt}
@@ -957,12 +853,8 @@ export default function VerificacionFormModal({
                       key={opt}
                       type="button"
                       size="sm"
-                      variant={
-                        form.tipoMaterial === opt ? "default" : "outline"
-                      }
-                      onClick={() => {
-                        updateField("tipoMaterial", opt);
-                      }}
+                      variant={form.tipoMaterial === opt ? "default" : "outline"}
+                      onClick={() => updateField("tipoMaterial", opt)}
                     >
                       {opt}
                     </Button>
@@ -982,8 +874,7 @@ export default function VerificacionFormModal({
                         role="combobox"
                         className="w-full justify-between"
                       >
-                        {form.tipoPerfilVerificado ||
-                          "Seleccionar tipo de perfil"}
+                        {form.tipoPerfilVerificado || "Seleccionar tipo de perfil"}
                         <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                       </Button>
                     </PopoverTrigger>
@@ -991,24 +882,18 @@ export default function VerificacionFormModal({
                       <Command>
                         <CommandInput placeholder="Buscar perfil..." />
                         <CommandList>
-                          <CommandEmpty>
-                            No se encontraron perfiles.
-                          </CommandEmpty>
+                          <CommandEmpty>No se encontraron perfiles.</CommandEmpty>
                           <CommandGroup>
                             {perfilesOptionsByMaterial().map((opt) => (
                               <CommandItem
                                 key={opt}
                                 value={opt}
-                                onSelect={() =>
-                                  updateField("tipoPerfilVerificado", opt)
-                                }
+                                onSelect={() => updateField("tipoPerfilVerificado", opt)}
                               >
                                 <Check
                                   className={cn(
                                     "mr-2 h-4 w-4",
-                                    form.tipoPerfilVerificado === opt
-                                      ? "opacity-100"
-                                      : "opacity-0",
+                                    form.tipoPerfilVerificado === opt ? "opacity-100" : "opacity-0",
                                   )}
                                 />
                                 {opt}
@@ -1025,9 +910,7 @@ export default function VerificacionFormModal({
                   <Label>Tipo de perfil verificado</Label>
                   <Input
                     value={form.tipoPerfilVerificado}
-                    onChange={(e) =>
-                      updateField("tipoPerfilVerificado", e.target.value)
-                    }
+                    onChange={(e) => updateField("tipoPerfilVerificado", e.target.value)}
                     placeholder="Especificar tipo de perfil"
                   />
                 </div>
@@ -1045,8 +928,7 @@ export default function VerificacionFormModal({
                         role="combobox"
                         className="w-full justify-between"
                       >
-                        {form.proveedorPerfil ||
-                          "Seleccionar proveedor de perfil"}
+                        {form.proveedorPerfil || "Seleccionar proveedor de perfil"}
                         <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                       </Button>
                     </PopoverTrigger>
@@ -1054,24 +936,18 @@ export default function VerificacionFormModal({
                       <Command>
                         <CommandInput placeholder="Buscar proveedor..." />
                         <CommandList>
-                          <CommandEmpty>
-                            No se encontraron proveedores.
-                          </CommandEmpty>
+                          <CommandEmpty>No se encontraron proveedores.</CommandEmpty>
                           <CommandGroup>
                             {proveedorOptionsByMaterial().map((opt) => (
                               <CommandItem
                                 key={opt}
                                 value={opt}
-                                onSelect={() =>
-                                  updateField("proveedorPerfil", opt)
-                                }
+                                onSelect={() => updateField("proveedorPerfil", opt)}
                               >
                                 <Check
                                   className={cn(
                                     "mr-2 h-4 w-4",
-                                    form.proveedorPerfil === opt
-                                      ? "opacity-100"
-                                      : "opacity-0",
+                                    form.proveedorPerfil === opt ? "opacity-100" : "opacity-0",
                                   )}
                                 />
                                 {opt}
@@ -1088,9 +964,7 @@ export default function VerificacionFormModal({
                   <Label>Proveedor de perfil</Label>
                   <Input
                     value={form.proveedorPerfil}
-                    onChange={(e) =>
-                      updateField("proveedorPerfil", e.target.value)
-                    }
+                    onChange={(e) => updateField("proveedorPerfil", e.target.value)}
                     placeholder="Especificar proveedor de perfil"
                   />
                 </div>
@@ -1106,8 +980,7 @@ export default function VerificacionFormModal({
                       role="combobox"
                       className="w-full justify-between"
                     >
-                      {form.estadoPerfiles ||
-                        "Seleccionar estado de los perfiles"}
+                      {form.estadoPerfiles || "Seleccionar estado de los perfiles"}
                       <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                     </Button>
                   </PopoverTrigger>
@@ -1115,24 +988,18 @@ export default function VerificacionFormModal({
                     <Command>
                       <CommandInput placeholder="Buscar estado..." />
                       <CommandList>
-                        <CommandEmpty>
-                          No se encontraron estados.
-                        </CommandEmpty>
+                        <CommandEmpty>No se encontraron estados.</CommandEmpty>
                         <CommandGroup>
                           {ESTADO_PERFILES_OPTIONS.map((opt) => (
                             <CommandItem
                               key={opt}
                               value={opt}
-                              onSelect={() =>
-                                updateField("estadoPerfiles", opt)
-                              }
+                              onSelect={() => updateField("estadoPerfiles", opt)}
                             >
                               <Check
                                 className={cn(
                                   "mr-2 h-4 w-4",
-                                  form.estadoPerfiles === opt
-                                    ? "opacity-100"
-                                    : "opacity-0",
+                                  form.estadoPerfiles === opt ? "opacity-100" : "opacity-0",
                                 )}
                               />
                               {opt}
@@ -1153,14 +1020,8 @@ export default function VerificacionFormModal({
                       key={opt}
                       type="button"
                       size="sm"
-                      variant={
-                        form.compatibilidadHerrajes === opt
-                          ? "default"
-                          : "outline"
-                      }
-                      onClick={() =>
-                        updateField("compatibilidadHerrajes", opt)
-                      }
+                      variant={form.compatibilidadHerrajes === opt ? "default" : "outline"}
+                      onClick={() => updateField("compatibilidadHerrajes", opt)}
                     >
                       {opt}
                     </Button>
@@ -1176,14 +1037,8 @@ export default function VerificacionFormModal({
                       key={opt}
                       type="button"
                       size="sm"
-                      variant={
-                        form.medidasVidriosConfirmadas === opt
-                          ? "default"
-                          : "outline"
-                      }
-                      onClick={() =>
-                        updateField("medidasVidriosConfirmadas", opt)
-                      }
+                      variant={form.medidasVidriosConfirmadas === opt ? "default" : "outline"}
+                      onClick={() => updateField("medidasVidriosConfirmadas", opt)}
                     >
                       {opt}
                     </Button>
@@ -1192,49 +1047,30 @@ export default function VerificacionFormModal({
               </div>
             </div>
 
-            {/* Archivos y auditoría */}
+            {/* Archivos y fechas */}
             <div className="flex flex-col gap-6">
               <div className="flex flex-col gap-4">
-                <h3 className="text-lg font-semibold">
-                  Planos / croquis adjuntos
-                </h3>
+                <h3 className="text-lg font-semibold">Planos / croquis adjuntos</h3>
 
                 <CloudinaryMultiUpload
                   label="Archivos de plano o croquis (hasta 5)"
                   helper="Subí planos generales y de detalle en PDF o imagen."
                   value={form.archivosPlanosCroquis}
-                  onChange={(urls) =>
-                    updateField("archivosPlanosCroquis", urls)
-                  }
+                  onChange={(urls) => updateField("archivosPlanosCroquis", urls)}
                   maxFiles={5}
                   folder="tinco/verificacion/planos"
                 />
               </div>
 
               <div className="flex flex-col gap-4">
-                <h3 className="text-lg font-semibold">
-                  Usuario y fechas de verificación
-                </h3>
-
-                <div className="flex flex-col gap-2">
-                  <Label>Usuario que verificó</Label>
-                  <UserSelect
-                    value={form.usuarioVerifico}
-                    onChange={(val) => updateField("usuarioVerifico", val)}
-                  />
-                </div>
+                <h3 className="text-lg font-semibold">Fechas de verificación</h3>
 
                 <div className="flex flex-col gap-2">
                   <Label>Fecha de verificación completa</Label>
                   <Input
                     type="date"
                     value={form.fechaVerificacionCompleta}
-                    onChange={(e) =>
-                      updateField(
-                        "fechaVerificacionCompleta",
-                        e.target.value,
-                      )
-                    }
+                    onChange={(e) => updateField("fechaVerificacionCompleta", e.target.value)}
                   />
                 </div>
               </div>
@@ -1242,18 +1078,14 @@ export default function VerificacionFormModal({
 
             {/* Observaciones y estado general */}
             <div className="flex flex-col gap-4">
-              <h3 className="text-lg font-semibold">
-                Resultado y aprobación para producción
-              </h3>
+              <h3 className="text-lg font-semibold">Resultado y aprobación para producción</h3>
 
               <div className="flex flex-col gap-2">
                 <Label>Observaciones de verificación</Label>
                 <Textarea
                   rows={3}
                   value={form.observacionesVerificacion}
-                  onChange={(e) =>
-                    updateField("observacionesVerificacion", e.target.value)
-                  }
+                  onChange={(e) => updateField("observacionesVerificacion", e.target.value)}
                   placeholder="Agregá cualquier comentario relevante de la verificación..."
                 />
               </div>
@@ -1266,14 +1098,8 @@ export default function VerificacionFormModal({
                       key={opt}
                       type="button"
                       size="sm"
-                      variant={
-                        form.estadoGeneralVerificacion === opt
-                          ? "default"
-                          : "outline"
-                      }
-                      onClick={() =>
-                        updateField("estadoGeneralVerificacion", opt)
-                      }
+                      variant={form.estadoGeneralVerificacion === opt ? "default" : "outline"}
+                      onClick={() => updateField("estadoGeneralVerificacion", opt)}
                     >
                       {opt}
                     </Button>
@@ -1289,33 +1115,22 @@ export default function VerificacionFormModal({
                       key={opt}
                       type="button"
                       size="sm"
-                      variant={
-                        form.aprobadoParaProduccion === opt
-                          ? "default"
-                          : "outline"
-                      }
-                      onClick={() =>
-                        updateField("aprobadoParaProduccion", opt)
-                      }
+                      variant={form.aprobadoParaProduccion === opt ? "default" : "outline"}
+                      onClick={() => updateField("aprobadoParaProduccion", opt)}
                     >
                       {opt}
                     </Button>
                   ))}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Si se marca como &quot;Sí&quot;, el proyecto podrá pasar a
-                  Taller para empezar la fabricación.
+                  Si se marca como &quot;Sí&quot;, el proyecto podrá pasar a Taller para empezar la fabricación.
                 </p>
               </div>
             </div>
           </div>
 
           <DialogFooter>
-            <Button
-              variant="ghost"
-              type="button"
-              onClick={() => !isSubmitting && onClose?.()}
-            >
+            <Button variant="ghost" type="button" onClick={() => !isSubmitting && onClose?.()}>
               Cancelar
             </Button>
             <Button type="submit" disabled={isSubmitting}>

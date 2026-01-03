@@ -71,6 +71,14 @@ import { VerificacionView } from "@/components/proyectos/VerificacionView";
 import TallerFormModal from "@/components/proyectos/FormTaller";
 import { TallerView } from "@/components/proyectos/TallerView";
 
+const ESTADOS_INICIALES: DestinoEstado[] = [
+  "Medición",
+  "Verificación",
+  "Taller",
+  "Depósito",
+  "Logística",
+];
+
 // --- Tipos auxiliares para evitar any ---
 
 type DestinoEstado =
@@ -135,7 +143,8 @@ type Filters = {
 const ALL_VALUE = "__all__";
 
 // Helpers reutilizables
-const getEstadoBadgeColor = (estado: string) => {
+const getEstadoBadgeColor = (estado?: string | null) => {
+  if (!estado) return "bg-primary/15 text-primary hover:bg-primary/20"; // ✅ sin estado
   switch (estado) {
     case "Taller":
       return "bg-orange-500 hover:bg-orange-600";
@@ -183,8 +192,8 @@ function getTecnicoLabel(asignadoA: AsignadoARef): string {
 async function fetchProyectosVisitaTecnica(): Promise<IProyecto[]> {
   const { data } = await axios.get("/api/proyectos", {
     params: {
-      estados:
-        "Visita Técnica,Medición,Verificación,Taller,Depósito,Logística",
+      estados: "Visita Técnica,Medición,Verificación,Taller,Depósito,Logística",
+      sinEstado: "1", // ✅ incluye estadoActual null/vacío
     },
   });
   return data.data;
@@ -208,6 +217,12 @@ export default function VisitaTecnicaPage() {
   const [viewStage, setViewStage] = useState<
     "visitaTecnica" | "medicion" | "verificacion" | "taller" | null
   >(null);
+
+  const [estadoDialog, setEstadoDialog] = useState<{
+    proyecto: IProyecto;
+  } | null>(null);
+
+  const [estadoSeleccionado, setEstadoSeleccionado] = useState<DestinoEstado | "">("");
 
   // Modales de edición
   const [proyectoEditandoVisita, setProyectoEditandoVisita] =
@@ -253,6 +268,42 @@ export default function VisitaTecnicaPage() {
     queryKey: ["proyectos-visita-tecnica"],
     queryFn: fetchProyectosVisitaTecnica,
   });
+
+  const setEstadoActualMutation = useMutation({
+  mutationFn: async ({ proyectoId, estado }: { proyectoId: string; estado: string }) => {
+    // ✅ asumimos que tu PUT ya soporta forzarEstado (como en pasarEtapaMutation)
+    return axios.put(`/api/proyectos/${proyectoId}`, {
+      forzarEstado: estado,
+    });
+  },
+  onSuccess: async () => {
+    toast.success("Estado asignado");
+    await queryClient.invalidateQueries({ queryKey: ["proyectos-visita-tecnica"] });
+    // seguimos flujo normal: abrir vista del proyecto ya con estado
+    const p = estadoDialog?.proyecto;
+    const estado = estadoSeleccionado;
+
+    setEstadoDialog(null);
+    setEstadoSeleccionado("");
+
+    if (p && estado) {
+      // armamos un "proyecto actualizado" para abrir el view sin esperar al refetch
+      const proyectoActualizado = { ...p, estadoActual: estado } as IProyecto;
+      setProyectoSeleccionado(proyectoActualizado);
+
+      if (estado === "Medición") setViewStage("medicion");
+      else if (estado === "Verificación") setViewStage("verificacion");
+      else if (estado === "Taller") setViewStage("taller");
+      else setViewStage("visitaTecnica");
+    }
+  },
+  onError: (error: unknown) => {
+    let message = "Error desconocido";
+    if (axios.isAxiosError(error)) message = error.response?.data?.error || error.message;
+    else if (error instanceof Error) message = error.message;
+    toast.error("No se pudo asignar el estado: " + message);
+  },
+});
 
   // Opciones únicas para filtros
   const filterOptions = useMemo(() => {
@@ -428,11 +479,14 @@ export default function VisitaTecnicaPage() {
       {
         accessorKey: "estadoActual",
         header: "Estado",
-        cell: ({ row }) => (
-          <Badge className={getEstadoBadgeColor(row.original.estadoActual)}>
-            {row.original.estadoActual}
-          </Badge>
-        ),
+        cell: ({ row }) => {
+          const estado = (row.original as any).estadoActual as string | null | undefined;
+          return (
+            <Badge className={getEstadoBadgeColor(estado)}>
+              {estado || "Sin estado"}
+            </Badge>
+          );
+        },
       },
     ];
   }, []);
@@ -608,6 +662,72 @@ export default function VisitaTecnicaPage() {
       </AlertDialog>
 
       {/* Modal de vista del proyecto (al clic en row) */}
+      <Dialog
+  open={!!estadoDialog}
+  onOpenChange={(open) => {
+    if (!open) {
+      setEstadoDialog(null);
+      setEstadoSeleccionado("");
+    }
+  }}
+>
+  {estadoDialog && (
+    <DialogContent className="sm:max-w-[520px]">
+      <DialogHeader>
+        <DialogTitle>Seleccionar estado inicial</DialogTitle>
+        <DialogDescription>
+          Este proyecto fue creado sin estado. Elegí el estado inicial para continuar.
+        </DialogDescription>
+      </DialogHeader>
+
+      <div className="space-y-3 mt-2">
+        <Select value={estadoSeleccionado} onValueChange={(v) => setEstadoSeleccionado(v as any)}>
+          <SelectTrigger>
+            <SelectValue placeholder="Elegí un estado..." />
+          </SelectTrigger>
+          <SelectContent>
+            {ESTADOS_INICIALES.map((e) => (
+              <SelectItem key={e} value={e}>
+                {e}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setEstadoDialog(null);
+              setEstadoSeleccionado("");
+            }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            disabled={!estadoSeleccionado || setEstadoActualMutation.isPending}
+            onClick={() => {
+              if (!estadoDialog?.proyecto?._id || !estadoSeleccionado) return;
+              setEstadoActualMutation.mutate({
+                proyectoId: estadoDialog.proyecto._id as string,
+                estado: estadoSeleccionado,
+              });
+            }}
+          >
+            {setEstadoActualMutation.isPending ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Guardando...
+              </span>
+            ) : (
+              "Confirmar"
+            )}
+          </Button>
+        </div>
+      </div>
+    </DialogContent>
+  )}
+</Dialog>
       <Dialog
         open={!!proyectoSeleccionado}
         onOpenChange={(open) => {
@@ -1119,20 +1239,22 @@ export default function VisitaTecnicaPage() {
           data={filteredData}
           onRowClick={(row) => {
             const proyecto = row.original as IProyecto;
-            setProyectoSeleccionado(proyecto);
-
-            const estado = proyecto.estadoActual;
-
-            if (estado === "Medición") {
-              setViewStage("medicion");
-            } else if (estado === "Verificación") {
-              setViewStage("verificacion");
-            } else if (estado === "Taller") {
-              setViewStage("taller");
-            } else {
-              // Para Depósito / Logística seguimos mostrando la vista de Visita Técnica
-              setViewStage("visitaTecnica");
+            const estado = (proyecto as any).estadoActual as string | null | undefined;
+                    
+            // ✅ si no tiene estado: abrir dialog de selección
+            if (!estado) {
+              setEstadoDialog({ proyecto });
+              setEstadoSeleccionado("");
+              return;
             }
+          
+            // ✅ si ya tiene estado: abrir vista normal
+            setProyectoSeleccionado(proyecto);
+          
+            if (estado === "Medición") setViewStage("medicion");
+            else if (estado === "Verificación") setViewStage("verificacion");
+            else if (estado === "Taller") setViewStage("taller");
+            else setViewStage("visitaTecnica");
           }}
         />
       ) : (

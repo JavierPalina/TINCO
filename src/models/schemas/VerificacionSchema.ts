@@ -1,5 +1,4 @@
-// /models/schemas/VerificacionSchema.ts
-import { Schema, Types } from "mongoose";
+import { Schema } from "mongoose";
 
 export const VerificacionSchema = new Schema(
   {
@@ -23,26 +22,18 @@ export const VerificacionSchema = new Schema(
     medidasVerificadasObservaciones: { type: String }, // si eligieron "Observaciones"
 
     fuenteMedidas: {
-      type: String, // listado en UI:
-      //  Medición en obra propia, Plano del cliente, Plano del arquitecto / estudio, etc.
+      type: String, // listado en UI
     },
 
     planosRevisados: {
-      type: String, // listado en UI:
-      //  Plano aprobado, aprobado con observaciones, etc.
+      type: String, // listado en UI
     },
     fechaRevisionPlano: { type: Date }, // Fecha de revisión de plano
 
     // --- Materiales / lista de materiales ---
     materialesDisponiblesEstado: {
       type: String,
-      enum: [
-        "Sí",
-        "No",
-        "Faltan materiales",
-        "Pendiente de ingreso",
-        "En revisión",
-      ],
+      enum: ["Sí", "No", "Faltan materiales", "Pendiente de ingreso", "En revisión"],
     },
     materialesFaltantesDetalle: { type: String }, // campo texto cuando "Faltan materiales"
     materialesProveedorPendiente: { type: String }, // proveedor cuando "Pendiente de ingreso"
@@ -55,13 +46,7 @@ export const VerificacionSchema = new Schema(
     // --- Accesorios / vidrios ---
     accesoriosCompletosEstado: {
       type: String,
-      enum: [
-        "Sí",
-        "No",
-        "Faltan accesorios",
-        "Pendiente de recepción",
-        "En revisión",
-      ],
+      enum: ["Sí", "No", "Faltan accesorios", "Pendiente de recepción", "En revisión"],
     },
     accesoriosFaltantesDetalle: { type: String }, // texto cuando "Faltan accesorios"
 
@@ -125,12 +110,7 @@ export const VerificacionSchema = new Schema(
       default: [],
     },
 
-    // --- Usuario y fechas de verificación ---
-    usuarioVerifico: {
-      type: Types.ObjectId,
-      ref: "User", // técnico de taller que verificó
-    },
-
+    // --- Fechas de verificación ---
     fechaVerificacionCompleta: { type: Date }, // día que se finalizó el control
 
     // --- Observaciones y estado general ---

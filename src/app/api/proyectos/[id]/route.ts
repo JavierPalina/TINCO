@@ -6,7 +6,6 @@ import { authOptions } from "@/lib/authOptions";
 import { getServerSession } from "next-auth";
 
 // ▶️ Tipos auxiliares
-
 type EstadoProyecto = (typeof ESTADOS_PROYECTO)[number];
 
 type EtapaNombre =
@@ -64,25 +63,30 @@ export async function PUT(
       );
     }
 
-    console.log(
-      "🟡 Estado actual antes de modificar:",
-      proyecto.estadoActual,
-      "visitaTecnica:",
-      proyecto.visitaTecnica,
-    );
+    console.log("🟡 Estado actual antes de modificar:", proyecto.estadoActual);
 
-    let proximoEstado: EstadoProyecto =
-      proyecto.estadoActual as EstadoProyecto;
+    // ✅ Si estadoActual viene null, arrancamos proximoEstado en null y sólo lo cambiamos si corresponde.
+    let proximoEstado: EstadoProyecto | null =
+      (proyecto.estadoActual as EstadoProyecto) ?? null;
 
     const proyectoDynamic = proyecto as unknown as ProyectoDynamic;
 
-    // 🔸 Caso 1: completar etapa del workflow (visitaTecnica, medicion, etc.)
-    if (
-      etapaACompletar &&
+    const isDatosObject =
       datosFormulario !== undefined &&
       typeof datosFormulario === "object" &&
-      !Array.isArray(datosFormulario)
-    ) {
+      datosFormulario !== null &&
+      !Array.isArray(datosFormulario);
+
+    // ✅ Caso A: si viene forzarEstado, lo aplicamos SIEMPRE (ideal para tu dialog)
+    if (forzarEstado && ESTADOS_PROYECTO.includes(forzarEstado)) {
+      console.log("🟠 Override manual de estado a:", forzarEstado);
+      proyecto.estadoActual = forzarEstado;
+      const proyectoActualizado = await proyecto.save();
+      return NextResponse.json({ success: true, data: proyectoActualizado });
+    }
+
+    // 🔸 Caso 1: completar etapa del workflow (visitaTecnica, medicion, etc.)
+    if (etapaACompletar && isDatosObject) {
       console.log("🟢 Caso workflow, etapaACompletar:", etapaACompletar);
 
       // Aseguramos que exista el subdoc
@@ -91,68 +95,55 @@ export async function PUT(
       }
 
       const etapa = proyectoDynamic[etapaACompletar];
-
       if (etapa) {
-        // merge de los datos del formulario
-        Object.assign(
-          etapa,
-          datosFormulario as Record<string, unknown>,
-        );
-
+        Object.assign(etapa, datosFormulario as Record<string, unknown>);
         etapa.estado = "Completado";
         etapa.fechaCompletado = new Date();
       }
 
-      // Narrowing de datos por etapa para los campos especiales
+      // Workflow: decidir próximo estado
       switch (etapaACompletar) {
-        case "visitaTecnica": {
+        case "visitaTecnica":
           proximoEstado = "Medición";
           break;
-        }
+
         case "medicion": {
-          const datosMedicion = datosFormulario as {
-            enviarAVerificacion?: string;
-          };
+          const datosMedicion = datosFormulario as { enviarAVerificacion?: string };
           if (datosMedicion.enviarAVerificacion === "Sí") {
             proximoEstado = "Verificación";
           }
           break;
         }
+
         case "verificacion": {
-          const datosVerificacion = datosFormulario as {
-            aprobadoParaProduccion?: string;
-          };
+          const datosVerificacion = datosFormulario as { aprobadoParaProduccion?: string };
           if (datosVerificacion.aprobadoParaProduccion === "Sí") {
             proximoEstado = "Taller";
           }
           break;
         }
+
         case "taller": {
           const datosTaller = datosFormulario as {
             pedidoListoParaEntrega?: string;
             destinoFinal?: EstadoProyecto;
           };
-          if (
-            datosTaller.pedidoListoParaEntrega === "Sí" &&
-            datosTaller.destinoFinal
-          ) {
+          if (datosTaller.pedidoListoParaEntrega === "Sí" && datosTaller.destinoFinal) {
             proximoEstado = datosTaller.destinoFinal;
           }
           break;
         }
+
         case "deposito": {
-          const datosDeposito = datosFormulario as {
-            estadoInterno?: string;
-          };
+          const datosDeposito = datosFormulario as { estadoInterno?: string };
           if (datosDeposito.estadoInterno === "Listo para entrega") {
             proximoEstado = "Logística";
           }
           break;
         }
+
         case "logistica": {
-          const datosLogistica = datosFormulario as {
-            estadoEntrega?: string;
-          };
+          const datosLogistica = datosFormulario as { estadoEntrega?: string };
           if (datosLogistica.estadoEntrega === "Entregado") {
             proximoEstado = "Completado";
           }
@@ -160,101 +151,48 @@ export async function PUT(
         }
       }
 
-      if (forzarEstado && ESTADOS_PROYECTO.includes(forzarEstado)) {
-        console.log("🟠 Override manual de estado a:", forzarEstado);
-        proximoEstado = forzarEstado;
+      if (proximoEstado) {
+        proyecto.estadoActual = proximoEstado as EstadoProyecto;
       }
 
-      proyecto.estadoActual = proximoEstado;
+      const proyectoActualizado = await proyecto.save();
+      console.log("✅ Proyecto guardado (workflow). estadoActual:", proyectoActualizado.estadoActual);
+      return NextResponse.json({ success: true, data: proyectoActualizado });
+    }
 
-      // 🔸 Caso 2: actualización genérica de una sub-doc sin workflow
-    } else if (
-      datosFormulario &&
-      typeof datosFormulario === "object" &&
-      !Array.isArray(datosFormulario)
-    ) {
+    // 🔸 Caso 2: actualización genérica de una sub-doc sin workflow
+    if (isDatosObject) {
       const datosGenericos = datosFormulario as Record<string, unknown>;
       const [etapaKey] = Object.keys(datosGenericos) as string[];
+      const subData = datosGenericos[etapaKey] as Record<string, unknown> | undefined;
 
-      const subData = datosGenericos[etapaKey] as
-        | Record<string, unknown>
-        | undefined;
-
-      console.log(
-        "🔵 Caso genérico sub-doc. etapaKey:",
-        etapaKey,
-        "subData:",
-        subData,
-      );
+      console.log("🔵 Caso genérico sub-doc. etapaKey:", etapaKey, "subData:", subData);
 
       if (etapaKey) {
-        // 👉 Si subData tiene campos → merge normal
         if (subData && Object.keys(subData).length > 0) {
-          console.log("🔹 Merge normal de subdoc", etapaKey);
-
-          const proyectoRecord =
-            proyecto as unknown as Record<string, unknown>;
-
-          const targetSubdoc = (proyectoRecord[etapaKey] ??
-            {}) as Record<string, unknown>;
-
+          const proyectoRecord = proyecto as unknown as Record<string, unknown>;
+          const targetSubdoc = (proyectoRecord[etapaKey] ?? {}) as Record<string, unknown>;
           Object.assign(targetSubdoc, subData);
           proyectoRecord[etapaKey] = targetSubdoc;
         } else {
-          // 👉 Objeto vacío → interpretamos como "borrar / vaciar" ese subdoc
-          console.log(
-            "🔻 Limpiando subdoc con $set",
-            etapaKey,
-            "en proyecto",
-            proyecto._id.toString(),
-          );
-
-          await Proyecto.updateOne(
-            { _id: proyecto._id },
-            { $set: { [etapaKey]: {} } },
-          );
-
+          console.log("🔻 Limpiando subdoc con $set", etapaKey, "en proyecto", proyecto._id.toString());
+          await Proyecto.updateOne({ _id: proyecto._id }, { $set: { [etapaKey]: {} } });
           const proyectoActualizado = await Proyecto.findById(proyecto._id);
-
-          const proyectoActualizadoRecord =
-            proyectoActualizado as unknown as Record<string, unknown>;
-
-          console.log(
-            "✅ Subdoc luego de limpiar:",
-            etapaKey,
-            proyectoActualizadoRecord[etapaKey],
-          );
-
-          return NextResponse.json({
-            success: true,
-            data: proyectoActualizado,
-          });
+          return NextResponse.json({ success: true, data: proyectoActualizado });
         }
       }
     }
 
-    // 🟢 Caso 3: cambio directo de estadoActual (como desde el botón "Finalizar")
-    if (
-      !etapaACompletar &&
-      (datosFormulario === undefined ||
-        (typeof datosFormulario === "object" &&
-          datosFormulario !== null &&
-          !Array.isArray(datosFormulario) &&
-          Object.keys(datosFormulario as Record<string, unknown>).length ===
-            0)) &&
-      estadoActual &&
-      ESTADOS_PROYECTO.includes(estadoActual)
-    ) {
+    // 🟢 Caso 3: cambio directo de estadoActual (si te llega explícito)
+    if (estadoActual && ESTADOS_PROYECTO.includes(estadoActual)) {
       console.log("🟢 Seteando estadoActual directo:", estadoActual);
       proyecto.estadoActual = estadoActual;
+      const proyectoActualizado = await proyecto.save();
+      return NextResponse.json({ success: true, data: proyectoActualizado });
     }
 
+    // ✅ Si no hubo nada que cambiar, devolvemos el proyecto actual (sin inventar estado)
     const proyectoActualizado = await proyecto.save();
-    console.log(
-      "✅ Proyecto guardado. estadoActual:",
-      proyectoActualizado.estadoActual,
-    );
-
     return NextResponse.json({ success: true, data: proyectoActualizado });
   } catch (error) {
     console.error("❌ Error en PUT /api/proyectos/[id]:", error);

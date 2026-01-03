@@ -1,4 +1,3 @@
-// /components/proyectos/VerificacionView.tsx
 "use client";
 
 import { useState } from "react";
@@ -32,12 +31,7 @@ type EtapaCotizacion = {
   color: string;
 };
 
-const NEXT_ESTADOS: string[] = [
-  "Taller",
-  "Depósito",
-  "Logística",
-  "Completado",
-];
+const NEXT_ESTADOS: string[] = ["Taller", "Depósito", "Logística", "Completado"];
 
 const getEstadoBadgeColor = (estado: string) => {
   switch (estado) {
@@ -61,7 +55,6 @@ const getEstadoBadgeColor = (estado: string) => {
 };
 
 // ---- Tipos auxiliares para evitar any ---- //
-
 type CotizacionRef =
   | string
   | {
@@ -74,21 +67,13 @@ interface ProyectoConCotizacion {
   cotizacion?: CotizacionRef;
 }
 
-type UsuarioVerifico =
-  | {
-      name?: string | null;
-      nombre?: string | null;
-    }
-  | string
-  | null
-  | undefined;
-
 type VerificacionData = {
   clienteObraEmpresa?: string;
   direccionObra?: string;
-  usuarioVerifico?: UsuarioVerifico;
+
   fechaRevisionPlano?: string | Date | null;
   fechaVerificacionCompleta?: string | Date | null;
+
   archivosPlanosCroquis?: string[];
 
   medidasVerificadas?: string;
@@ -154,9 +139,7 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
   const [isTerminatingProject, setIsTerminatingProject] = useState(false);
 
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
-  const [selectedNextEstado, setSelectedNextEstado] = useState<string | null>(
-    null,
-  );
+  const [selectedNextEstado, setSelectedNextEstado] = useState<string | null>(null);
   const [isMovingEstado, setIsMovingEstado] = useState(false);
 
   const v = (proyecto.verificacion ?? {}) as VerificacionData;
@@ -168,8 +151,7 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
     : [];
 
   const fechaRevisionPlano =
-    v.fechaRevisionPlano &&
-    !Number.isNaN(new Date(v.fechaRevisionPlano).getTime())
+    v.fechaRevisionPlano && !Number.isNaN(new Date(v.fechaRevisionPlano).getTime())
       ? new Date(v.fechaRevisionPlano).toLocaleDateString()
       : "-";
 
@@ -179,9 +161,7 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
       ? new Date(v.fechaVerificacionCompleta).toLocaleDateString()
       : "-";
 
-  const { data: etapasCotizacion, isLoading: isLoadingEtapas } = useQuery<
-    EtapaCotizacion[]
-  >({
+  const { data: etapasCotizacion, isLoading: isLoadingEtapas } = useQuery<EtapaCotizacion[]>({
     queryKey: ["etapasCotizacion"],
     queryFn: async () => {
       const { data } = await axios.get("/api/etapas-cotizacion");
@@ -204,15 +184,11 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
 
     const etapaId = findEtapaIdByNombre(nombreEtapa);
     if (!etapaId) {
-      toast.error(
-        `No se encontró la etapa "${nombreEtapa}" en el pipeline de cotizaciones.`,
-      );
+      toast.error(`No se encontró la etapa "${nombreEtapa}" en el pipeline de cotizaciones.`);
       return;
     }
 
-    await axios.put(`/api/cotizaciones/${cotizacionId}`, {
-      etapa: etapaId,
-    });
+    await axios.put(`/api/cotizaciones/${cotizacionId}`, { etapa: etapaId });
   };
 
   // 🔴 Eliminar SOLO la verificación
@@ -270,8 +246,7 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
       if (axios.isAxiosError(error)) {
         toast.error(
           "Error al eliminar el proyecto: " +
-            ((error.response?.data as { error?: string } | undefined)?.error ??
-              error.message),
+            ((error.response?.data as { error?: string } | undefined)?.error ?? error.message),
         );
       } else {
         toast.error(
@@ -304,8 +279,7 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
       if (axios.isAxiosError(error)) {
         toast.error(
           "Error al terminar el proyecto: " +
-            ((error.response?.data as { error?: string } | undefined)?.error ??
-              error.message),
+            ((error.response?.data as { error?: string } | undefined)?.error ?? error.message),
         );
       } else {
         toast.error(
@@ -341,8 +315,7 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
       if (axios.isAxiosError(error)) {
         toast.error(
           "Error al mover el proyecto: " +
-            ((error.response?.data as { error?: string } | undefined)?.error ??
-            error.message),
+            ((error.response?.data as { error?: string } | undefined)?.error ?? error.message),
         );
       } else {
         toast.error(
@@ -355,37 +328,24 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
     }
   };
 
-  const usuarioVerificoNombre =
-    (typeof v.usuarioVerifico === "string"
-      ? v.usuarioVerifico
-      : v.usuarioVerifico?.name || v.usuarioVerifico?.nombre) ?? "—";
-
   const direccionObra = v.direccionObra || vt.direccion || "—";
 
   return (
     <div className="space-y-8 text-sm">
       {/* Alert: Eliminar verificación */}
-      <AlertDialog
-        open={deleteVerificacionOpen}
-        onOpenChange={setDeleteVerificacionOpen}
-      >
+      <AlertDialog open={deleteVerificacionOpen} onOpenChange={setDeleteVerificacionOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              ¿Eliminar datos de verificación?
-            </AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar datos de verificación?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción eliminará todos los datos de la etapa de verificación
-              del proyecto <strong>{proyecto.numeroOrden}</strong>.
+              Esta acción eliminará todos los datos de la etapa de verificación del proyecto{" "}
+              <strong>{proyecto.numeroOrden}</strong>.
               <br />
-              El proyecto seguirá existiendo, pero la sección de verificación
-              quedará vacía.
+              El proyecto seguirá existiendo, pero la sección de verificación quedará vacía.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeletingVerificacion}>
-              Cancelar
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeletingVerificacion}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90"
               onClick={handleConfirmDeleteVerificacion}
@@ -408,28 +368,19 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
       </AlertDialog>
 
       {/* Alert: Eliminar proyecto */}
-      <AlertDialog
-        open={deleteProjectOpen}
-        onOpenChange={setDeleteProjectOpen}
-      >
+      <AlertDialog open={deleteProjectOpen} onOpenChange={setDeleteProjectOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              ¿Marcar proyecto como no realizado?
-            </AlertDialogTitle>
+            <AlertDialogTitle>¿Marcar proyecto como no realizado?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esto marcará el proyecto{" "}
-              <strong>{proyecto.numeroOrden}</strong> como{" "}
+              Esto marcará el proyecto <strong>{proyecto.numeroOrden}</strong> como{" "}
               <strong>Rechazado</strong> y moverá la cotización asociada a{" "}
-              <strong>&quot;Proyectos no realizados&quot;</strong> en el
-              pipeline de cotizaciones. Luego el proyecto se eliminará de la
-              base de datos.
+              <strong>&quot;Proyectos no realizados&quot;</strong> en el pipeline de cotizaciones. Luego el
+              proyecto se eliminará de la base de datos.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeletingProject}>
-              Cancelar
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeletingProject}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90"
               onClick={handleEliminarProyecto}
@@ -457,15 +408,13 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>¿A dónde querés pasar la orden?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción cambiará el estado del proyecto{" "}
-              <strong>{proyecto.numeroOrden}</strong> a la etapa seleccionada.
+              Esta acción cambiará el estado del proyecto <strong>{proyecto.numeroOrden}</strong> a la etapa
+              seleccionada.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
           <div className="space-y-2 py-2">
-            <p className="text-xs text-muted-foreground">
-              Seleccioná la siguiente etapa del flujo:
-            </p>
+            <p className="text-xs text-muted-foreground">Seleccioná la siguiente etapa del flujo:</p>
             <div className="flex flex-wrap gap-2">
               {NEXT_ESTADOS.map((estado) => {
                 const isActive = selectedNextEstado === estado;
@@ -520,17 +469,12 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
-          <h3 className="text-lg font-semibold">
-            Verificación – {proyecto.numeroOrden}
-          </h3>
+          <h3 className="text-lg font-semibold">Verificación – {proyecto.numeroOrden}</h3>
           <p className="text-xs text-muted-foreground">
-            Resumen de verificación de medidas, materiales y perfiles antes de
-            pasar a taller.
+            Resumen de verificación de medidas, materiales y perfiles antes de pasar a taller.
           </p>
         </div>
-        <Badge className={getEstadoBadgeColor(proyecto.estadoActual)}>
-          {proyecto.estadoActual}
-        </Badge>
+        <Badge className={getEstadoBadgeColor(proyecto.estadoActual)}>{proyecto.estadoActual}</Badge>
       </div>
 
       {/* Datos generales */}
@@ -555,16 +499,7 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
           </div>
 
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              Usuario que verificó
-            </p>
-            <p className="font-medium">{usuarioVerificoNombre}</p>
-          </div>
-
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              Fecha verificación completa
-            </p>
+            <p className="text-xs text-muted-foreground">Fecha verificación completa</p>
             <p className="font-medium">{fechaVerificacionCompleta}</p>
           </div>
         </div>
@@ -578,98 +513,65 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Medidas verificadas</p>
-            <p className="font-medium">
-              {v.medidasVerificadas || "No indicado"}
-            </p>
+            <p className="font-medium">{v.medidasVerificadas || "No indicado"}</p>
           </div>
 
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Fuente de medidas</p>
-            <p className="font-medium">
-              {v.fuenteMedidas || "No especificada"}
-            </p>
+            <p className="font-medium">{v.fuenteMedidas || "No especificada"}</p>
           </div>
 
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Planos revisados</p>
-            <p className="font-medium">
-              {v.planosRevisados || "No especificado"}
-            </p>
+            <p className="font-medium">{v.planosRevisados || "No especificado"}</p>
           </div>
 
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              Fecha revisión de plano
-            </p>
+            <p className="text-xs text-muted-foreground">Fecha revisión de plano</p>
             <p className="font-medium">{fechaRevisionPlano}</p>
           </div>
         </div>
 
-        {v.medidasVerificadas === "Observaciones" &&
-          v.medidasVerificadasObservaciones && (
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">
-                Observaciones sobre las medidas
-              </p>
-              <p className="font-medium whitespace-pre-line">
-                {v.medidasVerificadasObservaciones}
-              </p>
-            </div>
-          )}
+        {v.medidasVerificadas === "Observaciones" && v.medidasVerificadasObservaciones && (
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Observaciones sobre las medidas</p>
+            <p className="font-medium whitespace-pre-line">{v.medidasVerificadasObservaciones}</p>
+          </div>
+        )}
       </section>
 
       <Separator />
 
       {/* Materiales, lista y accesorios */}
       <section className="space-y-3">
-        <h3 className="text-lg font-semibold">
-          Materiales, lista y accesorios
-        </h3>
+        <h3 className="text-lg font-semibold">Materiales, lista y accesorios</h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              Materiales disponibles
-            </p>
-            <p className="font-medium">
-              {v.materialesDisponiblesEstado || "No indicado"}
-            </p>
+            <p className="text-xs text-muted-foreground">Materiales disponibles</p>
+            <p className="font-medium">{v.materialesDisponiblesEstado || "No indicado"}</p>
           </div>
 
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              Lista de materiales revisada
-            </p>
-            <p className="font-medium">
-              {v.listaMaterialesRevisada || "No indicado"}
-            </p>
+            <p className="text-xs text-muted-foreground">Lista de materiales revisada</p>
+            <p className="font-medium">{v.listaMaterialesRevisada || "No indicado"}</p>
           </div>
 
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Accesorios completos</p>
-            <p className="font-medium">
-              {v.accesoriosCompletosEstado || "No indicado"}
-            </p>
+            <p className="font-medium">{v.accesoriosCompletosEstado || "No indicado"}</p>
           </div>
 
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              Vidrios disponibles
-            </p>
-            <p className="font-medium">
-              {v.vidriosDisponiblesEstado || "No indicado"}
-            </p>
+            <p className="text-xs text-muted-foreground">Vidrios disponibles</p>
+            <p className="font-medium">{v.vidriosDisponiblesEstado || "No indicado"}</p>
           </div>
         </div>
 
         {v.materialesFaltantesDetalle && (
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              Detalle de materiales faltantes
-            </p>
-            <p className="font-medium whitespace-pre-line">
-              {v.materialesFaltantesDetalle}
-            </p>
+            <p className="text-xs text-muted-foreground">Detalle de materiales faltantes</p>
+            <p className="font-medium whitespace-pre-line">{v.materialesFaltantesDetalle}</p>
           </div>
         )}
 
@@ -678,20 +580,14 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
             <p className="text-xs text-muted-foreground">
               Materiales pendientes de ingreso – proveedor
             </p>
-            <p className="font-medium whitespace-pre-line">
-              {v.materialesProveedorPendiente}
-            </p>
+            <p className="font-medium whitespace-pre-line">{v.materialesProveedorPendiente}</p>
           </div>
         )}
 
         {v.accesoriosFaltantesDetalle && (
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              Detalle de accesorios faltantes
-            </p>
-            <p className="font-medium whitespace-pre-line">
-              {v.accesoriosFaltantesDetalle}
-            </p>
+            <p className="text-xs text-muted-foreground">Detalle de accesorios faltantes</p>
+            <p className="font-medium whitespace-pre-line">{v.accesoriosFaltantesDetalle}</p>
           </div>
         )}
       </section>
@@ -709,48 +605,28 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
           </div>
 
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              Tipo de perfil verificado
-            </p>
-            <p className="font-medium">
-              {v.tipoPerfilVerificado || "No indicado"}
-            </p>
+            <p className="text-xs text-muted-foreground">Tipo de perfil verificado</p>
+            <p className="font-medium">{v.tipoPerfilVerificado || "No indicado"}</p>
           </div>
 
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              Proveedor de perfil
-            </p>
-            <p className="font-medium">
-              {v.proveedorPerfil || "No indicado"}
-            </p>
+            <p className="text-xs text-muted-foreground">Proveedor de perfil</p>
+            <p className="font-medium">{v.proveedorPerfil || "No indicado"}</p>
           </div>
 
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              Estado de los perfiles
-            </p>
-            <p className="font-medium">
-              {v.estadoPerfiles || "No indicado"}
-            </p>
+            <p className="text-xs text-muted-foreground">Estado de los perfiles</p>
+            <p className="font-medium">{v.estadoPerfiles || "No indicado"}</p>
           </div>
 
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              Compatibilidad con herrajes
-            </p>
-            <p className="font-medium">
-              {v.compatibilidadHerrajes || "No indicado"}
-            </p>
+            <p className="text-xs text-muted-foreground">Compatibilidad con herrajes</p>
+            <p className="font-medium">{v.compatibilidadHerrajes || "No indicado"}</p>
           </div>
 
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              Medidas de vidrios confirmadas
-            </p>
-            <p className="font-medium">
-              {v.medidasVidriosConfirmadas || "No indicado"}
-            </p>
+            <p className="text-xs text-muted-foreground">Medidas de vidrios confirmadas</p>
+            <p className="font-medium">{v.medidasVidriosConfirmadas || "No indicado"}</p>
           </div>
 
           <div className="space-y-1">
@@ -760,9 +636,7 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
 
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Estado de color</p>
-            <p className="font-medium">
-              {v.estadoColor || "No indicado"}
-            </p>
+            <p className="font-medium">{v.estadoColor || "No indicado"}</p>
           </div>
         </div>
       </section>
@@ -800,34 +674,22 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
 
       {/* Observaciones y estado general */}
       <section className="space-y-3">
-        <h3 className="text-lg font-semibold">
-          Resultado de la verificación
-        </h3>
+        <h3 className="text-lg font-semibold">Resultado de la verificación</h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              Estado general de la verificación
-            </p>
-            <p className="font-medium">
-              {v.estadoGeneralVerificacion || "No indicado"}
-            </p>
+            <p className="text-xs text-muted-foreground">Estado general de la verificación</p>
+            <p className="font-medium">{v.estadoGeneralVerificacion || "No indicado"}</p>
           </div>
 
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              Aprobado para producción
-            </p>
-            <p className="font-medium">
-              {v.aprobadoParaProduccion || "No indicado"}
-            </p>
+            <p className="text-xs text-muted-foreground">Aprobado para producción</p>
+            <p className="font-medium">{v.aprobadoParaProduccion || "No indicado"}</p>
           </div>
         </div>
 
         <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">
-            Observaciones de verificación
-          </p>
+          <p className="text-xs text-muted-foreground">Observaciones de verificación</p>
           <p className="font-medium whitespace-pre-line">
             {v.observacionesVerificacion || "Sin observaciones."}
           </p>
@@ -838,9 +700,7 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
 
       {/* Acciones */}
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold text-muted-foreground">
-          Acciones sobre el proyecto
-        </h3>
+        <h3 className="text-sm font-semibold text-muted-foreground">Acciones sobre el proyecto</h3>
         <div className="flex flex-wrap gap-2">
           {/* Finalizar → elegir estado destino */}
           <Button

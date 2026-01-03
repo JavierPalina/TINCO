@@ -1,7 +1,16 @@
-import type { NextConfig } from "next";
+// next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  images: {
+    remotePatterns: [
+      // Cloudinary (para tus avatares)
+      { protocol: "https", hostname: "res.cloudinary.com" },
 
-const nextConfig: NextConfig = {
-  /* config options here */
+      // Si seguís usando el placeholder remoto de shadcn:
+      { protocol: "https", hostname: "github.com" },
+      { protocol: "https", hostname: "avatars.githubusercontent.com" },
+    ],
+  },
 };
 
-export default nextConfig;
+module.exports = nextConfig;

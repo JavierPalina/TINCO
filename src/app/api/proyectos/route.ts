@@ -28,25 +28,44 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
-    // antes solo leías "estado"
     const estado = searchParams.get('estado');
-    const estadosParam = searchParams.get('estados'); // 👈 nuevo: CSV con varios estados
+    const estadosParam = searchParams.get('estados'); // CSV con varios estados
+    const sinEstado = searchParams.get('sinEstado'); // "1" para incluir null/empty
 
     const filtro: Record<string, unknown> = {};
 
+    // Parse estados
+    let estadosArray: string[] = [];
     if (estadosParam) {
-      // ej: "Visita Técnica,Medición,Verificación"
-      const estadosArray = estadosParam
+      estadosArray = estadosParam
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
+    }
 
-      if (estadosArray.length) {
-        filtro.estadoActual = { $in: estadosArray };
-      }
+    // Armamos condiciones combinables
+    const conditions: any[] = [];
+
+    if (estadosArray.length) {
+      conditions.push({ estadoActual: { $in: estadosArray } });
     } else if (estado) {
-      // compatibilidad con lo que ya tenías
-      filtro.estadoActual = estado;
+      conditions.push({ estadoActual: estado });
+    }
+
+    if (sinEstado === '1') {
+      conditions.push({
+        $or: [
+          { estadoActual: { $exists: false } },
+          { estadoActual: null },
+          { estadoActual: '' },
+        ],
+      });
+    }
+
+    if (conditions.length === 1) {
+      Object.assign(filtro, conditions[0]);
+    } else if (conditions.length > 1) {
+      filtro.$or = conditions;
     }
 
     const proyectos = await Proyecto.find(filtro)
@@ -95,16 +114,16 @@ export async function POST(request: NextRequest) {
     if (cotizacionId) {
       const cotizacion = await Cotizacion.findById(cotizacionId);
       if (cotizacion && cotizacion.vendedor) {
-        // asumimos que vendedor es un ObjectId o string compatible con el esquema de Proyecto
         vendedorId = cotizacion.vendedor.toString();
       }
     }
 
+    // ✅ Se crea SIN estadoActual
     const nuevoProyecto = await Proyecto.create({
       cliente: clienteId,
       cotizacion: cotizacionId,
       vendedor: vendedorId,
-      estadoActual: 'Visita Técnica',
+      estadoActual: null,
     });
 
     return NextResponse.json(
