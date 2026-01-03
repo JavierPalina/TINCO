@@ -4,15 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { useParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { IProyecto } from "@/models/Proyecto"; // Ajusta la ruta si es necesario
+import { IProyecto } from "@/models/Proyecto";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// Importamos los 6 componentes de formulario (nos darán error hasta que los creemos)
-// import { FormVisitaTecnica } from '@/components/proyectos/FormVisitaTecnica';
+// import { FormVisitaTecnica } from "@/components/proyectos/FormVisitaTecnica";
 import MedicionFormModal from "@/components/proyectos/FormMedicion";
 import VerificacionFormModal from "@/components/proyectos/FormVerificacion";
-import FormTaller from "@/components/proyectos/FormTaller"
+import FormTaller from "@/components/proyectos/FormTaller";
 import FormDeposito from "@/components/proyectos/FormDeposito";
 import FormLogistica from "@/components/proyectos/FormLogistica";
 
@@ -41,15 +40,21 @@ type ClientePopulado = {
   direccion?: string;
 };
 
+function getDefaultTab(estadoActual: unknown): string {
+  // estado puede venir null/undefined o incluso con espacios
+  const key =
+    typeof estadoActual === "string" && estadoActual.trim() !== ""
+      ? estadoActual.trim()
+      : "";
+
+  return estadoATab[key] ?? "visita-tecnica";
+}
+
 export default function ProyectoDetallePage() {
   const params = useParams();
   const projectId = params.id as string;
 
-  const {
-    data: proyecto,
-    isLoading,
-    isError,
-  } = useQuery({
+  const { data: proyecto, isLoading, isError } = useQuery({
     queryKey: ["proyecto", projectId],
     queryFn: () => fetchProyecto(projectId),
     enabled: !!projectId,
@@ -71,7 +76,7 @@ export default function ProyectoDetallePage() {
     );
   }
 
-  const defaultTab = estadoATab[proyecto.estadoActual] || "visita-tecnica";
+  const defaultTab = getDefaultTab(proyecto.estadoActual);
 
   // casteamos el cliente a un tipo seguro (sin any)
   const cliente = proyecto.cliente as ClientePopulado | null;
@@ -79,31 +84,31 @@ export default function ProyectoDetallePage() {
   return (
     <div className="container mx-auto py-10">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold">
-          Proyecto: {proyecto.numeroOrden}
-        </h1>
+        <h1 className="text-3xl font-bold">Proyecto: {proyecto.numeroOrden}</h1>
+
         <div className="flex flex-col md:flex-row gap-4 text-lg mt-2">
           <span>
             Cliente:{" "}
-            <span className="font-semibold">
-              {cliente?.nombreCompleto ?? "—"}
-            </span>
+            <span className="font-semibold">{cliente?.nombreCompleto ?? "—"}</span>
           </span>
+
           <span>
             Teléfono:{" "}
-            <span className="font-semibold">
-              {cliente?.telefono ?? "—"}
-            </span>
+            <span className="font-semibold">{cliente?.telefono ?? "—"}</span>
           </span>
+
           <span>
             Dirección:{" "}
-            <span className="font-semibold">
-              {cliente?.direccion ?? "—"}
-            </span>
+            <span className="font-semibold">{cliente?.direccion ?? "—"}</span>
           </span>
-          <span>
-            Estado:{" "}
-            <Badge className="text-lg">{proyecto.estadoActual}</Badge>
+
+          <span className="inline-flex items-center gap-2">
+            Estado:
+            <Badge className="text-lg">
+              {typeof proyecto.estadoActual === "string" && proyecto.estadoActual.trim() !== ""
+                ? proyecto.estadoActual
+                : "Sin estado"}
+            </Badge>
           </span>
         </div>
       </div>
@@ -134,9 +139,9 @@ export default function ProyectoDetallePage() {
           <FormTaller proyecto={proyecto} />
         </TabsContent>
 
-        {/* <TabsContent value="deposito" className="mt-4">
+        <TabsContent value="deposito" className="mt-4">
           <FormDeposito proyecto={proyecto} />
-        </TabsContent> */}
+        </TabsContent>
 
         <TabsContent value="logistica" className="mt-4">
           <FormLogistica proyecto={proyecto} />
