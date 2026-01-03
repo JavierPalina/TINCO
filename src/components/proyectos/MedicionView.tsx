@@ -4,7 +4,6 @@
 import { useState } from "react";
 import axios from "axios";
 import { useQuery } from "@tanstack/react-query";
-import { IProyecto } from "@/models/Proyecto";
 import { ProyectoDTO } from "@/types/proyecto";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -120,6 +119,14 @@ type CotizacionRefLike =
   | null
   | undefined;
 
+type HasToString = { toString: () => string };
+
+const hasToString = (v: unknown): v is HasToString =>
+  typeof v === "object" &&
+  v !== null &&
+  "toString" in v &&
+  typeof (v as HasToString).toString === "function";
+
 const getCotizacionIdFromProyecto = (
   proyecto: { cotizacion?: CotizacionRefLike } | null | undefined,
 ): string | null => {
@@ -133,7 +140,7 @@ const getCotizacionIdFromProyecto = (
     const id = (cot as { _id?: unknown })._id;
 
     if (typeof id === "string") return id;
-    if (id && typeof id === "object" && "toString" in id) return (id as any).toString();
+    if (hasToString(id)) return id.toString();
 
     return null;
   }
