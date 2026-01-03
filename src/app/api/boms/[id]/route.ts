@@ -1,15 +1,17 @@
 // src/app/api/boms/[id]/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Bom from "@/models/Bom";
 import { zUpdateBom } from "@/lib/validation/stock";
 
-type Context = { params: { id: string } };
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
 
-export async function GET(_req: Request, { params }: Context) {
+export async function GET(_req: NextRequest, { params }: RouteContext) {
   await dbConnect();
 
-  const id = params.id;
+  const { id } = await params;
   if (!id) {
     return NextResponse.json({ ok: false, error: "Missing id" }, { status: 400 });
   }
@@ -22,10 +24,10 @@ export async function GET(_req: Request, { params }: Context) {
   return NextResponse.json({ ok: true, data: bom });
 }
 
-export async function PUT(req: Request, { params }: Context) {
+export async function PUT(req: NextRequest, { params }: RouteContext) {
   await dbConnect();
 
-  const id = params.id;
+  const { id } = await params;
   if (!id) {
     return NextResponse.json({ ok: false, error: "Missing id" }, { status: 400 });
   }
