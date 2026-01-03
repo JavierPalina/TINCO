@@ -42,7 +42,8 @@ const NEXT_ESTADOS: string[] = [
   "Logística",
 ];
 
-const getEstadoBadgeColor = (estado: string) => {
+const getEstadoBadgeColor = (estado?: string | null) => {
+  if (!estado) return "bg-gray-400 hover:bg-gray-500";
   switch (estado) {
     case "Taller":
       return "bg-orange-500 hover:bg-orange-600";
@@ -377,6 +378,8 @@ export function VisitaTecnicaView({ proyecto, onDeleted }: Props) {
       ? vt.asignadoA
       : vt.asignadoA?.name) ?? "Sin asignar";
 
+  const estadoLabel = proyecto.estadoActual ?? "Sin estado";
+
   return (
     <div className="space-y-8 text-sm">
       {/* Alert para confirmar eliminación de VISITA TÉCNICA */}
@@ -538,7 +541,7 @@ export function VisitaTecnicaView({ proyecto, onDeleted }: Props) {
           </p>
         </div>
         <Badge className={getEstadoBadgeColor(proyecto.estadoActual)}>
-          {proyecto.estadoActual}
+          {estadoLabel}
         </Badge>
       </div>
 
