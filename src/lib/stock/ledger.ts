@@ -1,3 +1,4 @@
+// src/lib/stock/ledger.ts
 import mongoose from "mongoose";
 import StockBalance from "@/models/StockBalance";
 import StockMovement from "@/models/StockMovement";
@@ -5,12 +6,22 @@ import Item from "@/models/Item";
 
 type Ref = { kind: string; id: string } | undefined;
 
-function balKey(itemId: mongoose.Types.ObjectId, warehouseId: mongoose.Types.ObjectId, locationId?: mongoose.Types.ObjectId) {
+function balKey(
+  itemId: mongoose.Types.ObjectId,
+  warehouseId: mongoose.Types.ObjectId,
+  locationId?: mongoose.Types.ObjectId,
+) {
   return { itemId, warehouseId, ...(locationId ? { locationId } : {}) };
 }
 
-async function getOrCreateBalance(session: mongoose.ClientSession, itemId: any, warehouseId: any, locationId?: any) {
+async function getOrCreateBalance(
+  session: mongoose.ClientSession,
+  itemId: mongoose.Types.ObjectId,
+  warehouseId: mongoose.Types.ObjectId,
+  locationId?: mongoose.Types.ObjectId,
+) {
   const filter = balKey(itemId, warehouseId, locationId);
+
   const existing = await StockBalance.findOne(filter).session(session);
   if (existing) return existing;
 
@@ -25,6 +36,7 @@ async function getOrCreateBalance(session: mongoose.ClientSession, itemId: any, 
     ],
     { session },
   );
+
   return created[0];
 }
 
@@ -56,7 +68,9 @@ export async function applyMovement(params: {
     const bal = await getOrCreateBalance(session, itemId, warehouseId, locationId);
 
     // regla: no permitir available negativo en OUT / ADJUST negativo
-    const deltaOnHand = params.type === "IN" ? params.qty : params.type === "OUT" ? -params.qty : params.qty;
+    const deltaOnHand =
+      params.type === "IN" ? params.qty : params.type === "OUT" ? -params.qty : params.qty;
+
     const newOnHand = bal.onHand + deltaOnHand;
     const newAvailable = newOnHand - bal.reserved;
 
@@ -113,6 +127,7 @@ export async function applyTransfer(params: {
 }) {
   const session = await mongoose.startSession();
   session.startTransaction();
+
   try {
     const itemId = new mongoose.Types.ObjectId(params.itemId);
 
@@ -181,6 +196,7 @@ export async function applyReservation(params: {
 }) {
   const session = await mongoose.startSession();
   session.startTransaction();
+
   try {
     const whId = new mongoose.Types.ObjectId(params.warehouseId);
 
@@ -192,6 +208,7 @@ export async function applyReservation(params: {
 
       const deltaReserved = params.action === "RESERVE" ? line.qty : -line.qty;
       const newReserved = bal.reserved + deltaReserved;
+
       if (newReserved < 0) throw new Error("Reserved no puede ser negativo");
 
       const newAvailable = bal.onHand - newReserved;

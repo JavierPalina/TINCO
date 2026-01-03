@@ -3,6 +3,22 @@ import dbConnect from "@/lib/dbConnect";
 import StockReservation from "@/models/StockReservation";
 import { applyReservation } from "@/lib/stock/ledger";
 
+type ReservationLineShape = {
+  itemId: { toString(): string } | string;
+  qty: number;
+  uom: string;
+};
+
+function errorMessage(e: unknown) {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  try {
+    return JSON.stringify(e);
+  } catch {
+    return "Error";
+  }
+}
+
 export async function POST(_req: Request, ctx: { params: { id: string } }) {
   await dbConnect();
 
@@ -13,14 +29,16 @@ export async function POST(_req: Request, ctx: { params: { id: string } }) {
   }
 
   try {
+    const lines = (reservation.lines as unknown as ReservationLineShape[]).map((l) => ({
+      itemId: typeof l.itemId === "string" ? l.itemId : l.itemId.toString(),
+      qty: l.qty,
+      uom: l.uom,
+    }));
+
     await applyReservation({
       action: "UNRESERVE",
       warehouseId: reservation.warehouseId.toString(),
-      lines: reservation.lines.map((l: any) => ({
-        itemId: l.itemId.toString(),
-        qty: l.qty,
-        uom: l.uom,
-      })),
+      lines,
       ref: reservation.ref,
       note: "Release reservation",
     });
@@ -29,7 +47,7 @@ export async function POST(_req: Request, ctx: { params: { id: string } }) {
     await reservation.save();
 
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? "Error" }, { status: 400 });
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 400 });
   }
 }

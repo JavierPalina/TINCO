@@ -1,3 +1,4 @@
+// src/components/stock/ItemsTable.tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -8,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Item = {
   _id: string;
@@ -19,15 +21,33 @@ type Item = {
   active: boolean;
 };
 
+type ItemForm = {
+  type: Item["type"];
+  sku: string;
+  name: string;
+  category: string;
+  uom: Item["uom"];
+};
+
+function getErrorMessage(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    const apiMsg = (err.response?.data as { error?: unknown } | undefined)?.error;
+    if (typeof apiMsg === "string") return apiMsg;
+  }
+  if (err instanceof Error) return err.message;
+  return "Error";
+}
+
 export function ItemsTable() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [form, setForm] = useState({
-    type: "COMPONENT" as Item["type"],
+
+  const [form, setForm] = useState<ItemForm>({
+    type: "COMPONENT",
     sku: "",
     name: "",
     category: "Perfil",
-    uom: "UN" as Item["uom"],
+    uom: "UN",
   });
 
   const queryKey = useMemo(() => ["items", search], [search]);
@@ -52,7 +72,7 @@ export function ItemsTable() {
       setForm((p) => ({ ...p, sku: "", name: "" }));
       qc.invalidateQueries({ queryKey: ["items"] });
     },
-    onError: (e: any) => toast.error(e?.response?.data?.error ?? "Error creando item"),
+    onError: (e: unknown) => toast.error(getErrorMessage(e)),
   });
 
   return (
@@ -65,7 +85,7 @@ export function ItemsTable() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
           <Input
             value={form.sku}
             onChange={(e) => setForm((p) => ({ ...p, sku: e.target.value }))}
@@ -81,21 +101,33 @@ export function ItemsTable() {
             onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
             placeholder="Categoría"
           />
-          <Input
-            value={form.type}
-            onChange={(e) => setForm((p) => ({ ...p, type: e.target.value as any }))}
-            placeholder="Tipo (FINISHED/COMPONENT/SERVICE)"
-          />
-          <div className="flex gap-2">
-            <Input
-              value={form.uom}
-              onChange={(e) => setForm((p) => ({ ...p, uom: e.target.value as any }))}
-              placeholder="UOM (UN/M/M2/KG)"
-            />
-            <Button onClick={() => createMutation.mutate()} disabled={!form.sku || !form.name || createMutation.isPending}>
-              Crear
-            </Button>
-          </div>
+
+          <Select value={form.type} onValueChange={(v) => setForm((p) => ({ ...p, type: v as Item["type"] }))}>
+            <SelectTrigger>
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="FINISHED">Producto terminado (FINISHED)</SelectItem>
+              <SelectItem value="COMPONENT">Componente (COMPONENT)</SelectItem>
+              <SelectItem value="SERVICE">Servicio (SERVICE)</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={form.uom} onValueChange={(v) => setForm((p) => ({ ...p, uom: v as Item["uom"] }))}>
+            <SelectTrigger>
+              <SelectValue placeholder="UOM" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="UN">UN</SelectItem>
+              <SelectItem value="M">M</SelectItem>
+              <SelectItem value="M2">M2</SelectItem>
+              <SelectItem value="KG">KG</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button onClick={() => createMutation.mutate()} disabled={!form.sku || !form.name || createMutation.isPending}>
+            {createMutation.isPending ? "Creando..." : "Crear"}
+          </Button>
         </div>
 
         <div className="border rounded-md overflow-hidden">
@@ -119,6 +151,7 @@ export function ItemsTable() {
                   <TableCell>{i.uom}</TableCell>
                 </TableRow>
               ))}
+
               {(data ?? []).length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">

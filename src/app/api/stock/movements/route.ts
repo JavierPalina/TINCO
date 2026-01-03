@@ -3,15 +3,31 @@ import dbConnect from "@/lib/dbConnect";
 import StockMovement from "@/models/StockMovement";
 import { zCreateMovement } from "@/lib/validation/stock";
 import { applyMovement, applyTransfer } from "@/lib/stock/ledger";
+import type { FilterQuery } from "mongoose";
+
+type MovementFilterShape = {
+  itemId?: string;
+  warehouseId?: string;
+};
+
+function errorMessage(e: unknown) {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  try {
+    return JSON.stringify(e);
+  } catch {
+    return "Error";
+  }
+}
 
 export async function GET(req: Request) {
   await dbConnect();
   const { searchParams } = new URL(req.url);
 
-  const itemId = searchParams.get("itemId")?.trim();
-  const warehouseId = searchParams.get("warehouseId")?.trim();
+  const itemId = searchParams.get("itemId")?.trim() || undefined;
+  const warehouseId = searchParams.get("warehouseId")?.trim() || undefined;
 
-  const filter: any = {};
+  const filter: FilterQuery<MovementFilterShape> = {};
   if (itemId) filter.itemId = itemId;
   if (warehouseId) filter.warehouseId = warehouseId;
 
@@ -28,6 +44,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   await dbConnect();
   const body = await req.json();
+
   const parsed = zCreateMovement.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: parsed.error.flatten() }, { status: 400 });
@@ -66,7 +83,7 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? "Error" }, { status: 400 });
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 400 });
   }
 }

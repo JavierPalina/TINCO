@@ -67,6 +67,19 @@ function formatDateTimeAR(iso: string) {
   };
 }
 
+function isMovementTypeFilter(v: string): v is MovementTypeFilter {
+  return (
+    v === "all" ||
+    v === "IN" ||
+    v === "OUT" ||
+    v === "ADJUST" ||
+    v === "TRANSFER" ||
+    v === "RESERVE" ||
+    v === "UNRESERVE" ||
+    v === "PRODUCE"
+  );
+}
+
 export default function StockMovementsPage() {
   const [warehouseId, setWarehouseId] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<MovementTypeFilter>("all");
@@ -81,10 +94,11 @@ export default function StockMovementsPage() {
   const { data, isFetching } = useQuery<Movement[]>({
     queryKey,
     queryFn: async () => {
-      const params: any = {};
+      const params: Record<string, string | boolean> = {};
       if (warehouseId !== "all") params.warehouseId = warehouseId;
+
       const { data } = await axios.get("/api/stock/movements", { params });
-      return data.data;
+      return data.data as Movement[];
     },
     placeholderData: keepPreviousData,
   });
@@ -171,7 +185,6 @@ export default function StockMovementsPage() {
           const t = row.original.type;
           const main = row.original.warehouseId?.name ?? "-";
 
-          // Para transferencias, mostrar origen → destino de forma explícita
           if (t === "TRANSFER") {
             const from = row.original.fromWarehouseId?.name ?? "Origen";
             const to = row.original.toWarehouseId?.name ?? "Destino";
@@ -211,9 +224,7 @@ export default function StockMovementsPage() {
           row.original.ref?.kind ? (
             <div className="text-xs">
               <div className="font-medium">{row.original.ref.kind}</div>
-              <div className="text-muted-foreground truncate max-w-[220px]">
-                {row.original.ref.id || "-"}
-              </div>
+              <div className="text-muted-foreground truncate max-w-[220px]">{row.original.ref.id || "-"}</div>
             </div>
           ) : (
             <span className="text-muted-foreground">-</span>
@@ -282,7 +293,12 @@ export default function StockMovementsPage() {
 
               <div className="flex items-center gap-2">
                 <div className="text-sm font-medium">Tipo</div>
-                <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as MovementTypeFilter)}>
+                <Select
+                  value={typeFilter}
+                  onValueChange={(v) => {
+                    if (isMovementTypeFilter(v)) setTypeFilter(v);
+                  }}
+                >
                   <SelectTrigger className="w-[260px]">
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>

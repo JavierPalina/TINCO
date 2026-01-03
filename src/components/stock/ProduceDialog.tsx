@@ -1,3 +1,4 @@
+// src/components/stock/ProduceDialog.tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -23,11 +24,30 @@ type Warehouse = { _id: string; name: string };
 type Location = { _id: string; code: string; warehouseId: string };
 type Item = { _id: string; sku: string; name: string; uom: string; type: string };
 
+type ProducePayload = {
+  finishedItemId: string;
+  warehouseId: string;
+  locationId?: string;
+  qty: number;
+  note?: string;
+};
+
 const NONE_LOCATION = "__none__"; // sentinel: Radix SelectItem no permite value=""
 
 function toNumberSafe(v: string) {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
+}
+
+function getErrorMessage(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    const apiMsg = (err.response?.data as { error?: unknown } | undefined)?.error;
+    if (typeof apiMsg === "string") return apiMsg;
+    // si tu API devuelve { error: { ... } } (ej zod flatten), lo convertimos a string
+    if (apiMsg) return "Error de validación";
+  }
+  if (err instanceof Error) return err.message;
+  return "Error";
 }
 
 export function ProduceDialog({ onDone }: { onDone?: () => void }) {
@@ -67,7 +87,10 @@ export function ProduceDialog({ onDone }: { onDone?: () => void }) {
     enabled: !!warehouseId,
   });
 
-  const selected = useMemo(() => items?.find((i) => i._id === finishedItemId), [items, finishedItemId]);
+  const selected = useMemo(
+    () => items?.find((i) => i._id === finishedItemId),
+    [items, finishedItemId],
+  );
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -76,13 +99,15 @@ export function ProduceDialog({ onDone }: { onDone?: () => void }) {
       const q = toNumberSafe(qty);
       if (q <= 0) throw new Error("Cantidad inválida");
 
-      await axios.post("/api/stock/produce", {
+      const payload: ProducePayload = {
         finishedItemId,
         warehouseId,
         locationId: locationId || undefined,
         qty: q,
         note: note.trim() || undefined,
-      });
+      };
+
+      await axios.post("/api/stock/produce", payload);
     },
     onSuccess: () => {
       toast.success("Producción registrada");
@@ -91,9 +116,8 @@ export function ProduceDialog({ onDone }: { onDone?: () => void }) {
       setOpen(false);
       onDone?.();
     },
-    onError: (e: any) => {
-      const msg = e?.response?.data?.error ?? e?.message ?? "Error";
-      toast.error(msg);
+    onError: (e: unknown) => {
+      toast.error(getErrorMessage(e));
     },
   });
 

@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { StockPageHeader } from "@/components/stock/StockPageHeader";
 import { DataTablePro } from "@/components/stock/DataTablePro";
 import { ExportCsvButton } from "@/components/stock/ExportCsvButton";
-import { FilterChipsBar } from "@/components/stock/FilterChipsBar";
+import { FilterChipsBar, type Chip } from "@/components/stock/FilterChipsBar";
 
 type Item = {
   _id: string;
@@ -27,6 +27,7 @@ type Item = {
 };
 
 type TypeFilter = "all" | "RAW" | "COMPONENT" | "FINISHED";
+type ActiveFilter = "all" | "true" | "false";
 
 function typeLabel(t: string) {
   const map: Record<string, string> = {
@@ -38,7 +39,6 @@ function typeLabel(t: string) {
 }
 
 function typeBadge(t: string) {
-  // Mantengo variants simples (sin inventar colores) y consistentemente “sobrios”.
   const map: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
     FINISHED: { label: "Producto terminado", variant: "default" },
     COMPONENT: { label: "Componente", variant: "secondary" },
@@ -47,28 +47,38 @@ function typeBadge(t: string) {
   return map[t] ?? { label: t, variant: "outline" };
 }
 
+function isTypeFilter(v: string): v is TypeFilter {
+  return v === "all" || v === "RAW" || v === "COMPONENT" || v === "FINISHED";
+}
+
+function isActiveFilter(v: string): v is ActiveFilter {
+  return v === "all" || v === "true" || v === "false";
+}
+
 export default function StockItemsPage() {
   const [type, setType] = useState<TypeFilter>("all");
-  const [active, setActive] = useState<"all" | "true" | "false">("all");
+  const [active, setActive] = useState<ActiveFilter>("all");
 
   const queryKey = useMemo(() => ["itemsList", type, active], [type, active]);
 
   const { data, isFetching } = useQuery<Item[]>({
     queryKey,
     queryFn: async () => {
-      const params: any = {};
+      const params: Record<string, string | boolean> = {};
       if (type !== "all") params.type = type;
       if (active !== "all") params.active = active === "true";
+
       const { data } = await axios.get("/api/items", { params });
-      return data.data;
+      return data.data as Item[];
     },
     placeholderData: keepPreviousData,
   });
 
   const rows = data ?? [];
 
-  const chips = useMemo(() => {
-    const arr: any[] = [];
+  const chips = useMemo<Chip[]>(() => {
+    const arr: Chip[] = [];
+
     if (type !== "all") {
       arr.push({
         key: "type",
@@ -77,6 +87,7 @@ export default function StockItemsPage() {
         onRemove: () => setType("all"),
       });
     }
+
     if (active !== "all") {
       arr.push({
         key: "active",
@@ -85,6 +96,7 @@ export default function StockItemsPage() {
         onRemove: () => setActive("all"),
       });
     }
+
     return arr;
   }, [type, active]);
 
@@ -105,9 +117,7 @@ export default function StockItemsPage() {
                 <Badge variant={b.variant} className="whitespace-nowrap">
                   {b.label}
                 </Badge>
-                {!row.original.isActive ? (
-                  <span className="text-xs text-muted-foreground">Inactivo</span>
-                ) : null}
+                {!row.original.isActive ? <span className="text-xs text-muted-foreground">Inactivo</span> : null}
               </div>
             </div>
           );
@@ -137,11 +147,7 @@ export default function StockItemsPage() {
         header: "Estado",
         accessorFn: (r) => (r.isActive ? "Activo" : "Inactivo"),
         cell: ({ row }) =>
-          row.original.isActive ? (
-            <Badge variant="secondary">Activo</Badge>
-          ) : (
-            <Badge variant="outline">Inactivo</Badge>
-          ),
+          row.original.isActive ? <Badge variant="secondary">Activo</Badge> : <Badge variant="outline">Inactivo</Badge>,
       },
       {
         id: "createdAt",
@@ -202,7 +208,12 @@ export default function StockItemsPage() {
               <div className="flex flex-col md:flex-row md:items-center gap-2">
                 <div className="flex items-center gap-2">
                   <div className="text-sm font-medium">Tipo</div>
-                  <Select value={type} onValueChange={(v) => setType(v as TypeFilter)}>
+                  <Select
+                    value={type}
+                    onValueChange={(v) => {
+                      if (isTypeFilter(v)) setType(v);
+                    }}
+                  >
                     <SelectTrigger className="w-[240px]">
                       <SelectValue placeholder="Todos" />
                     </SelectTrigger>
@@ -217,7 +228,12 @@ export default function StockItemsPage() {
 
                 <div className="flex items-center gap-2">
                   <div className="text-sm font-medium">Estado</div>
-                  <Select value={active} onValueChange={(v) => setActive(v as any)}>
+                  <Select
+                    value={active}
+                    onValueChange={(v) => {
+                      if (isActiveFilter(v)) setActive(v);
+                    }}
+                  >
                     <SelectTrigger className="w-[220px]">
                       <SelectValue placeholder="Todos" />
                     </SelectTrigger>

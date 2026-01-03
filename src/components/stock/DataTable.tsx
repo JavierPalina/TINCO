@@ -1,3 +1,4 @@
+// src/components/stock/DataTable.tsx
 "use client";
 
 import * as React from "react";
@@ -18,11 +19,16 @@ import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SlidersHorizont
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 type Props<TData> = {
-  columns: ColumnDef<TData, any>[];
+  columns: ColumnDef<TData, unknown>[];
   data: TData[];
   isLoading?: boolean;
   searchPlaceholder?: string;
@@ -50,7 +56,8 @@ export function DataTable<TData>({
   const table = useReactTable({
     data,
     columns,
-    getRowId: getRowId as any,
+    // wrapper para evitar casts a any
+    getRowId: getRowId ? (row, index) => getRowId(row, index) : undefined,
     state: { sorting, columnFilters, globalFilter, columnVisibility },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
@@ -153,20 +160,40 @@ export function DataTable<TData>({
           </div>
 
           <div className="flex items-center gap-1 justify-end">
-            <Button variant="outline" size="icon" onClick={() => table.setPageIndex(0)} disabled={!table.getCanPreviousPage()}>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => table.setPageIndex(0)}
+              disabled={!table.getCanPreviousPage()}
+            >
               <ChevronsLeft className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+            >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <div className="px-2 text-xs text-muted-foreground">
               Página <span className="font-medium">{table.getState().pagination.pageIndex + 1}</span> de{" "}
               <span className="font-medium">{table.getPageCount()}</span>
             </div>
-            <Button variant="outline" size="icon" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+            >
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon" onClick={() => table.setPageIndex(table.getPageCount() - 1)} disabled={!table.getCanNextPage()}>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+              disabled={!table.getCanNextPage()}
+            >
               <ChevronsRight className="h-4 w-4" />
             </Button>
           </div>

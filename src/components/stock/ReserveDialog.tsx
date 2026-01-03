@@ -1,3 +1,4 @@
+// src/components/stock/ReserveDialog.tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -17,13 +18,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Warehouse = { _id: string; name: string };
 type Item = { _id: string; sku: string; name: string; uom: "UN" | "M" | "M2" | "KG"; type: string };
@@ -33,6 +28,18 @@ type Line = { itemId: string; qty: string; uom: Item["uom"] };
 function toNumberSafe(v: string) {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
+}
+
+function getErrorMessage(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    // tu API suele devolver { error: string } o { error: {...} }
+    const data = err.response?.data as { error?: unknown } | undefined;
+    if (typeof data?.error === "string") return data.error;
+    if (data?.error) return "Error de validación";
+    return err.message || "Error";
+  }
+  if (err instanceof Error) return err.message;
+  return "Error";
 }
 
 export function ReserveDialog({
@@ -55,7 +62,16 @@ export function ReserveDialog({
   const open = controlledOpen ?? openUncontrolled;
   const setOpen = onOpenChange ?? setOpenUncontrolled;
 
-  // en reset():
+  const qc = useQueryClient();
+
+  const [warehouseId, setWarehouseId] = useState("");
+  const [refKind, setRefKind] = useState("PROJECT");
+  const [refId, setRefId] = useState("");
+  const [note, setNote] = useState("");
+
+  const [itemSearch, setItemSearch] = useState("");
+  const [lines, setLines] = useState<Line[]>([{ itemId: "", qty: "1", uom: "UN" }]);
+
   function reset() {
     setWarehouseId(defaults?.warehouseId ?? "");
     setRefKind(defaults?.refKind ?? "PROJECT");
@@ -68,15 +84,6 @@ export function ReserveDialog({
         : [{ itemId: "", qty: "1", uom: "UN" as const }],
     );
   }
-  const qc = useQueryClient();
-
-  const [warehouseId, setWarehouseId] = useState("");
-  const [refKind, setRefKind] = useState("PROJECT");
-  const [refId, setRefId] = useState("");
-  const [note, setNote] = useState("");
-
-  const [itemSearch, setItemSearch] = useState("");
-  const [lines, setLines] = useState<Line[]>([{ itemId: "", qty: "1", uom: "UN" }]);
 
   const { data: warehouses } = useQuery<Warehouse[]>({
     queryKey: ["warehouses"],
@@ -85,7 +92,8 @@ export function ReserveDialog({
 
   const { data: items } = useQuery<Item[]>({
     queryKey: ["items", itemSearch],
-    queryFn: async () => (await axios.get("/api/items", { params: { search: itemSearch, active: true } })).data.data,
+    queryFn: async () =>
+      (await axios.get("/api/items", { params: { search: itemSearch, active: true } })).data.data,
   });
 
   const selectedItemById = useMemo(() => {
@@ -124,14 +132,19 @@ export function ReserveDialog({
       setOpen(false);
       onDone?.();
     },
-    onError: (e: any) => {
-      const msg = e?.response?.data?.error ?? e?.message ?? "Error";
-      toast.error(msg);
+    onError: (e: unknown) => {
+      toast.error(getErrorMessage(e));
     },
   });
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (v) reset(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (v) reset();
+      }}
+    >
       <DialogTrigger asChild>
         <Button variant="outline">Nueva reserva</Button>
       </DialogTrigger>
@@ -139,9 +152,7 @@ export function ReserveDialog({
       <DialogContent className="sm:max-w-[720px]">
         <DialogHeader>
           <DialogTitle>Crear reserva</DialogTitle>
-          <DialogDescription>
-            Reserva stock disponible en un depósito. Afecta reserved/available.
-          </DialogDescription>
+          <DialogDescription>Reserva stock disponible en un depósito. Afecta reserved/available.</DialogDescription>
         </DialogHeader>
 
         <Card>
@@ -162,10 +173,16 @@ export function ReserveDialog({
                   </SelectContent>
                 </Select>
               </div>
+
               <div>
                 <label className="text-xs text-muted-foreground">Ref kind</label>
-                <Input value={refKind} onChange={(e) => setRefKind(e.target.value)} placeholder="PROJECT / QUOTE / MANUAL" />
+                <Input
+                  value={refKind}
+                  onChange={(e) => setRefKind(e.target.value)}
+                  placeholder="PROJECT / QUOTE / MANUAL"
+                />
               </div>
+
               <div>
                 <label className="text-xs text-muted-foreground">Ref id</label>
                 <Input value={refId} onChange={(e) => setRefId(e.target.value)} placeholder="ID externo" />
@@ -174,7 +191,11 @@ export function ReserveDialog({
 
             <div>
               <label className="text-xs text-muted-foreground">Buscar item</label>
-              <Input value={itemSearch} onChange={(e) => setItemSearch(e.target.value)} placeholder="Buscar por SKU o nombre..." />
+              <Input
+                value={itemSearch}
+                onChange={(e) => setItemSearch(e.target.value)}
+                placeholder="Buscar por SKU o nombre..."
+              />
             </div>
 
             <div className="space-y-2">
@@ -188,7 +209,9 @@ export function ReserveDialog({
                         value={l.itemId}
                         onValueChange={(v) => {
                           const picked = items?.find((x) => x._id === v);
-                          setLines((prev) => prev.map((p, i) => (i === idx ? { ...p, itemId: v, uom: picked?.uom ?? p.uom } : p)));
+                          setLines((prev) =>
+                            prev.map((p, i) => (i === idx ? { ...p, itemId: v, uom: picked?.uom ?? p.uom } : p)),
+                          );
                         }}
                       >
                         <SelectTrigger>
@@ -202,14 +225,21 @@ export function ReserveDialog({
                           ))}
                         </SelectContent>
                       </Select>
-                      {it && <div className="text-xs text-muted-foreground mt-1">UOM: <span className="font-semibold">{it.uom}</span></div>}
+
+                      {it ? (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          UOM: <span className="font-semibold">{it.uom}</span>
+                        </div>
+                      ) : null}
                     </div>
 
                     <div className="md:col-span-1">
                       <label className="text-xs text-muted-foreground">Qty</label>
                       <Input
                         value={l.qty}
-                        onChange={(e) => setLines((prev) => prev.map((p, i) => (i === idx ? { ...p, qty: e.target.value } : p)))}
+                        onChange={(e) =>
+                          setLines((prev) => prev.map((p, i) => (i === idx ? { ...p, qty: e.target.value } : p)))
+                        }
                         placeholder="1"
                       />
                     </div>
@@ -219,6 +249,7 @@ export function ReserveDialog({
                         <label className="text-xs text-muted-foreground">UOM</label>
                         <Input value={l.uom} readOnly />
                       </div>
+
                       <Button
                         type="button"
                         variant="destructive"
@@ -250,8 +281,12 @@ export function ReserveDialog({
         </Card>
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>Crear reserva</Button>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancelar
+          </Button>
+          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+            Crear reserva
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,3 +1,4 @@
+// src/components/stock/ReservationsTable.tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -26,6 +27,13 @@ type Reservation = {
 type KindFilter = "PROJECT" | "QUOTE" | "MANUAL" | "PO" | "SO";
 type StatusFilter = "all" | "ACTIVE" | "RELEASED";
 
+type ReservationsQueryParams = {
+  kind: KindFilter;
+  refId?: string;
+  status?: Exclude<StatusFilter, "all">;
+  warehouseId?: string;
+};
+
 function formatDateTimeAR(iso: string) {
   const d = new Date(iso);
   return {
@@ -40,6 +48,16 @@ function statusBadge(status: string) {
     RELEASED: { label: "Liberada", variant: "secondary" },
   };
   return map[status] ?? { label: status, variant: "outline" };
+}
+
+function getErrorMessage(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    const apiMsg = (err.response?.data as { error?: unknown } | undefined)?.error;
+    if (typeof apiMsg === "string") return apiMsg;
+    if (apiMsg) return "Error de validación";
+  }
+  if (err instanceof Error) return err.message;
+  return "Error";
 }
 
 export function ReservationsTable() {
@@ -63,15 +81,10 @@ export function ReservationsTable() {
   const { data, isFetching } = useQuery<Reservation[]>({
     queryKey,
     queryFn: async () => {
-      const params: any = { kind };
+      const params: ReservationsQueryParams = { kind };
 
-      // refId: si está vacío, no filtrar por id
       if (refId.trim()) params.refId = refId.trim();
-
-      // status: "all" no filtra
       if (status !== "all") params.status = status;
-
-      // warehouseId: "all" no filtra
       if (warehouseId !== "all") params.warehouseId = warehouseId;
 
       const { data } = await axios.get("/api/stock/reservations", { params });
@@ -134,7 +147,7 @@ export function ReservationsTable() {
       qc.invalidateQueries({ queryKey: ["stockBalances"] });
       qc.invalidateQueries({ queryKey: ["movements"] });
     },
-    onError: (e: any) => toast.error(e?.response?.data?.error ?? "Error liberando reserva"),
+    onError: (e: unknown) => toast.error(getErrorMessage(e)),
   });
 
   return (
@@ -214,6 +227,8 @@ export function ReservationsTable() {
           {rows.map((r) => {
             const s = statusBadge(r.status);
             const dt = formatDateTimeAR(r.createdAt);
+
+            // Nota: isPending es global a la mutation, no por fila. Si querés “Liberando...” por fila, guardá el id actual en state.
             const canRelease = r.status === "ACTIVE" && !releaseMutation.isPending;
 
             return (
@@ -253,9 +268,7 @@ export function ReservationsTable() {
                       <li key={idx} className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="text-sm font-medium">{l.itemId?.sku ?? "-"}</div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {l.itemId?.name ?? "-"}
-                          </div>
+                          <div className="text-xs text-muted-foreground truncate">{l.itemId?.name ?? "-"}</div>
                         </div>
                         <div className="text-sm tabular-nums font-semibold whitespace-nowrap">
                           {l.qty} <span className="text-muted-foreground font-normal">{l.uom}</span>

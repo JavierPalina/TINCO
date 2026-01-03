@@ -1,3 +1,4 @@
+// src/components/stock/MovementDialog.tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -17,13 +18,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Warehouse = { _id: string; name: string };
 type Location = { _id: string; code: string; warehouseId: string };
@@ -31,11 +26,47 @@ type Item = { _id: string; sku: string; name: string; uom: "UN" | "M" | "M2" | "
 
 type MovementType = "IN" | "OUT" | "ADJUST" | "TRANSFER";
 
+type RefPayload = { kind: string; id: string };
+
+type TransferPayload = {
+  type: "TRANSFER";
+  itemId: string;
+  uom: Item["uom"];
+  qty: number;
+  from: { warehouseId: string; locationId?: string };
+  to: { warehouseId: string; locationId?: string };
+  note?: string;
+  ref?: RefPayload;
+};
+
+type SimpleMovementPayload = {
+  type: Exclude<MovementType, "TRANSFER">;
+  itemId: string;
+  warehouseId: string;
+  locationId?: string;
+  qty: number; // ADJUST permite +/- (lo validás con tu lógica)
+  uom: Item["uom"];
+  unitCost?: number; // sólo IN
+  note?: string;
+  ref?: RefPayload;
+};
+
+type CreateMovementPayload = TransferPayload | SimpleMovementPayload;
+
 const NONE_LOCATION = "__none__"; // sentinel: Radix SelectItem no permite value=""
 
 function toNumberSafe(v: string) {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
+}
+
+function getErrorMessage(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    const apiMsg = (err.response?.data as { error?: unknown } | undefined)?.error;
+    if (typeof apiMsg === "string") return apiMsg;
+  }
+  if (err instanceof Error) return err.message;
+  return "Error";
 }
 
 export function MovementDialog({
@@ -48,7 +79,7 @@ export function MovementDialog({
   open?: boolean;
   onOpenChange?: (v: boolean) => void;
   defaults?: {
-    type?: "IN" | "OUT" | "ADJUST" | "TRANSFER";
+    type?: MovementType;
     itemId?: string;
     warehouseId?: string;
     locationId?: string;
@@ -97,7 +128,7 @@ export function MovementDialog({
     },
   });
 
-  const locationsKey = useMemo(() => ["locationsByWarehouse", warehouseId], [warehouseId]);
+  const locationsKey = useMemo(() => ["locationsByWarehouse", warehouseId] as const, [warehouseId]);
   const { data: locationsForWarehouse } = useQuery<Location[]>({
     queryKey: locationsKey,
     queryFn: async () => {
@@ -136,22 +167,23 @@ export function MovementDialog({
     mutationFn: async () => {
       const qtyNum = toNumberSafe(qty);
 
-      const ref = refId.trim()
+      const ref: RefPayload | undefined = refId.trim()
         ? { kind: refKind.trim() || "MANUAL", id: refId.trim() }
         : undefined;
 
       if (!itemId) throw new Error("Seleccioná un item");
-      if (qtyNum <= 0) throw new Error("Cantidad inválida");
+      if (qtyNum === 0 || !Number.isFinite(qtyNum)) throw new Error("Cantidad inválida");
 
-      const uomFinal = selectedItem?.uom ?? uom;
+      const uomFinal: Item["uom"] = selectedItem?.uom ?? uom;
 
       if (type === "TRANSFER") {
         if (!fromWarehouseId || !toWarehouseId) throw new Error("Seleccioná depósitos de origen y destino");
         if (fromWarehouseId === toWarehouseId && (fromLocationId || "") === (toLocationId || "")) {
           throw new Error("Transferencia inválida: origen y destino iguales");
         }
+        if (qtyNum <= 0) throw new Error("Cantidad inválida");
 
-        await axios.post("/api/stock/movements", {
+        const payload: TransferPayload = {
           type: "TRANSFER",
           itemId,
           uom: uomFinal,
@@ -160,13 +192,18 @@ export function MovementDialog({
           to: { warehouseId: toWarehouseId, locationId: toLocationId || undefined },
           note: note.trim() || undefined,
           ref,
-        });
+        };
+
+        await axios.post("/api/stock/movements", payload);
         return;
       }
 
       if (!warehouseId) throw new Error("Seleccioná un depósito");
 
-      const payload: any = {
+      // ADJUST admite negativo/positivo; IN/OUT deben ser > 0
+      if (type !== "ADJUST" && qtyNum <= 0) throw new Error("Cantidad inválida");
+
+      const payload: SimpleMovementPayload = {
         type,
         itemId,
         warehouseId,
@@ -178,9 +215,11 @@ export function MovementDialog({
       };
 
       const costNum = unitCost.trim() ? toNumberSafe(unitCost) : undefined;
-      if (typeof costNum === "number" && costNum >= 0 && type === "IN") payload.unitCost = costNum;
+      if (typeof costNum === "number" && Number.isFinite(costNum) && costNum >= 0 && type === "IN") {
+        payload.unitCost = costNum;
+      }
 
-      await axios.post("/api/stock/movements", payload);
+      await axios.post("/api/stock/movements", payload as CreateMovementPayload);
     },
     onSuccess: () => {
       toast.success("Movimiento registrado");
@@ -189,9 +228,8 @@ export function MovementDialog({
       setOpen(false);
       onDone?.();
     },
-    onError: (e: any) => {
-      const msg = e?.response?.data?.error ?? e?.message ?? "Error";
-      toast.error(msg);
+    onError: (e: unknown) => {
+      toast.error(getErrorMessage(e));
     },
   });
 
@@ -228,9 +266,7 @@ export function MovementDialog({
       <DialogContent className="sm:max-w-[720px]">
         <DialogHeader>
           <DialogTitle>Registrar movimiento de stock</DialogTitle>
-          <DialogDescription>
-            Ingreso, egreso, ajuste o transferencia entre depósitos/ubicaciones.
-          </DialogDescription>
+          <DialogDescription>Ingreso, egreso, ajuste o transferencia entre depósitos/ubicaciones.</DialogDescription>
         </DialogHeader>
 
         <Card>
@@ -253,11 +289,7 @@ export function MovementDialog({
 
               <div className="md:col-span-3">
                 <label className="text-xs text-muted-foreground">Buscar item</label>
-                <Input
-                  value={itemSearch}
-                  onChange={(e) => setItemSearch(e.target.value)}
-                  placeholder="Buscar por SKU o nombre..."
-                />
+                <Input value={itemSearch} onChange={(e) => setItemSearch(e.target.value)} placeholder="Buscar por SKU o nombre..." />
               </div>
             </div>
 
@@ -293,14 +325,8 @@ export function MovementDialog({
               </div>
 
               <div className="md:col-span-1">
-                <label className="text-xs text-muted-foreground">
-                  {type === "ADJUST" ? "Cantidad (+/-)" : "Cantidad"}
-                </label>
-                <Input
-                  value={qty}
-                  onChange={(e) => setQty(e.target.value)}
-                  placeholder={type === "ADJUST" ? "-2 / 3" : "1"}
-                />
+                <label className="text-xs text-muted-foreground">{type === "ADJUST" ? "Cantidad (+/-)" : "Cantidad"}</label>
+                <Input value={qty} onChange={(e) => setQty(e.target.value)} placeholder={type === "ADJUST" ? "-2 / 3" : "1"} />
               </div>
             </div>
 
@@ -351,12 +377,7 @@ export function MovementDialog({
 
                 <div>
                   <label className="text-xs text-muted-foreground">Costo unitario (solo IN)</label>
-                  <Input
-                    value={unitCost}
-                    onChange={(e) => setUnitCost(e.target.value)}
-                    placeholder="0"
-                    disabled={type !== "IN"}
-                  />
+                  <Input value={unitCost} onChange={(e) => setUnitCost(e.target.value)} placeholder="0" disabled={type !== "IN"} />
                 </div>
               </div>
             ) : (
@@ -460,11 +481,7 @@ export function MovementDialog({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
                 <label className="text-xs text-muted-foreground">Ref kind (opcional)</label>
-                <Input
-                  value={refKind}
-                  onChange={(e) => setRefKind(e.target.value)}
-                  placeholder="MANUAL / PO / PROJECT ..."
-                />
+                <Input value={refKind} onChange={(e) => setRefKind(e.target.value)} placeholder="MANUAL / PO / PROJECT ..." />
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">Ref id (opcional)</label>

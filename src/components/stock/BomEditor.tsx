@@ -1,3 +1,4 @@
+// src/components/stock/BomEditor.tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -13,13 +14,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 type Item = { _id: string; sku: string; name: string; type: string; uom: string };
 
+type BomLine = { componentItemId: Item; qty: number; uom: string };
+
 type Bom = {
   _id: string;
   finishedItemId: Item;
   version: number;
   active: boolean;
-  lines: { componentItemId: Item; qty: number; uom: string }[];
+  lines: BomLine[];
 };
+
+type ApiOk<T> = { ok: true; data: T };
+type ApiErr = { ok: false; error?: unknown };
+type ApiResp<T> = ApiOk<T> | ApiErr;
 
 function toNumberSafe(v: string) {
   const n = Number(v);
@@ -28,6 +35,26 @@ function toNumberSafe(v: string) {
 
 function itemLabel(i: Item) {
   return `${i.sku} · ${i.name}`;
+}
+
+function getErrorMessage(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    const d = err.response?.data as { error?: unknown } | undefined;
+    if (typeof d?.error === "string") return d.error;
+    if (d?.error && typeof d.error === "object") {
+      // zod flatten u otras estructuras
+      try {
+        return JSON.stringify(d.error);
+      } catch {
+        /* ignore */
+      }
+    }
+    if (typeof err.message === "string" && err.message.trim()) return err.message;
+    return "Error de red / servidor";
+  }
+  if (err instanceof Error) return err.message || "Error";
+  if (typeof err === "string") return err;
+  return "Error";
 }
 
 export function BomEditor() {
@@ -41,32 +68,32 @@ export function BomEditor() {
   const [componentSearch, setComponentSearch] = useState("");
   const [componentItemId, setComponentItemId] = useState<string>("");
 
-  // Campos de la línea (por ahora 1 línea como tu MVP)
+  // Campos de la línea (MVP: 1 línea)
   const [qty, setQty] = useState("1");
   const [uom, setUom] = useState("UN");
 
-  // Versión (sugerencia: autocalcular a partir de la última)
+  // Versión (si está vacío, se sugiere la próxima)
   const [version, setVersion] = useState<string>("");
 
   // Items FINISHED para elegir
   const { data: finishedItems, isFetching: fetchingFinished } = useQuery<Item[]>({
     queryKey: ["items", "finished", finishedSearch],
     queryFn: async () => {
-      const { data } = await axios.get("/api/items", {
+      const res = await axios.get<ApiResp<Item[]>>("/api/items", {
         params: { search: finishedSearch, active: true, type: "FINISHED" },
       });
-      return data.data;
+      return (res.data as ApiOk<Item[]>).data ?? [];
     },
   });
 
-  // Items para componentes (no fuerzo type porque depende de tu modelo, pero podés filtrarlo)
+  // Items para componentes (activos; si querés, podés filtrar por type=RAW/COMPONENT)
   const { data: componentItems, isFetching: fetchingComponents } = useQuery<Item[]>({
     queryKey: ["items", "components", componentSearch],
     queryFn: async () => {
-      const { data } = await axios.get("/api/items", {
+      const res = await axios.get<ApiResp<Item[]>>("/api/items", {
         params: { search: componentSearch, active: true },
       });
-      return data.data;
+      return (res.data as ApiOk<Item[]>).data ?? [];
     },
   });
 
@@ -75,8 +102,8 @@ export function BomEditor() {
   const { data: boms, isFetching: fetchingBoms } = useQuery<Bom[]>({
     queryKey,
     queryFn: async () => {
-      const { data } = await axios.get("/api/boms", { params: { finishedItemId } });
-      return data.data;
+      const res = await axios.get<ApiResp<Bom[]>>("/api/boms", { params: { finishedItemId } });
+      return (res.data as ApiOk<Bom[]>).data ?? [];
     },
     placeholderData: keepPreviousData,
     enabled: !!finishedItemId,
@@ -90,14 +117,12 @@ export function BomEditor() {
 
   const activeBom = useMemo(() => sortedBoms.find((b) => b.active), [sortedBoms]);
 
-  // Autopropone la próxima versión
   const suggestedNextVersion = useMemo(() => {
     if (!sortedBoms.length) return 1;
     const maxV = Math.max(...sortedBoms.map((b) => b.version));
     return maxV + 1;
   }, [sortedBoms]);
 
-  // Si el usuario no tocó version manualmente, sugerimos la próxima
   const effectiveVersion = version.trim() ? toNumberSafe(version) : suggestedNextVersion;
 
   const selectedFinished = useMemo(
@@ -110,8 +135,6 @@ export function BomEditor() {
     [componentItems, componentItemId],
   );
 
-  // Mantener UOM consistente al elegir componente (si querés usar UOM del componente)
-  // En BOM normalmente se expresa en UOM del componente, así que esto ayuda.
   function onPickComponent(id: string) {
     setComponentItemId(id);
     const it = componentItems?.find((x) => x._id === id);
@@ -133,12 +156,14 @@ export function BomEditor() {
         lines: [{ componentItemId, qty: q, uom: String(uom).trim() }],
       };
 
-      const { data } = await axios.post("/api/boms", payload);
-      return data.data;
+      const res = await axios.post<ApiResp<Bom>>("/api/boms", payload);
+      if (!("ok" in res.data) || res.data.ok !== true) throw new Error("Error creando BOM");
+      return res.data.data;
     },
     onSuccess: () => {
       toast.success("BOM creada");
       qc.invalidateQueries({ queryKey: ["boms"] });
+
       // UX: limpiar línea pero mantener finishedItemId
       setComponentItemId("");
       setComponentSearch("");
@@ -146,7 +171,9 @@ export function BomEditor() {
       setUom("UN");
       setVersion("");
     },
-    onError: (e: any) => toast.error(e?.response?.data?.error ?? e?.message ?? "Error creando BOM"),
+    onError: (err: unknown) => {
+      toast.error(getErrorMessage(err));
+    },
   });
 
   return (
@@ -172,7 +199,6 @@ export function BomEditor() {
               value={finishedItemId}
               onValueChange={(v) => {
                 setFinishedItemId(v);
-                // Reseteos por cambio de finished
                 setComponentItemId("");
                 setComponentSearch("");
                 setQty("1");
@@ -294,14 +320,18 @@ export function BomEditor() {
             <div>
               <div className="text-sm font-semibold">Versiones existentes</div>
               <div className="text-xs text-muted-foreground mt-1">
-                {finishedItemId
-                  ? "Listado de versiones para el producto seleccionado."
-                  : "Seleccioná un producto terminado para listar sus BOMs."}
+                {finishedItemId ? "Listado de versiones para el producto seleccionado." : "Seleccioná un producto terminado para listar sus BOMs."}
               </div>
             </div>
 
             <div className="text-xs text-muted-foreground">
-              {finishedItemId && (fetchingBoms ? "Actualizando..." : sortedBoms.length ? `${sortedBoms.length} versiones` : "0 versiones")}
+              {finishedItemId
+                ? fetchingBoms
+                  ? "Actualizando..."
+                  : sortedBoms.length
+                    ? `${sortedBoms.length} versiones`
+                    : "0 versiones"
+                : ""}
             </div>
           </div>
 

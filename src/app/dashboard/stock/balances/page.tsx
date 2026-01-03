@@ -1,5 +1,4 @@
 // app/dashboard/stock/balances/page.tsx
-
 "use client";
 
 import { useMemo, useState } from "react";
@@ -34,9 +33,11 @@ type BalanceRow = {
   updatedAt: string;
 };
 
+type OnlyLow = "all" | "low";
+
 export default function StockBalancesPage() {
   const [warehouseId, setWarehouseId] = useState<string>("all");
-  const [onlyLow, setOnlyLow] = useState<"all" | "low">("all"); // low = available <= 0
+  const [onlyLow, setOnlyLow] = useState<OnlyLow>("all"); // low = available <= 0
 
   const { data: warehouses } = useQuery<Warehouse[]>({
     queryKey: ["warehouses"],
@@ -48,37 +49,42 @@ export default function StockBalancesPage() {
   const { data, isFetching } = useQuery<BalanceRow[]>({
     queryKey,
     queryFn: async () => {
-      const params: any = {};
+      // sin `any`: tipamos params como Record<string, string>
+      const params: Record<string, string> = {};
       if (warehouseId !== "all") params.warehouseId = warehouseId;
+
       const { data } = await axios.get("/api/stock/balances", { params });
-      return data.data;
+      return data.data as BalanceRow[];
     },
     placeholderData: keepPreviousData,
   });
 
-  const baseRows = data ?? [];
-
+  // Evita warning: no dependas de `baseRows` externo
   const rows = useMemo(() => {
-    if (onlyLow === "low") return baseRows.filter((r) => r.available <= 0);
-    return baseRows;
-  }, [baseRows, onlyLow]);
+    const base = data ?? [];
+    if (onlyLow === "low") return base.filter((r) => r.available <= 0);
+    return base;
+  }, [data, onlyLow]);
 
   const totals = useMemo(() => {
     const skuSet = new Set<string>();
     let onHand = 0;
     let reserved = 0;
     let available = 0;
+
     for (const r of rows) {
       skuSet.add(r.item._id);
       onHand += r.onHand;
       reserved += r.reserved;
       available += r.available;
     }
+
     return { totalSkus: skuSet.size, onHand, reserved, available };
   }, [rows]);
 
   const chips = useMemo(() => {
-    const arr = [];
+    const arr: Array<{ key: string; label: string; value: string; onRemove: () => void }> = [];
+
     if (warehouseId !== "all") {
       const name = warehouses?.find((w) => w._id === warehouseId)?.name ?? warehouseId;
       arr.push({
@@ -88,6 +94,7 @@ export default function StockBalancesPage() {
         onRemove: () => setWarehouseId("all"),
       });
     }
+
     if (onlyLow === "low") {
       arr.push({
         key: "low",
@@ -96,6 +103,7 @@ export default function StockBalancesPage() {
         onRemove: () => setOnlyLow("all"),
       });
     }
+
     return arr;
   }, [warehouseId, onlyLow, warehouses]);
 
@@ -143,11 +151,7 @@ export default function StockBalancesPage() {
         header: "Estado",
         accessorFn: (r) => (r.available <= 0 ? "Faltante" : "OK"),
         cell: ({ row }) =>
-          row.original.available <= 0 ? (
-            <Badge variant="destructive">Faltante</Badge>
-          ) : (
-            <Badge variant="secondary">OK</Badge>
-          ),
+          row.original.available <= 0 ? <Badge variant="destructive">Faltante</Badge> : <Badge variant="secondary">OK</Badge>,
       },
       {
         id: "onHand",
@@ -165,11 +169,7 @@ export default function StockBalancesPage() {
         id: "available",
         header: () => <div className="text-right">Disponible</div>,
         accessorFn: (r) => r.available,
-        cell: ({ row }) => (
-          <div className="text-right tabular-nums font-semibold">
-            {row.original.available}
-          </div>
-        ),
+        cell: ({ row }) => <div className="text-right tabular-nums font-semibold">{row.original.available}</div>,
       },
       {
         id: "actions",
@@ -205,7 +205,11 @@ export default function StockBalancesPage() {
       <StockPageHeader
         title="Balances"
         description="Operación por SKU y depósito. Disponible = Físico - Reservado."
-        breadcrumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Stock", href: "/dashboard/stock/balances" }, { label: "Balances" }]}
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Stock", href: "/dashboard/stock/balances" },
+          { label: "Balances" },
+        ]}
         actions={
           <div className="flex gap-2">
             <ReserveDialog />
@@ -254,7 +258,10 @@ export default function StockBalancesPage() {
                   </SelectContent>
                 </Select>
 
-                <Select value={onlyLow} onValueChange={(v) => setOnlyLow(v as any)}>
+                <Select
+                  value={onlyLow}
+                  onValueChange={(v: OnlyLow) => setOnlyLow(v)}
+                >
                   <SelectTrigger className="w-[220px]">
                     <SelectValue placeholder="Estado" />
                   </SelectTrigger>
@@ -266,11 +273,7 @@ export default function StockBalancesPage() {
               </div>
             }
             toolbarRight={
-              <ExportCsvButton
-                filename={`balances_${warehouseId}_${onlyLow}.csv`}
-                rows={rows}
-                columns={exportCols}
-              />
+              <ExportCsvButton filename={`balances_${warehouseId}_${onlyLow}.csv`} rows={rows} columns={exportCols} />
             }
           />
         </CardContent>

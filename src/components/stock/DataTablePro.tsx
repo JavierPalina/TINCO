@@ -1,3 +1,4 @@
+// src/components/stock/DataTablePro.tsx
 "use client";
 
 import * as React from "react";
@@ -12,24 +13,11 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import {
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  SlidersHorizontal,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SlidersHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -40,7 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 type Props<TData> = {
-  columns: ColumnDef<TData, any>[];
+  columns: ColumnDef<TData, unknown>[];
   data: TData[];
   isLoading?: boolean;
   searchPlaceholder?: string;
@@ -48,8 +36,8 @@ type Props<TData> = {
   initialPageSize?: number;
   emptyTitle?: string;
   emptyDesc?: string;
-  toolbarLeft?: React.ReactNode;   // filtros / selects
-  toolbarRight?: React.ReactNode;  // acciones / export
+  toolbarLeft?: React.ReactNode; // filtros / selects
+  toolbarRight?: React.ReactNode; // acciones / export
 };
 
 export function DataTablePro<TData>({
@@ -71,7 +59,8 @@ export function DataTablePro<TData>({
   const table = useReactTable({
     data,
     columns,
-    getRowId: getRowId as any,
+    // wrapper para evitar casts a any
+    getRowId: getRowId ? (row, index) => getRowId(row, index) : undefined,
     state: { sorting, globalFilter, columnVisibility },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
@@ -139,9 +128,7 @@ export function DataTablePro<TData>({
                 <TableRow key={hg.id}>
                   {hg.headers.map((header) => (
                     <TableHead key={header.id} className="whitespace-nowrap">
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
+                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -152,7 +139,7 @@ export function DataTablePro<TData>({
               {isLoading ? (
                 Array.from({ length: 10 }).map((_, idx) => (
                   <TableRow key={`sk-${idx}`}>
-                    {columns.map((c, j) => (
+                    {columns.map((_, j) => (
                       <TableCell key={`skc-${idx}-${j}`}>
                         <Skeleton className="h-4 w-full" />
                       </TableCell>
@@ -210,12 +197,7 @@ export function DataTablePro<TData>({
               Página <span className="font-medium">{table.getState().pagination.pageIndex + 1}</span> de{" "}
               <span className="font-medium">{table.getPageCount()}</span>
             </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-            >
+            <Button variant="outline" size="icon" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
               <ChevronRight className="h-4 w-4" />
             </Button>
             <Button

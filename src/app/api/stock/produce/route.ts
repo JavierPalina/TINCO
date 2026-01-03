@@ -4,9 +4,26 @@ import Bom from "@/models/Bom";
 import { zProduce } from "@/lib/validation/stock";
 import { applyMovement } from "@/lib/stock/ledger";
 
+type BomLineShape = {
+  componentItemId: { toString(): string } | string;
+  qty: number;
+  uom: string;
+};
+
+function errorMessage(e: unknown) {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  try {
+    return JSON.stringify(e);
+  } catch {
+    return "Error";
+  }
+}
+
 export async function POST(req: Request) {
   await dbConnect();
   const body = await req.json();
+
   const parsed = zProduce.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: parsed.error.flatten() }, { status: 400 });
@@ -29,8 +46,8 @@ export async function POST(req: Request) {
           warehouseId: l.warehouseId ?? warehouseId,
           locationId: l.locationId,
         }))
-      : bom!.lines.map((l: any) => ({
-          componentItemId: l.componentItemId.toString(),
+      : (bom!.lines as unknown as BomLineShape[]).map((l) => ({
+          componentItemId: typeof l.componentItemId === "string" ? l.componentItemId : l.componentItemId.toString(),
           qty: l.qty * qty,
           uom: l.uom,
           warehouseId,
@@ -64,7 +81,7 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? "Error" }, { status: 400 });
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 400 });
   }
 }
