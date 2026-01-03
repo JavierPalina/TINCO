@@ -33,7 +33,8 @@ type EtapaCotizacion = {
 
 const NEXT_ESTADOS: string[] = ["Taller", "Depósito", "Logística", "Completado"];
 
-const getEstadoBadgeColor = (estado: string) => {
+const getEstadoBadgeColor = (estado?: string | null) => {
+  if (!estado) return "bg-gray-400 hover:bg-gray-500";
   switch (estado) {
     case "Taller":
       return "bg-orange-500 hover:bg-orange-600";
@@ -330,6 +331,8 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
 
   const direccionObra = v.direccionObra || vt.direccion || "—";
 
+  const estadoLabel = proyecto.estadoActual ?? "Sin estado";
+
   return (
     <div className="space-y-8 text-sm">
       {/* Alert: Eliminar verificación */}
@@ -474,7 +477,7 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
             Resumen de verificación de medidas, materiales y perfiles antes de pasar a taller.
           </p>
         </div>
-        <Badge className={getEstadoBadgeColor(proyecto.estadoActual)}>{proyecto.estadoActual}</Badge>
+        <Badge className={getEstadoBadgeColor(proyecto.estadoActual)}>{estadoLabel}</Badge>
       </div>
 
       {/* Datos generales */}
