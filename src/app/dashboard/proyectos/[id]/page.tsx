@@ -1,24 +1,27 @@
 "use client";
 
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { useParams, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { IProyecto } from "@/models/Proyecto";
+
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// import { FormVisitaTecnica } from "@/components/proyectos/FormVisitaTecnica";
-import MedicionFormModal from "@/components/proyectos/FormMedicion";
-import VerificacionFormModal from "@/components/proyectos/FormVerificacion";
-import FormTaller from "@/components/proyectos/FormTaller";
-import FormDeposito from "@/components/proyectos/FormDeposito";
-import FormLogistica from "@/components/proyectos/FormLogistica";
-import { ProyectoDTO } from "@/types/proyecto";
+import type { ProyectoDTO } from "@/types/proyecto";
+
+// VISTAS (solo lectura)
+import { VisitaTecnicaView } from "@/components/proyectos/VisitaTecnicaView";
+import { MedicionView } from "@/components/proyectos/MedicionView";
+import { VerificacionView } from "@/components/proyectos/VerificacionView";
+import { TallerView } from "@/components/proyectos/TallerView";
+import { DepositoView } from "@/components/proyectos/DepositoView";
+import { LogisticaView } from "@/components/proyectos/LogisticaView";
 
 async function fetchProyecto(id: string): Promise<ProyectoDTO> {
   const { data } = await axios.get(`/api/proyectos/${id}`);
-  return data.data;
+  return data.data as ProyectoDTO;
 }
 
 // Mapa para saber qué tab activar según el estado
@@ -50,6 +53,28 @@ function getDefaultTab(estadoActual: unknown): string {
   return estadoATab[key] ?? "visita-tecnica";
 }
 
+const getEstadoBadgeColor = (estado?: string | null) => {
+  if (!estado) return "bg-primary/15 text-primary hover:bg-primary/20";
+  switch (estado) {
+    case "Taller":
+      return "bg-orange-500 hover:bg-orange-600";
+    case "Logística":
+      return "bg-blue-500 hover:bg-blue-600";
+    case "Completado":
+      return "bg-green-600 hover:bg-green-700";
+    case "Visita Técnica":
+      return "bg-purple-500 hover:bg-purple-600";
+    case "Medición":
+      return "bg-purple-600 hover:bg-purple-700";
+    case "Verificación":
+      return "bg-yellow-600 hover:bg-yellow-700 text-black";
+    case "Depósito":
+      return "bg-slate-600 hover:bg-slate-700";
+    default:
+      return "bg-gray-400 hover:bg-gray-500";
+  }
+};
+
 export default function ProyectoDetallePage() {
   const params = useParams();
   const router = useRouter();
@@ -60,6 +85,8 @@ export default function ProyectoDetallePage() {
     queryFn: () => fetchProyecto(projectId),
     enabled: !!projectId,
   });
+
+  const defaultTab = useMemo(() => getDefaultTab(proyecto?.estadoActual), [proyecto?.estadoActual]);
 
   if (isLoading) {
     return (
@@ -77,39 +104,54 @@ export default function ProyectoDetallePage() {
     );
   }
 
-  const defaultTab = getDefaultTab(proyecto.estadoActual);
+  const cliente = (proyecto.cliente && typeof proyecto.cliente === "object"
+    ? (proyecto.cliente as ClientePopulado)
+    : null) as ClientePopulado | null;
 
-  const cliente = proyecto.cliente as ClientePopulado | null;
+  const estadoLabel =
+    typeof proyecto.estadoActual === "string" && proyecto.estadoActual.trim() !== ""
+      ? proyecto.estadoActual
+      : "Sin estado";
 
   return (
     <div className="container mx-auto py-10">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold">Proyecto: {proyecto.numeroOrden}</h1>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold">Proyecto: {proyecto.numeroOrden}</h1>
 
-        <div className="flex flex-col md:flex-row gap-4 text-lg mt-2">
-          <span>
-            Cliente:{" "}
-            <span className="font-semibold">{cliente?.nombreCompleto ?? "—"}</span>
-          </span>
+            <div className="flex flex-col md:flex-row gap-4 text-lg mt-2">
+              <span>
+                Cliente:{" "}
+                <span className="font-semibold">{cliente?.nombreCompleto ?? "—"}</span>
+              </span>
 
-          <span>
-            Teléfono:{" "}
-            <span className="font-semibold">{cliente?.telefono ?? "—"}</span>
-          </span>
+              <span>
+                Teléfono:{" "}
+                <span className="font-semibold">{cliente?.telefono ?? "—"}</span>
+              </span>
 
-          <span>
-            Dirección:{" "}
-            <span className="font-semibold">{cliente?.direccion ?? "—"}</span>
-          </span>
+              <span>
+                Dirección:{" "}
+                <span className="font-semibold">{cliente?.direccion ?? "—"}</span>
+              </span>
 
-          <span className="inline-flex items-center gap-2">
-            Estado:
-            <Badge className="text-lg">
-              {typeof proyecto.estadoActual === "string" && proyecto.estadoActual.trim() !== ""
-                ? proyecto.estadoActual
-                : "Sin estado"}
-            </Badge>
-          </span>
+              <span className="inline-flex items-center gap-2">
+                Estado:
+                <Badge className={`text-lg ${getEstadoBadgeColor(estadoLabel)}`}>
+                  {estadoLabel}
+                </Badge>
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="text-sm text-muted-foreground hover:underline"
+            onClick={() => router.back()}
+          >
+            Volver
+          </button>
         </div>
       </div>
 
@@ -123,35 +165,43 @@ export default function ProyectoDetallePage() {
           <TabsTrigger value="logistica">6. Logística</TabsTrigger>
         </TabsList>
 
-        {/* <TabsContent value="visita-tecnica" className="mt-4">
-          <FormVisitaTecnica proyecto={proyecto} />
-        </TabsContent> */}
-
-        <TabsContent value="medicion" className="mt-4">
-          <MedicionFormModal proyecto={proyecto} />
-        </TabsContent>
-
-        <TabsContent value="verificacion" className="mt-4">
-          <VerificacionFormModal proyecto={proyecto} />
-        </TabsContent>
-
-        <TabsContent value="taller" className="mt-4">
-          <FormTaller proyecto={proyecto} />
-        </TabsContent>
-
-        <TabsContent value="deposito" className="mt-4">
-          <FormDeposito
+        <TabsContent value="visita-tecnica" className="mt-4">
+          <VisitaTecnicaView
             proyecto={proyecto}
-            onClose={() => router.back()}
-            onSaved={() => {
-              // si querés, acá podés invalidar queries o refrescar la página
-              // router.refresh() en App Router a veces ayuda si dependés de server components
+            onDeleted={() => {
+              router.back();
             }}
           />
         </TabsContent>
 
+        <TabsContent value="medicion" className="mt-4">
+          <MedicionView
+            proyecto={proyecto}
+            onDeleted={() => {
+              router.back();
+            }}
+          />
+        </TabsContent>
+
+        <TabsContent value="verificacion" className="mt-4">
+          <VerificacionView
+            proyecto={proyecto}
+            onDeleted={() => {
+              router.back();
+            }}
+          />
+        </TabsContent>
+
+        <TabsContent value="taller" className="mt-4">
+          <TallerView proyecto={proyecto} />
+        </TabsContent>
+
+        <TabsContent value="deposito" className="mt-4">
+          <DepositoView proyecto={proyecto} />
+        </TabsContent>
+
         <TabsContent value="logistica" className="mt-4">
-          <FormLogistica proyecto={proyecto} />
+          <LogisticaView proyecto={proyecto} />
         </TabsContent>
       </Tabs>
     </div>

@@ -334,7 +334,23 @@ export default function VisitaTecnicaPage() {
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
-        cell: ({ row }) => <span className="font-semibold">{row.original.numeroOrden}</span>,
+        cell: ({ row }) => {
+          const proyecto = row.original;
+        
+          return (
+            <Button
+              variant="link"
+              className="p-0 h-auto font-semibold"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation(); // evita que se dispare onRowClick
+                router.push(`/dashboard/proyectos/${proyecto._id}`);
+              }}
+            >
+              {proyecto.numeroOrden}
+            </Button>
+          );
+        },
       },
       {
         accessorKey: "cliente.nombreCompleto",

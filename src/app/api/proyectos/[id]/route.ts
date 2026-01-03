@@ -35,12 +35,44 @@ interface ProyectoUpdateBody {
   estadoActual?: EstadoProyecto;
 }
 
+// ✅ GET: traer un proyecto por ID (para la vista detalle)
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  const { id } = params;
+
+  const session = await getServerSession(authOptions);
+  if (!session) return new NextResponse("No autorizado", { status: 401 });
+
+  await dbConnect();
+
+  try {
+    // Si querés populado (cliente/vendedor), descomentá/ajustá según tu schema:
+    // const proyecto = await Proyecto.findById(id).populate("cliente").populate("vendedor");
+    const proyecto = await Proyecto.findById(id);
+
+    if (!proyecto) {
+      return NextResponse.json(
+        { success: false, error: "Proyecto no encontrado" },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json({ success: true, data: proyecto });
+  } catch (error) {
+    console.error("❌ Error en GET /api/proyectos/[id]:", error);
+    const errorMessage = error instanceof Error ? error.message : "Error";
+    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
+  }
+}
+
 // 🔹 PUT: actualizar etapas / formularios / forzar estado
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: { id: string } },
 ) {
-  const { id } = await params;
+  const { id } = params;
 
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse("No autorizado", { status: 401 });
@@ -206,10 +238,10 @@ export async function PUT(
 
 // --- DELETE: BORRAR UN PROYECTO COMPLETO ---
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  _request: NextRequest,
+  { params }: { params: { id: string } },
 ) {
-  const { id } = await params;
+  const { id } = params;
 
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse("No autorizado", { status: 401 });
