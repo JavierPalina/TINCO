@@ -4,20 +4,15 @@ import dbConnect from "@/lib/dbConnect";
 import Bom from "@/models/Bom";
 import { zUpdateBom } from "@/lib/validation/stock";
 
-type RouteParams = { id: string };
-type RouteContext = { params: Record<string, string | string[]> };
+type Context = { params: { id: string } };
 
-function getId(ctx: RouteContext): string {
-  const v = ctx.params["id"];
-  if (Array.isArray(v)) return v[0] ?? "";
-  return v ?? "";
-}
-
-export async function GET(_req: Request, ctx: RouteContext) {
+export async function GET(_req: Request, { params }: Context) {
   await dbConnect();
 
-  const id = getId(ctx);
-  if (!id) return NextResponse.json({ ok: false, error: "Missing id" }, { status: 400 });
+  const id = params.id;
+  if (!id) {
+    return NextResponse.json({ ok: false, error: "Missing id" }, { status: 400 });
+  }
 
   const bom = await Bom.findById(id)
     .populate("finishedItemId")
@@ -27,11 +22,13 @@ export async function GET(_req: Request, ctx: RouteContext) {
   return NextResponse.json({ ok: true, data: bom });
 }
 
-export async function PUT(req: Request, ctx: RouteContext) {
+export async function PUT(req: Request, { params }: Context) {
   await dbConnect();
 
-  const id = getId(ctx);
-  if (!id) return NextResponse.json({ ok: false, error: "Missing id" }, { status: 400 });
+  const id = params.id;
+  if (!id) {
+    return NextResponse.json({ ok: false, error: "Missing id" }, { status: 400 });
+  }
 
   const body: unknown = await req.json();
   const parsed = zUpdateBom.safeParse(body);
