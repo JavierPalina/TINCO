@@ -4,10 +4,12 @@ import Bom from "@/models/Bom";
 import { zProduce } from "@/lib/validation/stock";
 import { applyMovement } from "@/lib/stock/ledger";
 
+type Uom = "UN" | "M" | "M2" | "KG";
+
 type BomLineShape = {
   componentItemId: { toString(): string } | string;
   qty: number;
-  uom: string;
+  uom: Uom;
 };
 
 function errorMessage(e: unknown) {
@@ -36,13 +38,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "No hay BOM activa para este producto" }, { status: 400 });
   }
 
-  // 1) consumir componentes
   const consumeLines =
     overrideConsumeLines?.length
       ? overrideConsumeLines.map((l) => ({
           componentItemId: l.componentItemId,
           qty: l.qty,
-          uom: l.uom,
+          uom: l.uom as Uom, // si zProduce ya valida enum, idealmente tipalo ahí y quitas el "as"
           warehouseId: l.warehouseId ?? warehouseId,
           locationId: l.locationId,
         }))
@@ -68,7 +69,6 @@ export async function POST(req: Request) {
       });
     }
 
-    // 2) ingresar terminado
     await applyMovement({
       type: "IN",
       itemId: finishedItemId,
