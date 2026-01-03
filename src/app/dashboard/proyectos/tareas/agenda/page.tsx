@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { ProyectoDTO } from "@/types/proyecto";
 
 // Clave especial para "todos" en selects
 const ALL_VALUE = "__all";
@@ -114,7 +115,7 @@ interface VendedorLite {
   name?: string;
 }
 
-type ProyectoLite = IProyecto & {
+type ProyectoLite = ProyectoDTO & {
   visitaTecnica?: VisitaTecnicaLite;
   medicion?: MedicionLite;
   taller?: TallerLite;
@@ -126,14 +127,14 @@ type AgendaEvent = {
   dateKey: string;
   date: Date;
   horaVisita: string; // puede ser "10:00", "Medición", "Taller", etc.
-  proyecto: IProyecto;
+  proyecto: ProyectoDTO;
   tecnicoNombre: string;
   clienteNombre: string;
   estadoActual: string;
   estadoBgClass: string;
 };
 
-async function fetchProyectosVisitaTecnica(): Promise<IProyecto[]> {
+async function fetchProyectosVisitaTecnica(): Promise<ProyectoDTO[]> {
   const { data } = await axios.get("/api/proyectos", {
     params: {
       // CSV de estados: mismo criterio que la tabla
@@ -218,7 +219,7 @@ export default function AgendaVisitaTecnicaPage() {
   const queryClient = useQueryClient();
 
   const [proyectoSeleccionado, setProyectoSeleccionado] =
-    useState<IProyecto | null>(null);
+    useState<ProyectoDTO | null>(null);
 
   // qué etapa se ve en el modal del proyecto
   const [viewStage, setViewStage] = useState<
