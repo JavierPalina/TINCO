@@ -24,6 +24,11 @@ import {
   Table,
   Smartphone,
   Package,
+  Boxes,
+  ArrowRightLeft,
+  ClipboardList,
+  Factory,
+  Layers,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -40,6 +45,7 @@ import {
 import { NotificationBell } from "./NotificationBell";
 
 import { canAccessSection, canAccessProyectoStage } from "@/lib/roles";
+import { cn } from "@/lib/utils";
 
 type ListItemProps = {
   href: string;
@@ -60,6 +66,24 @@ const DropdownListItem = ({ href, icon: Icon, title, children }: ListItemProps) 
   </DropdownMenuItem>
 );
 
+type NavLinkProps = {
+  href: string;
+  children: React.ReactNode;
+  className?: string;
+};
+
+const NavLink = ({ href, children, className }: NavLinkProps) => (
+  <Link
+    href={href}
+    className={cn(
+      "text-sm font-medium text-muted-foreground hover:text-primary transition-colors",
+      className,
+    )}
+  >
+    {children}
+  </Link>
+);
+
 export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { setTheme, resolvedTheme } = useTheme();
@@ -75,7 +99,7 @@ export function Header() {
   const showUsers = canAccessSection(role, "users");
   const showNotificaciones = canAccessSection(role, "notificaciones");
 
-    const proyectosLinks = useMemo(() => {
+  const proyectosLinks = useMemo(() => {
     const items: Array<{
       key: "tareas_agenda" | "tareas_tabla";
       href: string;
@@ -106,26 +130,79 @@ export function Header() {
     return items;
   }, [role]);
 
+  const stockLinks = useMemo(() => {
+    const items: Array<{
+      key: "stock_items" | "stock_balances" | "stock_movements" | "stock_reservations" | "stock_boms";
+      href: string;
+      icon: React.ElementType;
+      title: string;
+      desc: string;
+    }> = [];
+
+    // Rutas que te pasé en el módulo de stock
+    items.push({
+      key: "stock_balances",
+      href: "/dashboard/stock/balances",
+      icon: Boxes,
+      title: "Balances",
+      desc: "Disponible, reservado y físico por depósito",
+    });
+
+    items.push({
+      key: "stock_movements",
+      href: "/dashboard/stock/movements",
+      icon: ArrowRightLeft,
+      title: "Movimientos",
+      desc: "Ingresos, egresos, ajustes y transferencias",
+    });
+
+    items.push({
+      key: "stock_reservations",
+      href: "/dashboard/stock/reservations",
+      icon: ClipboardList,
+      title: "Reservas",
+      desc: "Reserva/liberación de stock por referencia",
+    });
+
+    items.push({
+      key: "stock_boms",
+      href: "/dashboard/stock/boms",
+      icon: Layers,
+      title: "BOM (Kits)",
+      desc: "Recetas de consumo por SKU terminado",
+    });
+
+    items.push({
+      key: "stock_items",
+      href: "/dashboard/stock/items",
+      icon: Package,
+      title: "Items (SKU)",
+      desc: "Catálogo de productos y componentes",
+    });
+
+    return items;
+  }, []);
+
   // Para el logo: si no tiene pipeline, mandalo a proyectos o clientes
   const homeHref = showPipeline
     ? "/dashboard/pipeline"
     : showProyectos
-    ? "/dashboard/proyectos"
-    : showClientes
-    ? "/dashboard/clientes"
-    : "/dashboard";
+      ? "/dashboard/proyectos"
+      : showClientes
+        ? "/dashboard/clientes"
+        : "/dashboard";
 
   const avatarSrc =
-  typeof session?.user?.image === "string" && session.user.image.trim() !== ""
-    ? session.user.image
-    : "/avatar-placeholder.png";
+    typeof session?.user?.image === "string" && session.user.image.trim() !== ""
+      ? session.user.image
+      : "/avatar-placeholder.png";
 
   return (
     <header className="p-4 border-b bg-background sticky top-0 z-50 bg-card">
       <nav className="container mx-auto flex justify-between items-center gap-4">
         {/* LOGO + NAV PRINCIPAL */}
         <div className="flex gap-6 items-center">
-          <Link href={homeHref}>
+          <Link href={homeHref} aria-label="Ir al inicio">
             <Image
               src={resolvedTheme === "dark" ? "/logo-dark.png" : "/logo.png"}
               alt="Logo de la Empresa"
@@ -137,21 +214,14 @@ export function Header() {
           </Link>
 
           <div className="hidden md:flex items-center gap-6">
-            {showPipeline && (
-              <Link
-                href="/dashboard/pipeline"
-                className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
-              >
-                Pipeline
-              </Link>
-            )}
+            {showPipeline && <NavLink href="/dashboard/pipeline">Pipeline</NavLink>}
 
             {showProyectos && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    className="flex items-center text-sm font-medium text-muted-foreground hover:text-primary transition-colors p-0 h-auto hover:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="group flex items-center text-sm font-medium text-muted-foreground hover:text-primary transition-colors p-0 h-auto hover:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
                   >
                     Proyectos
                     <ChevronDown className="relative top-[1px] ml-1 h-3 w-3 transition duration-200 group-data-[state=open]:rotate-180" />
@@ -159,48 +229,35 @@ export function Header() {
                 </DropdownMenuTrigger>
 
                 <DropdownMenuContent className="w-[360px]" align="start">
-  <div className="p-2">
-    <DropdownMenuLabel className="px-2">PROYECTOS</DropdownMenuLabel>
+                  <div className="p-2">
+                    <DropdownMenuLabel className="px-2">PROYECTOS</DropdownMenuLabel>
 
-    {proyectosLinks.map((it) => (
-      <DropdownListItem
-        key={it.key}
-        href={it.href}
-        icon={it.icon}
-        title={it.title}
-      >
-        {it.desc}
-      </DropdownListItem>
-    ))}
-  </div>
-</DropdownMenuContent>
+                    {proyectosLinks.length > 0 ? (
+                      proyectosLinks.map((it) => (
+                        <DropdownListItem key={it.key} href={it.href} icon={it.icon} title={it.title}>
+                          {it.desc}
+                        </DropdownListItem>
+                      ))
+                    ) : (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">
+                        No hay accesos habilitados para tu rol.
+                      </div>
+                    )}
+                  </div>
+                </DropdownMenuContent>
               </DropdownMenu>
             )}
 
-            {showClientes && (
-              <Link
-                href="/dashboard/clientes"
-                className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
-              >
-                Clientes
-              </Link>
-            )}
+            {showClientes && <NavLink href="/dashboard/clientes">Clientes</NavLink>}
 
-            {showNotificaciones && (
-              <Link
-                href="/dashboard/notificaciones"
-                className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
-              >
-                Notificaciones
-              </Link>
-            )}
+            {showNotificaciones && <NavLink href="/dashboard/notificaciones">Notificaciones</NavLink>}
 
             {showServicios && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    className="text-sm font-medium p-2 h-auto hover:bg-transparent"
+                    className="group text-sm font-medium p-0 h-auto text-muted-foreground hover:text-primary hover:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
                   >
                     Servicios
                     <ChevronDown className="relative top-[1px] ml-1 h-3 w-3 transition duration-200 group-data-[state=open]:rotate-180" />
@@ -240,14 +297,43 @@ export function Header() {
               </DropdownMenu>
             )}
 
+            {/* STOCK: ahora como dropdown con subsecciones */}
             {showStock && (
-              <Link
-                href="/dashboard/stock"
-                className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors inline-flex items-center gap-2"
-              >
-                <Package className="h-4 w-4" />
-                Stock
-              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="group flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors p-0 h-auto hover:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                  >
+                    <Package className="h-4 w-4" />
+                    Stock
+                    <ChevronDown className="relative top-[1px] ml-1 h-3 w-3 transition duration-200 group-data-[state=open]:rotate-180" />
+                  </Button>
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent className="w-[420px]" align="start">
+                  <div className="p-2">
+                    <DropdownMenuLabel className="px-2">STOCK / DEPÓSITO</DropdownMenuLabel>
+
+                    {stockLinks.map((it) => (
+                      <DropdownListItem key={it.key} href={it.href} icon={it.icon} title={it.title}>
+                        {it.desc}
+                      </DropdownListItem>
+                    ))}
+
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href="/dashboard/stock/movements" className="flex items-center gap-2 p-2">
+                        <Factory className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">Acciones rápidas</span>
+                        <span className="text-xs text-muted-foreground ml-2">
+                          Movimientos, reservas y producción
+                        </span>
+                      </Link>
+                    </DropdownMenuItem>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         </div>
@@ -260,7 +346,7 @@ export function Header() {
 
         {/* NOTIFICACIONES + PERFIL + MENÚ MOBILE */}
         <div className="flex items-center gap-2">
-          <NotificationBell />
+          {showNotificaciones && <NotificationBell />}
 
           {/* PERFIL */}
           <DropdownMenu>
@@ -268,9 +354,7 @@ export function Header() {
               <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={avatarSrc} alt="avatar" />
-                  <AvatarFallback>
-                    {session?.user?.name?.[0]?.toUpperCase() || "U"}
-                  </AvatarFallback>
+                  <AvatarFallback>{session?.user?.name?.[0]?.toUpperCase() || "U"}</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
@@ -278,9 +362,7 @@ export function Header() {
             <DropdownMenuContent className="w-56" align="end" forceMount>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">
-                    {session?.user?.name || "Usuario"}
-                  </p>
+                  <p className="text-sm font-medium leading-none">{session?.user?.name || "Usuario"}</p>
                   <p className="text-xs leading-none text-muted-foreground">
                     {session?.user?.email || "usuario@ejemplo.com"}
                   </p>
@@ -296,9 +378,7 @@ export function Header() {
                 </Link>
               </DropdownMenuItem>
 
-              <DropdownMenuItem
-                onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-              >
+              <DropdownMenuItem onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>
                 {resolvedTheme === "dark" ? (
                   <>
                     <Sun className="mr-2 h-4 w-4" />
@@ -347,7 +427,7 @@ export function Header() {
                 </Button>
               </DropdownMenuTrigger>
 
-              <DropdownMenuContent align="end" className="min-w-[260px]">
+              <DropdownMenuContent align="end" className="min-w-[280px]">
                 <DropdownMenuLabel>Menú</DropdownMenuLabel>
 
                 {showPipeline && (
@@ -361,11 +441,17 @@ export function Header() {
                     <DropdownMenuSeparator />
                     <DropdownMenuLabel>Proyectos</DropdownMenuLabel>
 
-                    {proyectosLinks.map((it) => (
-                      <DropdownMenuItem key={it.key} asChild>
-                        <Link href={it.href}>{it.title}</Link>
-                      </DropdownMenuItem>
-                    ))}
+                    {proyectosLinks.length > 0 ? (
+                      proyectosLinks.map((it) => (
+                        <DropdownMenuItem key={it.key} asChild>
+                          <Link href={it.href}>{it.title}</Link>
+                        </DropdownMenuItem>
+                      ))
+                    ) : (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">
+                        No hay accesos habilitados para tu rol.
+                      </div>
+                    )}
                   </>
                 )}
 
@@ -400,10 +486,21 @@ export function Header() {
                   </>
                 )}
 
+                {/* STOCK MOBILE: subsecciones */}
                 {showStock && (
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard/stock">Stock</Link>
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Stock</DropdownMenuLabel>
+
+                    {stockLinks.map((it) => (
+                      <DropdownMenuItem key={it.key} asChild>
+                        <Link href={it.href} className="flex items-center gap-2">
+                          <it.icon className="h-4 w-4 text-muted-foreground" />
+                          <span>{it.title}</span>
+                        </Link>
+                      </DropdownMenuItem>
+                    ))}
+                  </>
                 )}
 
                 <DropdownMenuSeparator />
