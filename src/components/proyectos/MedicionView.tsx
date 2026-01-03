@@ -20,9 +20,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Trash2, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { ProyectoDTO } from "@/types/proyecto";
 
 type Props = {
-  proyecto: IProyecto;
+  proyecto: ProyectoDTO;
   /** Se llama cuando se eliminó o cambió el proyecto y el padre debe refrescar */
   onDeleted?: () => void;
 };

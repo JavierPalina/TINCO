@@ -20,9 +20,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Loader2, Plus, X } from "lucide-react";
 import { toast } from "sonner";
+import { ProyectoDTO } from "@/types/proyecto";
 
 type FormDepositoProps = {
-  proyecto: IProyecto;
+  proyecto: ProyectoDTO;
   onClose: () => void;
   onSaved: () => void;
 };
@@ -65,7 +66,7 @@ export type DepositoFormValues = {
   crearTareaReposicion: boolean;
 };
 
-type ProyectoConDeposito = IProyecto & {
+type ProyectoConDeposito = ProyectoDTO & {
   deposito?: Partial<DepositoFormValues> | null;
 };
 

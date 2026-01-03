@@ -21,6 +21,7 @@ import {
 import { Trash2, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ProyectoDTO } from "@/types/proyecto";
 
 type LogisticaData = {
   numeroOrdenLogistica?: string;
@@ -57,7 +58,7 @@ type LogisticaData = {
 };
 
 interface LogisticaViewProps {
-  proyecto: IProyecto;
+  proyecto: ProyectoDTO;
   /** Opcional: callback para que el padre refresque / cierre modal cuando algo cambia */
   onDeleted?: () => void;
 }
@@ -78,7 +79,7 @@ type CotizacionRef =
 
 type ClienteLite = { nombreCompleto?: string } | string | null | undefined;
 
-type ProyectoConExtras = IProyecto & {
+type ProyectoConExtras = ProyectoDTO & {
   logistica?: LogisticaData | null;
   cliente?: ClienteLite;
   cotizacion?: CotizacionRef;

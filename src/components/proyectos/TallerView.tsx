@@ -4,7 +4,7 @@ import { useState } from "react";
 import axios from "axios";
 import { useQuery } from "@tanstack/react-query";
 
-import { IProyecto } from "@/models/Proyecto";
+import { ProyectoDTO } from "@/types/proyecto";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +21,7 @@ import { Trash2, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 type Props = {
-  proyecto: IProyecto;
+  proyecto: ProyectoDTO;
   /** Opcional: para avisarle al padre que cambió algo y refrescar */
   onDeleted?: () => void;
 };

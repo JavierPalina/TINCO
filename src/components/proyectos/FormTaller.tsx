@@ -34,6 +34,7 @@ import { CloudinaryMultiUpload } from "@/components/ui/CloudinaryMultiUpload";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { IProyecto } from "@/models/Proyecto";
 import { UserSelect } from "@/components/ui/UserSelect";
+import { ProyectoDTO } from "@/types/proyecto";
 
 // ----------------- CONSTANTES ----------------- //
 
@@ -216,7 +217,7 @@ type FormState = {
 };
 
 type Props = {
-  proyecto: IProyecto;
+  proyecto: ProyectoDTO;
   onClose?: () => void;
   onSaved?: () => void;
 };

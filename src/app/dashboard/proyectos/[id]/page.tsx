@@ -14,8 +14,9 @@ import VerificacionFormModal from "@/components/proyectos/FormVerificacion";
 import FormTaller from "@/components/proyectos/FormTaller";
 import FormDeposito from "@/components/proyectos/FormDeposito";
 import FormLogistica from "@/components/proyectos/FormLogistica";
+import { ProyectoDTO } from "@/types/proyecto";
 
-async function fetchProyecto(id: string): Promise<IProyecto> {
+async function fetchProyecto(id: string): Promise<ProyectoDTO> {
   const { data } = await axios.get(`/api/proyectos/${id}`);
   return data.data;
 }

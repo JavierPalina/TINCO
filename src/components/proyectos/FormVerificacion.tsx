@@ -34,9 +34,10 @@ import {
 } from "@/components/ui/command";
 import { ChevronsUpDown, Check, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ProyectoDTO } from "@/types/proyecto";
 
 type Props = {
-  proyecto: IProyecto;
+  proyecto: ProyectoDTO;
   onClose?: () => void;
   onSaved?: () => void;
 };

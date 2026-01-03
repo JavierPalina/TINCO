@@ -22,6 +22,7 @@ import {
 import { Trash2, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ProyectoDTO } from "@/types/proyecto";
 
 type DepositoData = {
   numeroOrdenDeposito?: string;
@@ -59,7 +60,7 @@ type DepositoData = {
 };
 
 interface DepositoViewProps {
-  proyecto: IProyecto;
+  proyecto: ProyectoDTO;
   /** Opcional: para refrescar el padre cuando algo cambia */
   onDeleted?: () => void;
 }

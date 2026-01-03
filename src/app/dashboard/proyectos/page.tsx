@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { IProyecto } from "@/models/Proyecto";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -69,6 +68,7 @@ import { DepositoView } from "@/components/proyectos/DepositoView";
 // 🔹 LOGÍSTICA
 import LogisticaFormModal from "@/components/proyectos/FormLogistica";
 import { LogisticaView } from "@/components/proyectos/LogisticaView";
+import { ProyectoDTO } from "@/types/proyecto";
 
 // --- Tipos auxiliares para evitar any ---
 type DestinoEstado =
@@ -112,7 +112,7 @@ interface VendedorLite {
   name?: string;
 }
 
-type ProyectoLite = IProyecto & {
+type ProyectoLite = ProyectoDTO & {
   visitaTecnica?: VisitaTecnicaLite;
   cliente?: ClienteLite | string | null;
   vendedor?: VendedorLite | string | null;
@@ -224,7 +224,7 @@ function StandardDialogShell({
 }
 
 // --- FETCH TODAS LAS ETAPAS ---
-async function fetchProyectosVisitaTecnica(): Promise<IProyecto[]> {
+async function fetchProyectosVisitaTecnica(): Promise<ProyectoDTO[]> {
   const { data } = await axios.get("/api/proyectos", {
     params: {
       estados: "Visita Técnica,Medición,Verificación,Taller,Depósito,Logística",
@@ -239,30 +239,30 @@ export default function VisitaTecnicaPage() {
 
   // Modal "pasar a X"
   const [proyectoAPasar, setProyectoAPasar] = useState<{
-    proyecto: IProyecto;
+    proyecto: ProyectoDTO;
     destino: DestinoEstado;
   } | null>(null);
 
   // Modal de vista de proyecto
   const [proyectoSeleccionado, setProyectoSeleccionado] =
-    useState<IProyecto | null>(null);
+    useState<ProyectoDTO | null>(null);
 
   // qué etapa se ve en el view
   const [viewStage, setViewStage] = useState<ViewStage>(null);
 
   // Modales de edición
   const [proyectoEditandoVisita, setProyectoEditandoVisita] =
-    useState<IProyecto | null>(null);
+    useState<ProyectoDTO | null>(null);
   const [proyectoEditandoMedicion, setProyectoEditandoMedicion] =
-    useState<IProyecto | null>(null);
+    useState<ProyectoDTO | null>(null);
   const [proyectoEditandoVerificacion, setProyectoEditandoVerificacion] =
-    useState<IProyecto | null>(null);
+    useState<ProyectoDTO | null>(null);
   const [proyectoEditandoTaller, setProyectoEditandoTaller] =
-    useState<IProyecto | null>(null);
+    useState<ProyectoDTO | null>(null);
   const [proyectoEditandoDeposito, setProyectoEditandoDeposito] =
-    useState<IProyecto | null>(null);
+    useState<ProyectoDTO | null>(null);
   const [proyectoEditandoLogistica, setProyectoEditandoLogistica] =
-    useState<IProyecto | null>(null);
+    useState<ProyectoDTO | null>(null);
 
   // 🔎 Buscador global
   const [searchTerm, setSearchTerm] = useState("");
@@ -376,7 +376,7 @@ export default function VisitaTecnicaPage() {
     },
   });
 
-  const columns = useMemo<ColumnDef<IProyecto>[]>(
+  const columns = useMemo<ColumnDef<ProyectoDTO>[]>(
     () => [
       {
         accessorKey: "numeroOrden",
@@ -475,7 +475,7 @@ export default function VisitaTecnicaPage() {
         header: "Acciones",
         enableSorting: false,
         cell: ({ row }) => {
-          const proyecto = row.original as IProyecto;
+          const proyecto = row.original as ProyectoDTO;
 
           return (
             <DropdownMenu>
@@ -592,7 +592,7 @@ export default function VisitaTecnicaPage() {
   );
 
   // Aplicar filtros + buscador
-  const filteredData: IProyecto[] = useMemo(() => {
+  const filteredData: ProyectoDTO[] = useMemo(() => {
     if (!proyectos) return [];
 
     const q = searchTerm.trim().toLowerCase();
@@ -1348,7 +1348,7 @@ export default function VisitaTecnicaPage() {
           columns={columns}
           data={filteredData}
           onRowClick={(row) => {
-            const proyecto = row.original as IProyecto;
+            const proyecto = row.original as ProyectoDTO;
             setProyectoSeleccionado(proyecto);
 
             // ✅ acá está lo que pedís: abre el view según estadoActual (Deposito/Depósito, etc.)

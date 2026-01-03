@@ -28,6 +28,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ProyectoDTO } from "@/types/proyecto";
 
 const TIPO_ENTREGA_OPTS = [
   "Entrega a obra",
@@ -215,7 +216,7 @@ function toISOIfPossible(value?: string): string | undefined {
 }
 
 interface FormLogisticaProps {
-  proyecto: IProyecto;
+  proyecto: ProyectoDTO;
   onClose?: () => void;
   onSaved?: () => void;
 }

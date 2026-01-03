@@ -37,9 +37,10 @@ import { FirmaDigitalField } from "@/components/ui/FirmaDigitalField";
 import { ScrollArea } from "../ui/scroll-area";
 import { IProyecto } from "@/models/Proyecto";
 import { UserSelect } from "@/components/ui/UserSelect";
+import { ProyectoDTO } from "@/types/proyecto";
 
 type Props = {
-  proyecto: IProyecto;
+  proyecto: ProyectoDTO;
   onClose?: () => void;
   onSaved?: () => void;
 };

@@ -8,7 +8,7 @@ import axios from "axios";
 import { Loader2, ArrowUpDown, Filter, Search } from "lucide-react";
 import { toast } from "sonner";
 
-import type { IProyecto } from "@/models/Proyecto";
+import type { ProyectoDTO } from "@/types/proyecto";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -100,8 +100,7 @@ interface VendedorLite {
  * Extendemos el tipo de Proyecto para evitar casts "any" al leer estadoActual y refs populadas.
  * No cambia el runtime; solo tipado local.
  */
-type ProyectoLite = IProyecto & {
-  estadoActual?: string | null;
+type ProyectoLite = ProyectoDTO & {
   visitaTecnica?: VisitaTecnicaLite;
   cliente?: ClienteLite | string | null;
   vendedor?: VendedorLite | string | null;

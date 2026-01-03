@@ -3,7 +3,7 @@
 import { useState } from "react";
 import axios from "axios";
 import { useQuery } from "@tanstack/react-query";
-import { IProyecto } from "@/models/Proyecto";
+import { ProyectoDTO } from "@/types/proyecto";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ import { Trash2, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 type Props = {
-  proyecto: IProyecto;
+  proyecto: ProyectoDTO;
   onDeleted?: () => void;
 };
 
