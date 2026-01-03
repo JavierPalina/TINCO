@@ -8,33 +8,6 @@ import UserModel from "@/models/User";
 import bcrypt from "bcrypt";
 import { ROLES, type UserRole } from "@/lib/roles";
 
-declare module "next-auth" {
-  interface Session {
-    user: {
-      id: string;
-      rol: UserRole;
-      image?: string | null;
-      name?: string | null;
-    } & DefaultSession["user"];
-  }
-
-  interface User extends DefaultUser {
-    rol: UserRole;
-    id: string;
-    image?: string | null;
-    name?: string | null;
-  }
-}
-
-declare module "next-auth/jwt" {
-  interface JWT {
-    rol: UserRole;
-    id: string;
-    image?: string | null;
-    name?: string | null;
-  }
-}
-
 /** User que retorna authorize() */
 type AppUser = {
   id: string;
