@@ -5,6 +5,7 @@ import { useState } from "react";
 import axios from "axios";
 import { useQuery } from "@tanstack/react-query";
 import { IProyecto } from "@/models/Proyecto";
+import { ProyectoDTO } from "@/types/proyecto";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Trash2, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import { ProyectoDTO } from "@/types/proyecto";
 
 type Props = {
   proyecto: ProyectoDTO;
@@ -35,7 +35,7 @@ type EtapaCotizacion = {
 };
 
 // Proyecto con campos extra que usamos acá
-type ProyectoWithExtras = IProyecto & {
+type ProyectoWithExtras = ProyectoDTO & {
   cotizacion?: string | { _id?: string };
   medicion?: MedicionData | null;
   cliente?: {
@@ -88,7 +88,8 @@ const NEXT_ESTADOS: string[] = [
   "Logística",
 ];
 
-const getEstadoBadgeColor = (estado: string) => {
+const getEstadoBadgeColor = (estado?: string | null) => {
+  if (!estado) return "bg-gray-400 hover:bg-gray-500";
   switch (estado) {
     case "Taller":
       return "bg-orange-500 hover:bg-orange-600";
@@ -362,6 +363,8 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
     }
   };
 
+    const estadoLabel = proyecto.estadoActual ?? "Sin estado";
+
   return (
     <div className="space-y-8 text-sm">
       {/* Alert para confirmar eliminación de MEDICIÓN */}
@@ -524,7 +527,7 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
           </p>
         </div>
         <Badge className={getEstadoBadgeColor(proyecto.estadoActual)}>
-          {proyecto.estadoActual}
+          {estadoLabel}
         </Badge>
       </div>
 
