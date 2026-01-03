@@ -3,10 +3,18 @@ import dbConnect from "@/lib/dbConnect";
 import StockReservation from "@/models/StockReservation";
 import { applyReservation } from "@/lib/stock/ledger";
 
+type Uom = "UN" | "M" | "M2" | "KG";
+const UOMS = ["UN", "M", "M2", "KG"] as const;
+
+function toUom(v: string): Uom {
+  if ((UOMS as readonly string[]).includes(v)) return v as Uom;
+  throw new Error(`UOM inválida: ${v}`);
+}
+
 type ReservationLineShape = {
   itemId: { toString(): string } | string;
   qty: number;
-  uom: string;
+  uom: string; // viene de DB, por eso string
 };
 
 type RouteContext = {
@@ -38,7 +46,7 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
     const lines = (reservation.lines as unknown as ReservationLineShape[]).map((l) => ({
       itemId: typeof l.itemId === "string" ? l.itemId : l.itemId.toString(),
       qty: l.qty,
-      uom: l.uom,
+      uom: toUom(l.uom),
     }));
 
     await applyReservation({
