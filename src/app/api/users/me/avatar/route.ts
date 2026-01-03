@@ -4,15 +4,24 @@ import { authOptions } from "@/lib/authOptions";
 import dbConnect from "@/lib/dbConnect";
 import User from "@/models/User";
 import cloudinary from "@/lib/cloudinary";
+import type {
+  UploadApiOptions,
+  UploadApiResponse,
+  UploadApiErrorResponse,
+} from "cloudinary";
 
 export const runtime = "nodejs";
 
-function uploadToCloudinary(buffer: Buffer, options: Record<string, any>) {
-  return new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(options, (error, result) => {
-      if (error || !result) return reject(error);
-      resolve({ secure_url: result.secure_url, public_id: result.public_id });
-    });
+function uploadToCloudinary(buffer: Buffer, options: UploadApiOptions) {
+  return new Promise<Pick<UploadApiResponse, "secure_url" | "public_id">>((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      options,
+      (error?: UploadApiErrorResponse, result?: UploadApiResponse) => {
+        if (error || !result) return reject(error ?? new Error("Error subiendo imagen"));
+        resolve({ secure_url: result.secure_url, public_id: result.public_id });
+      },
+    );
+
     stream.end(buffer);
   });
 }
@@ -40,8 +49,6 @@ export async function POST(req: NextRequest) {
   const bytes = Buffer.from(await file.arrayBuffer());
 
   const folder = process.env.CLOUDINARY_FOLDER || "avatars";
-
-  // 1 avatar por usuario (sobrescribe siempre)
   const publicId = `${folder}/${session.user.id}`;
 
   const uploaded = await uploadToCloudinary(bytes, {

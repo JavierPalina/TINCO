@@ -6,6 +6,14 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Upload, Trash2 } from "lucide-react";
 
+type UploadAvatarResponse = {
+  success: boolean;
+  data?: {
+    image: string;
+  };
+  error?: string;
+};
+
 export function AvatarUploader({
   onUploaded,
   onRemove,
@@ -19,32 +27,47 @@ export function AvatarUploader({
   const [uploading, setUploading] = useState(false);
 
   async function upload(file: File) {
-    if (!file.type.startsWith("image/")) return toast.error("El archivo debe ser una imagen");
-    if (file.size > 4 * 1024 * 1024) return toast.error("La imagen no puede superar 4MB");
+    if (!file.type.startsWith("image/")) {
+      toast.error("El archivo debe ser una imagen");
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      toast.error("La imagen no puede superar 4MB");
+      return;
+    }
 
     setUploading(true);
     try {
       const fd = new FormData();
       fd.append("file", file);
 
-      const { data } = await axios.post("/api/users/me/avatar", fd, {
+      const { data } = await axios.post<UploadAvatarResponse>("/api/users/me/avatar", fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      const url = data?.data?.image as string | undefined;
-      if (!url) throw new Error("Respuesta inválida del servidor");
+      const url = data?.data?.image;
+      if (!url) {
+        throw new Error(data?.error || "Respuesta inválida del servidor");
+      }
 
       onUploaded(url);
       toast.success("Foto subida");
-    } catch (err: any) {
-      toast.error(err?.message || "Error subiendo foto");
+    } catch (err: unknown) {
+      const msg =
+        axios.isAxiosError(err)
+          ? (err.response?.data as UploadAvatarResponse | undefined)?.error || err.message
+          : err instanceof Error
+            ? err.message
+            : "Error subiendo foto";
+
+      toast.error(msg);
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
     }
   }
 
-  const isDisabled = disabled || uploading;
+  const isDisabled = Boolean(disabled || uploading);
 
   return (
     <div className="flex flex-wrap items-center gap-2">

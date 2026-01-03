@@ -3,9 +3,10 @@
 import { useEffect } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+
 import {
   Dialog,
   DialogContent,
@@ -33,47 +34,25 @@ import {
 
 import type { IUser2 } from "@/app/dashboard/users/page";
 import type { UserRole } from "@/lib/roles";
+import type {
+  IPersonalData,
+  IContactData,
+  ILaboralData,
+  IFinancieraLegalData,
+} from "@/models/User";
 
-interface IPersonalData {
-  cuil?: string;
+/**
+ * Tipos de formulario:
+ * - Conservan estructura del modelo
+ * - Transforman fechas a string "yyyy-mm-dd" para inputs type="date"
+ */
+type PersonalDataForm = Omit<IPersonalData, "fechaNacimiento"> & {
   fechaNacimiento?: string;
-  nacionalidad?: string;
-  estadoCivil?: "soltero" | "casado" | "divorciado" | "viudo";
-  direccion?: {
-    calle?: string;
-    numero?: string;
-    piso?: string;
-    depto?: string;
-    ciudad?: string;
-    provincia?: string;
-    codigoPostal?: string;
-  };
-}
+};
 
-interface IContactData {
-  telefonoPrincipal?: string;
-  telefonoSecundario?: string;
-  emailPersonal?: string;
-  contactoEmergencia?: {
-    nombre?: string;
-    parentesco?: string;
-    telefono?: string;
-  };
-}
-
-interface ILaboralData {
-  puesto?: string;
+type LaboralDataForm = Omit<ILaboralData, "fechaIngreso"> & {
   fechaIngreso?: string;
-  equipo?: string;
-  reportaA?: string;
-}
-
-interface IFinancieraLegalData {
-  cbu?: string;
-  banco?: string;
-  obraSocial?: string;
-  numeroAfiliado?: string;
-}
+};
 
 interface IUserFormData {
   name: string;
@@ -81,9 +60,9 @@ interface IUserFormData {
   rol: UserRole;
   password?: string;
 
-  personalData?: IPersonalData;
+  personalData?: PersonalDataForm;
   contactData?: IContactData;
-  laboralData?: ILaboralData;
+  laboralData?: LaboralDataForm;
   financieraLegalData?: IFinancieraLegalData;
 }
 
@@ -93,37 +72,65 @@ interface UserFormDialogProps {
   user?: IUser2;
 }
 
+function formatDateForInput(date?: string | Date | null): string {
+  if (!date) return "";
+  try {
+    const d = typeof date === "string" ? new Date(date) : date;
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toISOString().split("T")[0];
+  } catch {
+    return "";
+  }
+}
+
+function getErrorMessage(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    const data = err.response?.data as { error?: string; message?: string } | undefined;
+    return data?.error || data?.message || err.message || "Error";
+  }
+  if (err instanceof Error) return err.message;
+  return "Error";
+}
+
 export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogProps) {
   const queryClient = useQueryClient();
-  const { register, handleSubmit, reset, setValue } = useForm<IUserFormData>();
 
-  const formatDateForInput = (date?: string | Date) => {
-    if (!date) return "";
-    try {
-      return new Date(date).toISOString().split("T")[0];
-    } catch {
-      return "";
-    }
-  };
+  const { register, handleSubmit, reset, setValue } = useForm<IUserFormData>({
+    defaultValues: {
+      name: "",
+      email: "",
+      rol: "vendedor",
+      password: "",
+      personalData: {},
+      contactData: {},
+      laboralData: {},
+      financieraLegalData: {},
+    },
+  });
 
   useEffect(() => {
     if (user) {
+      const personalData: PersonalDataForm = {
+        ...(user.personalData ?? {}),
+        fechaNacimiento: formatDateForInput(user.personalData?.fechaNacimiento),
+      };
+
+      const laboralData: LaboralDataForm = {
+        ...(user.laboralData ?? {}),
+        fechaIngreso: formatDateForInput(user.laboralData?.fechaIngreso),
+      };
+
       reset({
         name: user.name,
         email: user.email,
         rol: user.rol,
         password: "",
-        personalData: {
-          ...(user.personalData as any),
-          fechaNacimiento: formatDateForInput((user.personalData as any)?.fechaNacimiento),
-        },
-        contactData: (user.contactData as any) || {},
-        laboralData: {
-          ...(user.laboralData as any),
-          fechaIngreso: formatDateForInput((user.laboralData as any)?.fechaIngreso),
-        },
-        financieraLegalData: (user.financieraLegalData as any) || {},
+        personalData,
+        contactData: user.contactData ?? {},
+        laboralData,
+        financieraLegalData: user.financieraLegalData ?? {},
       });
+
       setValue("rol", user.rol);
     } else {
       reset({
@@ -139,31 +146,27 @@ export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogPro
     }
   }, [user, reset, setValue]);
 
-  const createMutation = useMutation<unknown, AxiosError, IUserFormData>({
+  const createMutation = useMutation<unknown, unknown, IUserFormData>({
     mutationFn: (data) => axios.post("/api/create-user", data),
     onSuccess: () => {
       toast.success("Usuario creado con éxito!");
       queryClient.invalidateQueries({ queryKey: ["users"] });
       onOpenChange(false);
     },
-    onError: (error) => {
-      const errorMessage =
-        (error?.response?.data as { error?: string })?.error || "Error al crear el usuario.";
-      toast.error(errorMessage);
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error) || "Error al crear el usuario.");
     },
   });
 
-  const updateMutation = useMutation<unknown, AxiosError, IUserFormData>({
+  const updateMutation = useMutation<unknown, unknown, IUserFormData>({
     mutationFn: (data) => axios.put(`/api/users/${user!._id}`, data),
     onSuccess: () => {
       toast.success("Usuario actualizado con éxito!");
       queryClient.invalidateQueries({ queryKey: ["users"] });
       onOpenChange(false);
     },
-    onError: (error) => {
-      const errorMessage =
-        (error?.response?.data as { error?: string })?.error || "Error al actualizar el usuario.";
-      toast.error(errorMessage);
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error) || "Error al actualizar el usuario.");
     },
   });
 
@@ -201,7 +204,7 @@ export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogPro
                 <Label htmlFor="rol">Rol*</Label>
                 <Select
                   onValueChange={(value) => setValue("rol", value as UserRole)}
-                  defaultValue={(user?.rol ?? "vendedor") as UserRole}
+                  defaultValue={user?.rol ?? "vendedor"}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar rol..." />
@@ -242,10 +245,12 @@ export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogPro
                     <Label>CUIL</Label>
                     <Input {...register("personalData.cuil")} />
                   </div>
+
                   <div className="space-y-2">
                     <Label>Fecha de Nacimiento</Label>
                     <Input type="date" {...register("personalData.fechaNacimiento")} />
                   </div>
+
                   <div className="space-y-2">
                     <Label>Nacionalidad</Label>
                     <Input {...register("personalData.nacionalidad")} />
@@ -313,18 +318,22 @@ export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogPro
                     <Label>Puesto / Cargo</Label>
                     <Input {...register("laboralData.puesto")} />
                   </div>
+
                   <div className="space-y-2">
                     <Label>Fecha de Ingreso</Label>
                     <Input type="date" {...register("laboralData.fechaIngreso")} />
                   </div>
+
                   <div className="space-y-2">
                     <Label>Equipo / Sector</Label>
                     <Input {...register("laboralData.equipo")} />
                   </div>
+
                   <div className="space-y-2">
                     <Label>Teléfono Principal</Label>
                     <Input {...register("contactData.telefonoPrincipal")} />
                   </div>
+
                   <div className="space-y-2 col-span-full">
                     <Label>Email Personal</Label>
                     <Input type="email" {...register("contactData.emailPersonal")} />
@@ -333,15 +342,18 @@ export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogPro
 
                 <div className="p-4 border rounded-lg space-y-4">
                   <h5 className="text-sm font-semibold">Contacto de Emergencia</h5>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Nombre Completo</Label>
                       <Input {...register("contactData.contactoEmergencia.nombre")} />
                     </div>
+
                     <div className="space-y-2">
                       <Label>Parentesco</Label>
                       <Input {...register("contactData.contactoEmergencia.parentesco")} />
                     </div>
+
                     <div className="space-y-2 col-span-full">
                       <Label>Teléfono de Emergencia</Label>
                       <Input {...register("contactData.contactoEmergencia.telefono")} />
@@ -359,14 +371,17 @@ export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogPro
                     <Label>Banco</Label>
                     <Input {...register("financieraLegalData.banco")} />
                   </div>
+
                   <div className="space-y-2">
                     <Label>CBU / Alias</Label>
                     <Input {...register("financieraLegalData.cbu")} />
                   </div>
+
                   <div className="space-y-2">
                     <Label>Obra Social</Label>
                     <Input {...register("financieraLegalData.obraSocial")} />
                   </div>
+
                   <div className="space-y-2">
                     <Label>N° de Afiliado</Label>
                     <Input {...register("financieraLegalData.numeroAfiliado")} />
@@ -377,7 +392,10 @@ export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogPro
           </Accordion>
 
           <DialogFooter className="mt-6">
-            <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+            <Button
+              type="submit"
+              disabled={createMutation.isPending || updateMutation.isPending}
+            >
               {createMutation.isPending || updateMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Procesando...

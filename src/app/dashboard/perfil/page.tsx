@@ -21,35 +21,52 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AvatarUploader } from "./AvatarUploader";
 import { perfilSchema, type PerfilFormValues } from "./schema";
 
-type MeData = {
-  _id: string;
-  name: string | null;
-  email: string | null;
-  rol: string;
-  image: string | null;
-  personalData: any;
-  contactData: any;
-  laboralData: any;
-  financieraLegalData: any;
+type MeResponse = {
+  success: boolean;
+  data: {
+    _id: string;
+    name: string | null;
+    email: string | null;
+    rol: string;
+    image: string | null;
+
+    personalData: PerfilFormValues["personalData"];
+    contactData: PerfilFormValues["contactData"];
+    laboralData: PerfilFormValues["laboralData"];
+    financieraLegalData: PerfilFormValues["financieraLegalData"];
+  };
+  error?: string;
 };
 
-async function fetchMe(): Promise<MeData> {
-  const { data } = await axios.get("/api/users/me");
-  return data.data as MeData;
+async function fetchMe(): Promise<MeResponse["data"]> {
+  const { data } = await axios.get<MeResponse>("/api/users/me");
+  return data.data;
 }
 
-function isoDateOrEmpty(value: any): string {
-  // Soporta Date de Mongo o string; devolvemos yyyy-mm-dd o ""
-  if (!value) return "";
+function isoDateOrEmpty(value: unknown): string {
+  // Soporta Date de Mongo (serializado), string ISO o yyyy-mm-dd
+  if (value === null || value === undefined) return "";
   if (typeof value === "string") return value.slice(0, 10);
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return "";
+    return value.toISOString().slice(0, 10);
+  }
+
+  // si viene como number (timestamp) o similar
   try {
-    const d = new Date(value);
+    const d = new Date(value as never);
     if (Number.isNaN(d.getTime())) return "";
     return d.toISOString().slice(0, 10);
   } catch {
     return "";
   }
 }
+
+type SessionUpdatePayload = Partial<{
+  name: string | null;
+  image: string | null;
+}>;
 
 export default function PerfilPage() {
   const { data: session, update } = useSession();
@@ -153,28 +170,35 @@ export default function PerfilPage() {
     });
   }, [me]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const avatarSrc =
-    form.watch("image") || session?.user?.image || "/avatar-placeholder.png";
+  const avatarSrc = form.watch("image") || session?.user?.image || "/avatar-placeholder.png";
 
   const saveMutation = useMutation({
     mutationFn: async (values: PerfilFormValues) => {
       const { data } = await axios.put("/api/users/me", values);
-      return data;
+      return data as unknown;
     },
     onSuccess: async () => {
       toast.success("Perfil actualizado");
       await qc.invalidateQueries({ queryKey: ["me"] });
 
       const values = form.getValues();
-      await update({ name: values.name ?? null, image: values.image ?? null } as any);
+
+      const payload: SessionUpdatePayload = {
+        name: values.name ?? null,
+        image: values.image ?? null,
+      };
+
+      await update(payload);
 
       // marcar “sin cambios”
       form.reset(values);
     },
     onError: (err: unknown) => {
       const msg = axios.isAxiosError(err)
-        ? err.response?.data?.error || err.message
-        : "Error";
+        ? (err.response?.data as { error?: string } | undefined)?.error || err.message
+        : err instanceof Error
+          ? err.message
+          : "Error";
       toast.error("No se pudo guardar: " + msg);
     },
   });
@@ -252,13 +276,11 @@ export default function PerfilPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Nombre</Label>
-                    <Input
-                      {...form.register("name")}
-                      placeholder="Tu nombre"
-                      disabled={isBusy}
-                    />
+                    <Input {...form.register("name")} placeholder="Tu nombre" disabled={isBusy} />
                     {form.formState.errors.name?.message && (
-                      <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
+                      <p className="text-sm text-destructive">
+                        {form.formState.errors.name.message}
+                      </p>
                     )}
                   </div>
 
@@ -322,10 +344,7 @@ export default function PerfilPage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2 md:col-span-2">
                         <Label>Calle</Label>
-                        <Input
-                          {...form.register("personalData.direccion.calle")}
-                          disabled={isBusy}
-                        />
+                        <Input {...form.register("personalData.direccion.calle")} disabled={isBusy} />
                       </div>
 
                       <div className="space-y-2">
@@ -338,18 +357,12 @@ export default function PerfilPage() {
 
                       <div className="space-y-2">
                         <Label>Piso</Label>
-                        <Input
-                          {...form.register("personalData.direccion.piso")}
-                          disabled={isBusy}
-                        />
+                        <Input {...form.register("personalData.direccion.piso")} disabled={isBusy} />
                       </div>
 
                       <div className="space-y-2">
                         <Label>Depto</Label>
-                        <Input
-                          {...form.register("personalData.direccion.depto")}
-                          disabled={isBusy}
-                        />
+                        <Input {...form.register("personalData.direccion.depto")} disabled={isBusy} />
                       </div>
 
                       <div className="space-y-2 md:col-span-2">
@@ -547,9 +560,7 @@ export default function PerfilPage() {
                 variant="outline"
                 disabled={isBusy || !form.formState.isDirty}
                 onClick={() => {
-                  if (!me) return;
-                  // Reaplica el reset con lo que vino del servidor
-                  form.reset(form.getValues()); // fallback rápido
+                  // Descarta cambios: vuelve a pedir los datos (fuente de verdad)
                   qc.invalidateQueries({ queryKey: ["me"] });
                 }}
               >

@@ -48,6 +48,15 @@ export interface IUser2 {
   financieraLegalData?: IFinancieraLegalData;
 }
 
+function getErrorMessage(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    const data = err.response?.data as { error?: string; message?: string } | undefined;
+    return data?.error || data?.message || err.message || "Error";
+  }
+  if (err instanceof Error) return err.message;
+  return "Error";
+}
+
 export default function UsersPage() {
   const queryClient = useQueryClient();
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -73,7 +82,7 @@ export default function UsersPage() {
     queryKey: ["users"],
     queryFn: async () => {
       const { data } = await axios.get("/api/users");
-      return data.data;
+      return data.data as IUser2[];
     },
   });
 
@@ -96,12 +105,10 @@ export default function UsersPage() {
   };
 
   const handleEdit = async (userSummary: IUser2) => {
-    const promise = async () => {
+    const promise = async (): Promise<IUser2> => {
       const { data } = await axios.get(`/api/users/${userSummary._id}`);
       if (!data.success) {
-        throw new Error(
-          data.error || "No se pudieron cargar los datos del usuario.",
-        );
+        throw new Error(data.error || "No se pudieron cargar los datos del usuario.");
       }
       return data.data as IUser2;
     };
@@ -113,7 +120,7 @@ export default function UsersPage() {
         setIsFormOpen(true);
         return "Datos cargados con éxito.";
       },
-      error: (err: any) => err?.message || "Error al cargar los datos.",
+      error: (err: unknown) => getErrorMessage(err) || "Error al cargar los datos.",
     });
   };
 
@@ -165,9 +172,7 @@ export default function UsersPage() {
               <TableCell>{user.email}</TableCell>
 
               <TableCell>
-                <Badge variant="secondary">
-                  {roleLabel[user.rol] ?? user.rol}
-                </Badge>
+                <Badge variant="secondary">{roleLabel[user.rol] ?? user.rol}</Badge>
               </TableCell>
 
               <TableCell>
@@ -203,11 +208,7 @@ export default function UsersPage() {
         </TableBody>
       </Table>
 
-      <UserFormDialog
-        isOpen={isFormOpen}
-        onOpenChange={setIsFormOpen}
-        user={editingUser}
-      />
+      <UserFormDialog isOpen={isFormOpen} onOpenChange={setIsFormOpen} user={editingUser} />
 
       <AlertDialog
         open={!!userToDelete}
@@ -219,8 +220,7 @@ export default function UsersPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Estás completamente seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Esto eliminará permanentemente el
-              usuario.
+              Esta acción no se puede deshacer. Esto eliminará permanentemente el usuario.
             </AlertDialogDescription>
           </AlertDialogHeader>
 

@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/authOptions";
 import dbConnect from "@/lib/dbConnect";
 import UserModel from "@/models/User";
 import { z } from "zod";
+import type { Types } from "mongoose";
 
 const updateSchema = z.object({
   name: z.string().min(2).max(80).nullable().optional(),
@@ -69,18 +70,70 @@ const updateSchema = z.object({
     .optional(),
 });
 
-function normalizeEmptyToNull<T>(value: T): T {
-  // Convierte "" => null dentro de objetos (solo strings)
+type UpdateBody = z.infer<typeof updateSchema>;
+
+/**
+ * Tipo mínimo del usuario en formato lean().
+ * Ajustá "rol" si tu UserRole es más estricto (acá lo dejamos string para no acoplar route a roles.ts).
+ */
+type LeanUser = {
+  _id: Types.ObjectId;
+  name?: string | null;
+  email?: string | null;
+  rol: string;
+  activo?: boolean;
+  image?: string | null;
+
+  personalData?: Record<string, unknown>;
+  contactData?: Record<string, unknown>;
+  laboralData?: Record<string, unknown>;
+  financieraLegalData?: Record<string, unknown>;
+};
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Convierte strings vacíos => null en objetos anidados.
+ * No usa any (solo unknown + type guards).
+ */
+function normalizeEmptyToNull(value: unknown): unknown {
   if (value === null || value === undefined) return value;
-  if (typeof value === "string") return (value.trim() === "" ? (null as any) : value) as any;
-  if (Array.isArray(value)) return value.map(normalizeEmptyToNull) as any;
-  if (typeof value === "object") {
-    const obj: any = value;
-    const out: any = {};
-    for (const k of Object.keys(obj)) out[k] = normalizeEmptyToNull(obj[k]);
+
+  if (typeof value === "string") {
+    return value.trim() === "" ? null : value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((v) => normalizeEmptyToNull(v));
+  }
+
+  if (isPlainObject(value)) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      out[k] = normalizeEmptyToNull(v);
+    }
     return out;
   }
+
   return value;
+}
+
+function toResponseUser(user: LeanUser) {
+  return {
+    _id: user._id,
+    name: user.name ?? null,
+    email: user.email ?? null,
+    rol: user.rol,
+    activo: user.activo ?? true,
+    image: user.image ?? null,
+
+    personalData: user.personalData ?? {},
+    contactData: user.contactData ?? {},
+    laboralData: user.laboralData ?? {},
+    financieraLegalData: user.financieraLegalData ?? {},
+  };
 }
 
 export async function GET() {
@@ -89,25 +142,10 @@ export async function GET() {
 
   await dbConnect();
 
-  const user = await UserModel.findById(session.user.id).lean();
-  if (!user || Array.isArray(user)) return new NextResponse("No encontrado", { status: 404 });
+  const user = (await UserModel.findById(session.user.id).lean()) as LeanUser | null;
+  if (!user) return new NextResponse("No encontrado", { status: 404 });
 
-  return NextResponse.json({
-    success: true,
-    data: {
-      _id: (user as any)._id,
-      name: (user as any).name ?? null,
-      email: (user as any).email ?? null,
-      rol: (user as any).rol,
-      activo: (user as any).activo,
-      image: (user as any).image ?? null,
-
-      personalData: (user as any).personalData ?? {},
-      contactData: (user as any).contactData ?? {},
-      laboralData: (user as any).laboralData ?? {},
-      financieraLegalData: (user as any).financieraLegalData ?? {},
-    },
-  });
+  return NextResponse.json({ success: true, data: toResponseUser(user) });
 }
 
 export async function PUT(req: NextRequest) {
@@ -116,7 +154,7 @@ export async function PUT(req: NextRequest) {
 
   await dbConnect();
 
-  const raw = await req.json();
+  const raw: unknown = await req.json();
   const parsed = updateSchema.safeParse(raw);
 
   if (!parsed.success) {
@@ -126,7 +164,19 @@ export async function PUT(req: NextRequest) {
     );
   }
 
-  const body = normalizeEmptyToNull(parsed.data);
+  // Normalizamos "" => null sin any
+  const normalizedUnknown = normalizeEmptyToNull(parsed.data);
+
+  // Volvemos a asegurar tipo (safe) antes de usar
+  const normalizedParsed = updateSchema.safeParse(normalizedUnknown);
+  if (!normalizedParsed.success) {
+    return NextResponse.json(
+      { success: false, error: "Datos inválidos", details: normalizedParsed.error.flatten() },
+      { status: 400 },
+    );
+  }
+
+  const body: UpdateBody = normalizedParsed.data;
 
   // whitelist explícita
   const $set: Record<string, unknown> = {};
@@ -139,21 +189,13 @@ export async function PUT(req: NextRequest) {
   if (body.laboralData !== undefined) $set["laboralData"] = body.laboralData;
   if (body.financieraLegalData !== undefined) $set["financieraLegalData"] = body.financieraLegalData;
 
-  const updated = await UserModel.findByIdAndUpdate(session.user.id, { $set }, { new: true }).lean();
-  if (!updated || Array.isArray(updated)) return new NextResponse("No encontrado", { status: 404 });
+  const updated = (await UserModel.findByIdAndUpdate(
+    session.user.id,
+    { $set },
+    { new: true },
+  ).lean()) as LeanUser | null;
 
-  return NextResponse.json({
-    success: true,
-    data: {
-      _id: (updated as any)._id,
-      name: (updated as any).name ?? null,
-      email: (updated as any).email ?? null,
-      rol: (updated as any).rol,
-      image: (updated as any).image ?? null,
-      personalData: (updated as any).personalData ?? {},
-      contactData: (updated as any).contactData ?? {},
-      laboralData: (updated as any).laboralData ?? {},
-      financieraLegalData: (updated as any).financieraLegalData ?? {},
-    },
-  });
+  if (!updated) return new NextResponse("No encontrado", { status: 404 });
+
+  return NextResponse.json({ success: true, data: toResponseUser(updated) });
 }
