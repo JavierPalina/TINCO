@@ -18,11 +18,11 @@ type Item = {
   createdAt: string;
 };
 
-export default function StockItemDetailPage({ params }: { params: { itemId: string } }) {
+export default function StockItemDetailClient({ itemId }: { itemId: string }) {
   const { data, isLoading } = useQuery<Item>({
-    queryKey: ["itemDetail", params.itemId],
+    queryKey: ["itemDetail", itemId],
     queryFn: async () => {
-      const { data } = await axios.get(`/api/items/${params.itemId}`);
+      const { data } = await axios.get(`/api/items/${itemId}`);
       return data.data;
     },
   });
