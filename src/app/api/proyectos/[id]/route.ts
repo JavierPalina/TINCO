@@ -38,9 +38,9 @@ interface ProyectoUpdateBody {
 // ✅ GET: traer un proyecto por ID (para la vista detalle)
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = params;
+  const { id } = await params;
 
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse("No autorizado", { status: 401 });
@@ -48,8 +48,6 @@ export async function GET(
   await dbConnect();
 
   try {
-    // Si querés populado (cliente/vendedor), descomentá/ajustá según tu schema:
-    // const proyecto = await Proyecto.findById(id).populate("cliente").populate("vendedor");
     const proyecto = await Proyecto.findById(id);
 
     if (!proyecto) {
