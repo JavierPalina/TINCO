@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
     // Búsqueda (después del lookup para permitir buscar por empresaNombre)
     if (searchTermRaw) {
       const safeTerm = escapeRegex(searchTermRaw);
-      const searchRegex = new RegExp(`^${safeTerm}`, "i");
+      const searchRegex = new RegExp(safeTerm, "i");
 
       const searchMatch: mongoose.PipelineStage.Match = {
         $match: {
