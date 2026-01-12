@@ -292,7 +292,7 @@ function QuoteCard({
             </div>
 
             <div className="mt-2">
-              <Link href={`/dashboard/clientes/${quote.cliente._id}`}>
+              <Link href={`/dashboard/listados/${quote.cliente._id}`}>
                 <p className="text-sm font-semibold hover:underline hover:text-primary transition-colors truncate">
                   {quote.cliente.nombreCompleto}
                 </p>

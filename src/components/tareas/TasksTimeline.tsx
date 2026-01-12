@@ -46,7 +46,7 @@ export function TasksTimeline({ tasks }: Props) {
             <div key={task._id} className="h-12 flex items-center truncate text-sm">
               {task.cliente?._id ? (
                 <Link
-                  href={`/dashboard/clientes/${task.cliente._id}`}
+                  href={`/dashboard/listados/${task.cliente._id}`}
                   className="hover:underline font-medium"
                 >
                   {task.titulo}

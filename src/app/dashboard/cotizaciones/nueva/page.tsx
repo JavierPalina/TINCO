@@ -62,7 +62,7 @@ function CreateQuoteForm() {
       return axios.post(`/api/clientes/${clientId}/cotizaciones`, newQuote);
     },
     onSuccess: () => {
-      router.push(`/dashboard/clientes/${clientId}`);
+      router.push(`/dashboard/listados/${clientId}`);
     },
     onError: (error) => {
       console.error("Error al crear la cotización:", error);

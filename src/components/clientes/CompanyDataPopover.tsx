@@ -1,82 +1,158 @@
 "use client";
 
-import { useForm, SubmitHandler } from 'react-hook-form';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import { useMemo, useState, useEffect } from "react";
+import { useForm, SubmitHandler } from "react-hook-form";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Building2 } from 'lucide-react';
-import { Client } from '@/types/client';
-import { Label } from '../ui/label';
-import { Input } from '../ui/input';
 
-type CompanyFormInputs = {
-  empresa?: string;
-  direccionEmpresa?: string;
-  ciudadEmpresa?: string;
-  paisEmpresa?: string;
-  razonSocial?: string;
-  contactoEmpresa?: string;
-  cuil?: string;
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Building2 } from "lucide-react";
+import { Client } from "@/types/client";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
+
+type EmpresaLite = {
+  _id: string;
+  razonSocial: string;
+  nombreFantasia?: string;
+  cuit?: string;
 };
 
-export function CompanyDataPopover({ client }: { client: Client }) {
-  const { register, handleSubmit } = useForm<CompanyFormInputs>({
-    defaultValues: {
-      empresa: client.empresa || '',
-      direccionEmpresa: client.direccionEmpresa || '',
-      ciudadEmpresa: client.ciudadEmpresa || '',
-      paisEmpresa: client.paisEmpresa || '',
-      razonSocial: client.razonSocial || '',
-      contactoEmpresa: client.contactoEmpresa || '',
-      cuil: client.cuil || '',
-    }
-  });
+type FormInputs = {
+  empresaAsignada: string; // "" => none
+};
+
+export function CompanyDataPopover({ client }: { client: Client & any }) {
   const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
+
+  const { data: empresasLite, isLoading } = useQuery<EmpresaLite[]>({
+    queryKey: ["empresas-lite", search],
+    queryFn: async () => {
+      const { data } = await axios.get("/api/empresas/simple", { params: { q: search } });
+      return data.data;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const options = useMemo(() => {
+    return [
+      { value: "", label: "Sin empresa" },
+      ...(empresasLite || []).map((e) => ({
+        value: e._id,
+        label: `${e.razonSocial}${e.cuit ? ` — ${e.cuit}` : ""}`,
+      })),
+    ];
+  }, [empresasLite]);
+
+  const currentEmpresaId = (client.empresaAsignada || "") as string;
+
+  const { handleSubmit, setValue, watch } = useForm<FormInputs>({
+    defaultValues: { empresaAsignada: currentEmpresaId },
+  });
+
+  const empresaAsignada = watch("empresaAsignada") || "";
+
+  useEffect(() => {
+    // si cambia el cliente, actualizo valor
+    setValue("empresaAsignada", currentEmpresaId);
+  }, [currentEmpresaId, setValue]);
+
+  const selectedEmpresa = useMemo(() => {
+    if (!empresaAsignada) return null;
+    return (empresasLite || []).find((e) => e._id === empresaAsignada) || null;
+  }, [empresaAsignada, empresasLite]);
 
   const mutation = useMutation({
-    mutationFn: (data: CompanyFormInputs) => {
-      return axios.put(`/api/clientes/${client._id}`, data);
+    mutationFn: async (payload: FormInputs) => {
+      return axios.put(`/api/clientes/${client._id}`, {
+        empresaAsignada: payload.empresaAsignada || null,
+      });
     },
-    onSuccess: () => {
-      toast.success("Datos de la empresa actualizados");
-      queryClient.invalidateQueries({ queryKey: ['clientes'] });
-      queryClient.invalidateQueries({ queryKey: ['cliente', client._id] });
+    onSuccess: async () => {
+      toast.success("Empresa actualizada");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["clientes"] }),
+        queryClient.invalidateQueries({ queryKey: ["cliente", client._id] }),
+      ]);
     },
-    onError: (error) => {
+    onError: () => {
       toast.error("Error al actualizar", {
-        description: "No se pudieron guardar los cambios."
+        description: "No se pudieron guardar los cambios.",
       });
     },
   });
 
-  const onSubmit: SubmitHandler<CompanyFormInputs> = (data) => mutation.mutate(data);
+  const onSubmit: SubmitHandler<FormInputs> = (data) => mutation.mutate(data);
 
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button size="icon" className="h-7 w-7 bg-primary/10 hover:bg-primary/40 text-primary" style={{marginLeft: "4px"}}>
+        <Button
+          size="icon"
+          className="h-7 w-7 bg-primary/10 hover:bg-primary/40 text-primary"
+          style={{ marginLeft: "4px" }}
+          title="Cambiar empresa"
+        >
           <Building2 className="h-4 w-4" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-96">
+
+      <PopoverContent className="w-[420px]">
         <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
-          <div className="space-y-2">
-            <h4 className="font-medium leading-none">Datos de la Empresa</h4>
-            <p className="text-sm text-muted-foreground">Edita la información de la empresa asociada.</p>
+          <div className="space-y-1">
+            <h4 className="font-medium leading-none">Empresa del cliente</h4>
+            <p className="text-sm text-muted-foreground">
+              Se asigna una única empresa existente. Los datos provienen del módulo Empresas.
+            </p>
           </div>
+
           <div className="grid gap-2">
-            <div className="grid grid-cols-3 items-center gap-4"><Label htmlFor="empresa" className="text-right">Nombre</Label><Input id="empresa" {...register("empresa")} className="col-span-2 h-8" /></div>
-            <div className="grid grid-cols-3 items-center gap-4"><Label htmlFor="razonSocial" className="text-right">Razón Social</Label><Input id="razonSocial" {...register("razonSocial")} className="col-span-2 h-8" /></div>
-            <div className="grid grid-cols-3 items-center gap-4"><Label htmlFor="cuil" className="text-right">CUIL/CUIT</Label><Input id="cuil" {...register("cuil")} className="col-span-2 h-8" /></div>
-            <div className="grid grid-cols-3 items-center gap-4"><Label htmlFor="contactoEmpresa" className="text-right">Contacto</Label><Input id="contactoEmpresa" {...register("contactoEmpresa")} className="col-span-2 h-8" /></div>
-            <div className="grid grid-cols-3 items-center gap-4"><Label htmlFor="direccionEmpresa" className="text-right">Dirección</Label><Input id="direccionEmpresa" {...register("direccionEmpresa")} className="col-span-2 h-8" /></div>
-            <div className="grid grid-cols-3 items-center gap-4"><Label htmlFor="ciudadEmpresa" className="text-right">Ciudad</Label><Input id="ciudadEmpresa" {...register("ciudadEmpresa")} className="col-span-2 h-8" /></div>
-            <div className="grid grid-cols-3 items-center gap-4"><Label htmlFor="paisEmpresa" className="text-right">País</Label><Input id="paisEmpresa" {...register("paisEmpresa")} className="col-span-2 h-8" /></div>
+            <Label>Buscar empresa</Label>
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Razón social, nombre fantasía o CUIT..."
+            />
           </div>
+
+          <div className="grid gap-2">
+            <Label>Empresa asignada</Label>
+            <Combobox
+              options={options}
+              value={empresaAsignada}
+              onChange={(v) => setValue("empresaAsignada", v)}
+              placeholder={isLoading ? "Cargando..." : "Seleccionar empresa..."}
+            />
+          </div>
+
+          <div className="grid gap-2 rounded-md border p-3">
+            <div className="text-sm font-medium">Detalle (solo lectura)</div>
+            {selectedEmpresa ? (
+              <div className="grid gap-1 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Razón social: </span>
+                  <span>{selectedEmpresa.razonSocial}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Nombre fantasía: </span>
+                  <span>{selectedEmpresa.nombreFantasia || "-"}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">CUIT: </span>
+                  <span>{selectedEmpresa.cuit || "-"}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">Sin empresa seleccionada.</div>
+            )}
+          </div>
+
           <Button type="submit" size="sm" disabled={mutation.isPending}>
-            {mutation.isPending ? "Guardando..." : "Guardar Cambios"}
+            {mutation.isPending ? "Guardando..." : "Guardar"}
           </Button>
         </form>
       </PopoverContent>

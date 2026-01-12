@@ -59,7 +59,7 @@ export function NotificationBell() {
             {urgentTasks.length > 0 ? (
               urgentTasks.slice(0, 4).map(task => (
                 <div key={task._id} className="text-sm">
-                  <Link href={`/dashboard/clientes/${task.cliente?._id}`} className="font-semibold hover:underline">
+                  <Link href={`/dashboard/listados/${task.cliente?._id}`} className="font-semibold hover:underline">
                     {task.titulo}
                   </Link>
                   <p className="text-muted-foreground">

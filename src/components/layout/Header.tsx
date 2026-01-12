@@ -183,13 +183,12 @@ export function Header() {
     return items;
   }, []);
 
-  // Para el logo: si no tiene pipeline, mandalo a proyectos o clientes
   const homeHref = showPipeline
     ? "/dashboard/pipeline"
     : showProyectos
       ? "/dashboard/proyectos"
       : showClientes
-        ? "/dashboard/clientes"
+        ? "/dashboard/listados"
         : "/dashboard";
 
   const avatarSrc =
@@ -248,7 +247,7 @@ export function Header() {
               </DropdownMenu>
             )}
 
-            {showClientes && <NavLink href="/dashboard/clientes">Clientes</NavLink>}
+            {showClientes && <NavLink href="/dashboard/listados">Listados</NavLink>}
 
             {showNotificaciones && <NavLink href="/dashboard/notificaciones">Notificaciones</NavLink>}
 
@@ -457,7 +456,7 @@ export function Header() {
 
                 {showClientes && (
                   <DropdownMenuItem asChild>
-                    <Link href="/dashboard/clientes">Clientes</Link>
+                    <Link href="/dashboard/listados">Listados</Link>
                   </DropdownMenuItem>
                 )}
 

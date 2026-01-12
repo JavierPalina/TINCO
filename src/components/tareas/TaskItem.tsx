@@ -56,7 +56,7 @@ export function TaskItem({ task }: { task: Task }) {
         <p className="text-sm text-muted-foreground">
           Cliente:{" "}
           <Link
-            href={`/dashboard/clientes/${task.cliente._id}`}
+            href={`/dashboard/listados/${task.cliente._id}`}
             className="hover:underline text-primary"
           >
             {task.cliente.nombreCompleto}

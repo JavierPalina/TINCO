@@ -48,7 +48,7 @@ export function ClientCard({ client }: { client: ClientCardProps }) {
                     <CardHeader className="flex flex-row items-start justify-between p-3 space-y-0">
                         <div>
                             <CardTitle className="text-base font-semibold leading-none">
-                                <Link href={`/dashboard/clientes/${client._id}`} className="hover:underline">
+                                <Link href={`/dashboard/listados/${client._id}`} className="hover:underline">
                                     {client.nombreCompleto}
                                 </Link>
                             </CardTitle>

@@ -49,7 +49,7 @@ export function ClientMobileCard({ client, prioridadesOptions }: Props) {
             <div className="min-w-0">
               <CardTitle className="text-base leading-tight">
                 <Link
-                  href={`/dashboard/clientes/${client._id}`}
+                  href={`/dashboard/listados/${client._id}`}
                   className="hover:underline truncate block"
                 >
                   {toTitle(client.nombreCompleto)}
