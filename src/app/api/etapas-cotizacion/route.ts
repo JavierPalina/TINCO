@@ -1,3 +1,5 @@
+// src/app/api/etapas-cotizacion/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import EtapaCotizacion from '@/models/EtapaCotizacion';

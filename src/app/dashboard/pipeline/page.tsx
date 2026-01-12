@@ -39,7 +39,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CreateQuoteDialog } from "@/components/cotizaciones/CreateQuoteDialog";
 import { SortableContext, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { QuotesPipelineFilters, Filters } from "@/components/cotizaciones/QuotesPipelineFilters";
+import {
+  QuotesPipelineFilters,
+  Filters,
+} from "@/components/cotizaciones/QuotesPipelineFilters";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -110,6 +113,7 @@ interface PipelineViewProps {
   columns: Columns;
   onDelete: (quoteId: string) => void;
   onUndo: (quoteId: string) => void;
+  onDeleteStage: (etapa: Etapa) => void;
   sensors: ReturnType<typeof useSensors>;
   onDragStart: (event: DragStartEvent) => void;
   onDragEnd: (event: DragEndEvent) => void;
@@ -164,18 +168,11 @@ function QuoteCard({
   onUndo: (quoteId: string) => void;
   stageColors: StageColorMap;
 }) {
-  // ✅ Cambio clave para mobile: listeners SOLO en un "handle"
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
-    id: quote._id,
-    data: { type: "Quote", quote },
-  });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({
+      id: quote._id,
+      data: { type: "Quote", quote },
+    });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -200,7 +197,7 @@ function QuoteCard({
   const handleWhatsApp = () => {
     const phone = "5491111111111";
     const message = encodeURIComponent(
-      `Hola ${quote.cliente?.nombreCompleto}, te escribo por la cotización ${quote.codigo}`,
+      `Hola ${quote.cliente?.nombreCompleto}, te escribo por la cotización ${quote.codigo}`
     );
     window.open(`https://wa.me/${phone}?text=${message}`, "_blank");
   };
@@ -227,7 +224,7 @@ function QuoteCard({
                       backgroundColor: stageColors[h.etapa?._id] || "#ccc",
                     }}
                     title={`${h.etapa?.nombre} - ${new Date(h.fecha).toLocaleDateString(
-                      "es-AR",
+                      "es-AR"
                     )}`}
                   />
                 ))}
@@ -242,7 +239,7 @@ function QuoteCard({
                     variant="outline"
                     className={cn(
                       "mt-1 text-xs ml-1 align-middle",
-                      prioridadStyles[quote.cliente.prioridad] || "",
+                      prioridadStyles[quote.cliente.prioridad] || ""
                     )}
                   >
                     {quote.cliente.prioridad}
@@ -251,7 +248,6 @@ function QuoteCard({
               </div>
 
               <div className="flex items-center gap-1 flex-shrink-0">
-                {/* ✅ Handle de drag (evita arrastre accidental en mobile) */}
                 <button
                   type="button"
                   className="inline-flex h-8 w-8 items-center justify-center rounded-md border bg-background text-muted-foreground active:scale-[0.98]"
@@ -278,7 +274,8 @@ function QuoteCard({
                       className="text-red-600 focus:text-red-600"
                       onSelect={() => onUndo(quote._id)}
                     >
-                      <StepBackIcon className="mr-2 h-4 w-4" /> Deshacer última acción
+                      <StepBackIcon className="mr-2 h-4 w-4" /> Deshacer última
+                      acción
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-red-600 focus:text-red-600"
@@ -316,7 +313,10 @@ function QuoteCard({
                   </span>
                 </button>
 
-                <TableCellActions client={quote?.cliente as Client} actionType="notas" />
+                <TableCellActions
+                  client={quote?.cliente as Client}
+                  actionType="notas"
+                />
                 <div style={{ marginLeft: -6 }}>
                   <TableCellActions
                     client={quote?.cliente as Client}
@@ -362,6 +362,7 @@ function QuoteColumn({
   stageColors,
   isFetching,
   onUndo,
+  onDeleteStage,
   highlight = false,
 }: {
   id: string;
@@ -371,12 +372,13 @@ function QuoteColumn({
   onUndo: (quoteId: string) => void;
   stageColors: StageColorMap;
   isFetching: boolean;
+  onDeleteStage: (etapa: Etapa) => void;
   highlight?: boolean;
 }) {
   const quoteIds = useMemo(() => quotes.map((q) => q._id), [quotes]);
   const totalAmount = useMemo(
     () => quotes.reduce((sum, quote) => sum + quote.montoTotal, 0),
-    [quotes],
+    [quotes]
   );
 
   const { setNodeRef, isOver } = useSortable({ id, data: { type: "Column" } });
@@ -387,11 +389,11 @@ function QuoteColumn({
       className={cn(
         "w-80 h-full flex flex-col flex-shrink-0 rounded-lg bg-card shadow-sm transition-colors duration-300 border",
         isOver && "bg-primary/10",
-        highlight && "border-emerald-500 ring-2 ring-emerald-500/25 bg-emerald-500/10",
-        isOver && highlight && "bg-emerald-500/15",
+        highlight &&
+          "border-emerald-500 ring-2 ring-emerald-500/25 bg-emerald-500/10",
+        isOver && highlight && "bg-emerald-500/15"
       )}
     >
-      {/* header de la columna */}
       <div className="p-3 pb-1 sticky top-0 bg-card/80 backdrop-blur-sm z-10 rounded-t-lg">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2 min-w-0">
@@ -401,17 +403,45 @@ function QuoteColumn({
             />
             <h2 className="font-semibold text-base truncate">{etapa.nombre}</h2>
           </div>
-          <span className="text-xs font-semibold text-muted-foreground bg-secondary rounded-full px-2 py-0.5">
-            {quotes.length} Leads
-          </span>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-muted-foreground bg-secondary rounded-full px-2 py-0.5">
+              {quotes.length} Leads
+            </span>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  className="text-red-600 focus:text-red-600"
+                  onSelect={() => {
+                    // UX: aviso rápido si ya sabemos que hay leads
+                    if (quotes.length > 0) {
+                      toast.error(
+                        "No podés eliminar esta etapa porque tiene leads. Movelos a otra etapa antes de eliminar."
+                      );
+                      return;
+                    }
+                    onDeleteStage(etapa);
+                  }}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" /> Eliminar etapa
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
+
         <div className="flex items-center gap-1 text-base font-bold">
           <DollarSign className="h-4 w-4" />
           <span>{totalAmount.toLocaleString("es-AR")}</span>
         </div>
       </div>
 
-      {/* cards */}
       <div className="flex-grow overflow-y-auto p-2">
         {isFetching ? (
           <div className="space-y-2">
@@ -444,7 +474,6 @@ function QuoteColumn({
         )}
       </div>
 
-      {/* Totales debajo de la columna */}
       <div className="border-t px-3 py-2 bg-muted/40 text-[11px] flex flex-col gap-1 rounded-b-lg">
         <div className="flex justify-between">
           <span className="text-muted-foreground">Leads</span>
@@ -452,7 +481,9 @@ function QuoteColumn({
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Total</span>
-          <span className="font-semibold">${totalAmount.toLocaleString("es-AR")}</span>
+          <span className="font-semibold">
+            ${totalAmount.toLocaleString("es-AR")}
+          </span>
         </div>
       </div>
     </div>
@@ -492,7 +523,8 @@ function QuotesTableView({
                     <div
                       className="w-2.5 h-2.5 rounded-full"
                       style={{
-                        backgroundColor: stageColors[quote.etapa._id] || quote.etapa.color,
+                        backgroundColor:
+                          stageColors[quote.etapa._id] || quote.etapa.color,
                       }}
                     />
                     {quote.etapa.nombre}
@@ -539,6 +571,7 @@ function PipelineView({
   columns,
   onDelete,
   onUndo,
+  onDeleteStage,
   sensors,
   onDragStart,
   onDragEnd,
@@ -548,7 +581,6 @@ function PipelineView({
 }: PipelineViewProps) {
   return (
     <>
-      {/* Desktop */}
       <div className="hidden md:flex" style={{ height: "calc(100vh - 206px)" }}>
         <DndContext
           sensors={sensors}
@@ -566,6 +598,7 @@ function PipelineView({
                   quotes={columns[etapa._id] || []}
                   onDelete={onDelete}
                   onUndo={onUndo}
+                  onDeleteStage={onDeleteStage}
                   stageColors={stageColors}
                   isFetching={isFetching}
                   highlight={
@@ -592,12 +625,11 @@ function PipelineView({
                   </div>
                 ) : null}
               </DragOverlay>,
-              document.body,
+              document.body
             )}
         </DndContext>
       </div>
 
-      {/* Mobile: snap horizontal + ancho cómodo */}
       <div className="md:hidden" style={{ height: "calc(100vh - 206px)" }}>
         <DndContext
           sensors={sensors}
@@ -618,6 +650,7 @@ function PipelineView({
                     quotes={columns[etapa._id] || []}
                     onDelete={onDelete}
                     onUndo={onUndo}
+                    onDeleteStage={onDeleteStage}
                     stageColors={stageColors}
                     isFetching={isFetching}
                     highlight={
@@ -645,7 +678,7 @@ function PipelineView({
                   </div>
                 ) : null}
               </DragOverlay>,
-              document.body,
+              document.body
             )}
         </DndContext>
       </div>
@@ -665,9 +698,9 @@ export default function PipelinePage() {
   const [columns, setColumns] = useState<Columns>({});
   const [activeQuote, setActiveQuote] = useState<Cotizacion | null>(null);
   const [quoteToDelete, setQuoteToDelete] = useState<string | null>(null);
+  const [stageToDelete, setStageToDelete] = useState<Etapa | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("pipeline");
 
-  // ✅ Overlay bloqueante de movimiento
   const [isMoveBlocking, setIsMoveBlocking] = useState(false);
   const [moveBlockingLabel, setMoveBlockingLabel] = useState<string>("");
 
@@ -709,7 +742,6 @@ export default function PipelinePage() {
     const total = etapas.length;
 
     etapas.forEach((etapa, index) => {
-      // columnas verdes especiales
       if (
         etapa.nombre === "Proyecto por Iniciar" ||
         etapa.nombre === "Proyectos no realizados" ||
@@ -733,9 +765,18 @@ export default function PipelinePage() {
     return colorMap;
   }, [etapas]);
 
-  const queryKey = ["cotizacionesPipeline", debouncedSearchTerm, filters.vendedorId, filters.dateRange];
+  const queryKey = [
+    "cotizacionesPipeline",
+    debouncedSearchTerm,
+    filters.vendedorId,
+    filters.dateRange,
+  ];
 
-  const { data: cotizaciones, isLoading: isLoadingQuotes, isFetching } = useQuery<Cotizacion[]>({
+  const {
+    data: cotizaciones,
+    isLoading: isLoadingQuotes,
+    isFetching,
+  } = useQuery<Cotizacion[]>({
     queryKey,
     queryFn: async () => {
       const params = {
@@ -768,10 +809,9 @@ export default function PipelinePage() {
     }
   }, [etapas, cotizaciones]);
 
-  // ✅ Sensores más "mobile friendly"
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } })
   );
 
   const updateQuoteStage = useMutation({
@@ -784,7 +824,11 @@ export default function PipelinePage() {
   });
 
   const updateQuoteWithFormData = useMutation({
-    mutationFn: (data: { quoteId: string; newStageId: string; formData: Record<string, unknown> }) =>
+    mutationFn: (data: {
+      quoteId: string;
+      newStageId: string;
+      formData: Record<string, unknown>;
+    }) =>
       axios.put(`/api/cotizaciones/${data.quoteId}/move`, {
         etapa: data.newStageId,
         historial: data.formData,
@@ -807,7 +851,7 @@ export default function PipelinePage() {
     },
   });
 
-  const deleteMutation = useMutation({
+  const deleteQuoteMutation = useMutation({
     mutationFn: (quoteId: string) => axios.delete(`/api/cotizaciones/${quoteId}`),
     onSuccess: () => {
       toast.success("Cotización eliminada con éxito.");
@@ -817,9 +861,33 @@ export default function PipelinePage() {
     onError: () => toast.error("Error al eliminar la cotización."),
   });
 
+  // ✅ Eliminar etapa + su formulario (si el backend devuelve 409, avisamos que debe mover leads)
+  const deleteStageMutation = useMutation({
+    mutationFn: (stageId: string) => axios.delete(`/api/etapas-cotizacion/${stageId}`),
+    onSuccess: async () => {
+      toast.success("Etapa eliminada con éxito.");
+      await queryClient.invalidateQueries({ queryKey: ["etapasCotizacion"] });
+      await queryClient.invalidateQueries({ queryKey });
+      setStageToDelete(null);
+    },
+    onError: (err: any) => {
+      const status = err?.response?.status;
+      const message =
+        err?.response?.data?.error || "No se pudo eliminar la etapa.";
+
+      if (status === 409) {
+        toast.error(message);
+      } else {
+        toast.error(message);
+      }
+    },
+  });
+
   function findContainer(id: string) {
     if (columns[id]) return id;
-    return Object.keys(columns).find((key) => columns[key].some((item) => item._id === id));
+    return Object.keys(columns).find((key) =>
+      columns[key].some((item) => item._id === id)
+    );
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -846,12 +914,10 @@ export default function PipelinePage() {
       return;
     }
 
-    // Movimiento entre columnas (cambio de etapa)
     if (activeContainer !== overContainer) {
       const quote = columns[activeContainer].find((q) => q._id === activeId);
       if (!quote) return;
 
-      // ✅ Bloqueo mientras consultamos si hay formulario
       setMoveBlockingLabel("Verificando requisitos de la etapa...");
       setIsMoveBlocking(true);
 
@@ -859,7 +925,6 @@ export default function PipelinePage() {
         const { data } = await axios.get(`/api/formularios-etapa/${overContainer}`);
         const camposFormulario = data.data?.campos || [];
 
-        // Hay formulario → abrimos modal (no movemos aún)
         if (camposFormulario.length > 0) {
           setFormFieldsForStage(camposFormulario);
           setQuoteToMove(quote);
@@ -869,7 +934,6 @@ export default function PipelinePage() {
           return;
         }
 
-        // No hay formulario → mover directo
         setMoveBlockingLabel("Moviendo cotización...");
 
         const newSourceItems = [...columns[activeContainer]];
@@ -888,7 +952,6 @@ export default function PipelinePage() {
           movedItem.etapa = nuevaEtapa;
         }
 
-        // Optimistic UI
         newDestItems.unshift(movedItem);
         setColumns((prev) => ({
           ...prev,
@@ -902,7 +965,6 @@ export default function PipelinePage() {
             newStageId: overContainer,
           });
 
-          // Si la nueva etapa es "Proyecto por Iniciar", creamos Proyecto
           if (nuevaEtapa?.nombre === "Proyecto por Iniciar") {
             setMoveBlockingLabel("Creando proyecto...");
             try {
@@ -913,7 +975,9 @@ export default function PipelinePage() {
               });
 
               toast.success(
-                `Proyecto creado para ${movedItem.cliente?.nombreCompleto || "el cliente"}`,
+                `Proyecto creado para ${
+                  movedItem.cliente?.nombreCompleto || "el cliente"
+                }`
               );
             } catch (error) {
               console.error("Error creando proyecto desde cotización", error);
@@ -936,7 +1000,6 @@ export default function PipelinePage() {
         setMoveBlockingLabel("");
       }
     } else {
-      // Reordenar dentro de la misma columna
       const activeIndex = columns[activeContainer].findIndex((q) => q._id === activeId);
       const overIndex = columns[overContainer].findIndex((q) => q._id === overId);
 
@@ -973,10 +1036,8 @@ export default function PipelinePage() {
 
   return (
     <div className="flex flex-col bg-muted/20">
-      {/* ✅ Overlay bloqueante */}
       <BlockingMoveOverlay show={isMoveBlocking} label={moveBlockingLabel} />
 
-      {/* Header: más usable en mobile */}
       <div className="p-4 border-b flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h1 className="text-2xl sm:text-3xl font-bold">Pipeline de Cotizaciones</h1>
@@ -1007,10 +1068,11 @@ export default function PipelinePage() {
               etapa: newEtapa || quoteToMove.etapa,
             };
 
-            // Optimistic UI
             setColumns((prev) => {
               const newPrev = { ...prev };
-              const newSourceItems = newPrev[activeContainer].filter((q) => q._id !== quoteId);
+              const newSourceItems = newPrev[activeContainer].filter(
+                (q) => q._id !== quoteId
+              );
               const newDestItems = [movedQuote, ...newPrev[overContainer]];
               return {
                 ...newPrev,
@@ -1019,7 +1081,6 @@ export default function PipelinePage() {
               };
             });
 
-            // ✅ Bloqueo durante el move con historial
             setMoveBlockingLabel("Moviendo cotización...");
             setIsMoveBlocking(true);
 
@@ -1039,7 +1100,9 @@ export default function PipelinePage() {
                     estadoActual: null,
                   });
                   toast.success(
-                    `Proyecto creado para ${quoteToMove.cliente?.nombreCompleto || "el cliente"}`,
+                    `Proyecto creado para ${
+                      quoteToMove.cliente?.nombreCompleto || "el cliente"
+                    }`
                   );
                 } catch (error) {
                   console.error("Error creando proyecto desde cotización", error);
@@ -1085,6 +1148,7 @@ export default function PipelinePage() {
       </div>
 
       <div className="flex-grow overflow-auto px-4">
+        {/* Confirmación eliminar cotización */}
         <AlertDialog open={!!quoteToDelete} onOpenChange={() => setQuoteToDelete(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -1096,7 +1160,29 @@ export default function PipelinePage() {
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => deleteMutation.mutate(quoteToDelete!)}
+                onClick={() => deleteQuoteMutation.mutate(quoteToDelete!)}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Sí, eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Confirmación eliminar etapa */}
+        <AlertDialog open={!!stageToDelete} onOpenChange={() => setStageToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Eliminar etapa</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción eliminará la etapa y su formulario asociado. Si la etapa contiene leads,
+                se te pedirá moverlos antes.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteStageMutation.mutate(stageToDelete!._id)}
                 className="bg-red-600 hover:bg-red-700"
               >
                 Sí, eliminar
@@ -1111,6 +1197,7 @@ export default function PipelinePage() {
             columns={columns}
             onDelete={setQuoteToDelete}
             onUndo={handleUndo}
+            onDeleteStage={(etapa) => setStageToDelete(etapa)}
             sensors={sensors}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}

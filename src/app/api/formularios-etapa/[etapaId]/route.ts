@@ -1,3 +1,5 @@
+// src/app/api/formularios-etapa/[etapaId]/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import FormularioEtapa from '@/models/FormularioEtapa';
