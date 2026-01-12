@@ -433,7 +433,7 @@ export function ClientActions({
             <CSVLink
               data={[client]}
               headers={csvHeaders}
-              filename={`cliente_${client.nombreCompleto.replace(/\s+/g, "_")}.csv`}
+              filename={`cliente_${safeStr(client?.nombreCompleto).replace(/\s+/g, "_")}.csv`}
               className="flex items-center w-full"
             >
               <Download className="mr-2 h-4 w-4" />
