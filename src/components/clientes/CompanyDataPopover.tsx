@@ -25,7 +25,11 @@ type FormInputs = {
   empresaAsignada: string; // "" => none
 };
 
-export function CompanyDataPopover({ client }: { client: Client & any }) {
+type ClientWithEmpresa = Client & {
+  empresaAsignada?: string | null;
+};
+
+export function CompanyDataPopover({ client }: { client: ClientWithEmpresa }) {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
 
@@ -48,7 +52,7 @@ export function CompanyDataPopover({ client }: { client: Client & any }) {
     ];
   }, [empresasLite]);
 
-  const currentEmpresaId = (client.empresaAsignada || "") as string;
+  const currentEmpresaId = client.empresaAsignada ?? "";
 
   const { handleSubmit, setValue, watch } = useForm<FormInputs>({
     defaultValues: { empresaAsignada: currentEmpresaId },

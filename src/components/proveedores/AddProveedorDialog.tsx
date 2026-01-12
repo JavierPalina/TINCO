@@ -38,8 +38,14 @@ type ProveedorFormInputs = {
   notas?: string;
 };
 
+// Payload hacia la API: fechaVtoCAI se manda como Date (o undefined)
+type ProveedorApiPayload = Omit<ProveedorFormInputs, "fechaVtoCAI"> & {
+  fechaVtoCAI?: Date;
+};
+
 export function AddProveedorDialog() {
   const queryClient = useQueryClient();
+
   const form = useForm<ProveedorFormInputs>({
     defaultValues: {
       cuit: "",
@@ -61,10 +67,11 @@ export function AddProveedorDialog() {
 
   const mutation = useMutation({
     mutationFn: async (payload: ProveedorFormInputs) => {
-      const body: any = {
+      const body: ProveedorApiPayload = {
         ...payload,
         fechaVtoCAI: payload.fechaVtoCAI ? new Date(payload.fechaVtoCAI) : undefined,
       };
+
       return axios.post("/api/proveedores", body);
     },
     onSuccess: async () => {
@@ -94,7 +101,10 @@ export function AddProveedorDialog() {
           <div className="grid gap-2 md:grid-cols-2">
             <div className="grid gap-1">
               <Label>CUIT *</Label>
-              <Input {...form.register("cuit", { required: true })} placeholder="20-XXXXXXXX-X" />
+              <Input
+                {...form.register("cuit", { required: true })}
+                placeholder="20-XXXXXXXX-X"
+              />
             </div>
 
             <div className="grid gap-1">
@@ -114,7 +124,10 @@ export function AddProveedorDialog() {
 
             <div className="grid gap-1 md:col-span-2">
               <Label>Domicilio</Label>
-              <Input {...form.register("domicilio")} placeholder="Calle, número, depto, etc" />
+              <Input
+                {...form.register("domicilio")}
+                placeholder="Calle, número, depto, etc"
+              />
             </div>
 
             <div className="grid gap-1">
@@ -161,8 +174,10 @@ export function AddProveedorDialog() {
               <Label>Inscripto a las Ganancias (SI/NO)</Label>
               <select
                 className="h-10 rounded-md border bg-background px-3 text-sm"
-                value={String(form.watch("inscriptoGanancias"))}
-                onChange={(e) => form.setValue("inscriptoGanancias", e.target.value === "true")}
+                value={String(form.watch("inscriptoGanancias") ?? false)}
+                onChange={(e) =>
+                  form.setValue("inscriptoGanancias", e.target.value === "true")
+                }
               >
                 <option value="false">No</option>
                 <option value="true">Sí</option>

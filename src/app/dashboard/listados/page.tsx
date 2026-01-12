@@ -46,11 +46,66 @@ import { Download, Loader2 } from "lucide-react";
 import { useDebounce } from "use-debounce";
 import { cn } from "@/lib/utils";
 
-// Si querés tipar proveedores/empresas estrictamente, creá types propios.
-// Por simplicidad, uso "any" en proveedores/empresas y mantengo Client para clientes.
 import { Client } from "@/types/client";
 
 type ListType = "clientes" | "proveedores" | "empresas";
+
+// -----------------------------
+// Types auxiliares para tipar listados
+// -----------------------------
+type Proveedor = {
+  _id: string;
+  cuit?: string;
+  razonSocial?: string;
+  nombreFantasia?: string;
+  telefono?: string;
+  email?: string;
+  localidad?: string;
+  provincia?: string;
+  categoriaIVA?: string;
+  fechaVtoCAI?: string | Date;
+  inscriptoGanancias?: boolean;
+  createdAt?: string | Date;
+};
+
+type Empresa = {
+  _id: string;
+  cuit?: string;
+  razonSocial?: string;
+  nombreFantasia?: string;
+  telefono?: string;
+  email?: string;
+  localidad?: string;
+  provincia?: string;
+  categoriaIVA?: string;
+  inscriptoGanancias?: boolean;
+  createdAt?: string | Date;
+};
+
+// Clientes listados: extendemos tu Client con los campos del aggregate
+type ClienteListado = Client & {
+  dni?: string;
+  direccion?: string;
+  ciudad?: string;
+  pais?: string;
+
+  prioridad?: string;
+  etapa?: string;
+  origenContacto?: string;
+
+  empresa?: string; // legacy
+  empresaAsignada?: string | null; // ref
+  empresaNombre?: string;
+
+  ultimoContacto?: string | Date;
+  createdAt: string | Date;
+};
+
+type ListConfig = {
+  title: string;
+  apiBase: string;
+  exportName: string;
+};
 
 // -----------------------------
 // Utilidades
@@ -164,10 +219,7 @@ const DEFAULT_VISIBILITY_PROVEEDORES: ColumnVisibilityProveedores = {
   "Fecha de Creación": false,
 };
 
-const LIST_CONFIG: Record<
-  ListType,
-  { title: string; apiBase: string; exportName: string }
-> = {
+const LIST_CONFIG: Record<ListType, ListConfig> = {
   clientes: {
     title: "Listado de Clientes",
     apiBase: "/api/clientes",
@@ -185,6 +237,14 @@ const LIST_CONFIG: Record<
   },
 };
 
+type FiltersState = {
+  searchTerm: string;
+  etapa: string;
+  prioridad: string;
+  provincia: string;
+  categoriaIVA: string;
+};
+
 // -----------------------------
 // Página
 // -----------------------------
@@ -195,16 +255,15 @@ export default function ListadosPage() {
 
   // ---- Tipo desde URL ----
   const typeFromUrl = (searchParams.get("type") || "clientes") as ListType;
-  const safeType: ListType = (["clientes", "proveedores", "empresas"].includes(typeFromUrl)
-    ? typeFromUrl
-    : "clientes") as ListType;
+  const safeType: ListType =
+    (["clientes", "proveedores", "empresas"].includes(typeFromUrl)
+      ? typeFromUrl
+      : "clientes") as ListType;
 
   const [listType, setListType] = useState<ListType>(safeType);
 
   // ---- Filtros desde URL ----
-  // Clientes: searchTerm, etapa, prioridad
-  // Proveedores/Empresas: searchTerm, provincia, categoriaIVA
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<FiltersState>({
     searchTerm: searchParams.get("searchTerm") || "",
     etapa: searchParams.get("etapa") || "",
     prioridad: searchParams.get("prioridad") || "",
@@ -217,37 +276,32 @@ export default function ListadosPage() {
   // ---- Columnas por tipo ----
   const [isClient, setIsClient] = useState(false);
 
-  const [columnVisibilityClientes, setColumnVisibilityClientes] = useState(
-    DEFAULT_VISIBILITY_CLIENTES
-  );
-  const [columnVisibilityEmpresas, setColumnVisibilityEmpresas] = useState(
-    DEFAULT_VISIBILITY_EMPRESAS
-  );
-  const [columnVisibilityProveedores, setColumnVisibilityProveedores] = useState(
-    DEFAULT_VISIBILITY_PROVEEDORES
-  );
+  const [columnVisibilityClientes, setColumnVisibilityClientes] =
+    useState<ColumnVisibilityClientes>(DEFAULT_VISIBILITY_CLIENTES);
+
+  const [columnVisibilityEmpresas, setColumnVisibilityEmpresas] =
+    useState<ColumnVisibilityEmpresas>(DEFAULT_VISIBILITY_EMPRESAS);
+
+  const [columnVisibilityProveedores, setColumnVisibilityProveedores] =
+    useState<ColumnVisibilityProveedores>(DEFAULT_VISIBILITY_PROVEEDORES);
 
   // ---- Helper URL: set params ----
   const setUrlParams = useCallback(
-    (next: Partial<typeof filters> & { type?: ListType }) => {
+    (next: Partial<FiltersState> & { type?: ListType }) => {
       const params = new URLSearchParams(searchParams.toString());
 
       const nextType = next.type ?? listType;
       params.set("type", nextType);
 
-      const apply = (key: keyof typeof filters, value: string) => {
+      const apply = (key: keyof FiltersState, value: string) => {
         const v = (value || "").trim();
         if (v) params.set(key, v);
         else params.delete(key);
       };
 
       apply("searchTerm", next.searchTerm ?? filters.searchTerm);
-
-      // Clientes
       apply("etapa", next.etapa ?? filters.etapa);
       apply("prioridad", next.prioridad ?? filters.prioridad);
-
-      // Proveedores/Empresas
       apply("provincia", next.provincia ?? filters.provincia);
       apply("categoriaIVA", next.categoriaIVA ?? filters.categoriaIVA);
 
@@ -259,9 +313,10 @@ export default function ListadosPage() {
   // ---- Sync estado desde URL (back/forward / link compartido) ----
   useEffect(() => {
     const urlType = (searchParams.get("type") || "clientes") as ListType;
-    const normalizedType: ListType = (["clientes", "proveedores", "empresas"].includes(urlType)
-      ? urlType
-      : "clientes") as ListType;
+    const normalizedType: ListType =
+      (["clientes", "proveedores", "empresas"].includes(urlType)
+        ? urlType
+        : "clientes") as ListType;
 
     setListType(normalizedType);
 
@@ -272,7 +327,6 @@ export default function ListadosPage() {
       provincia: searchParams.get("provincia") || "",
       categoriaIVA: searchParams.get("categoriaIVA") || "",
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   // ---- Persistencia de columnas (por tipo) ----
@@ -280,13 +334,13 @@ export default function ListadosPage() {
     setIsClient(true);
 
     const c = localStorage.getItem("colvis_clientes");
-    if (c) setColumnVisibilityClientes((prev) => ({ ...prev, ...JSON.parse(c) }));
+    if (c) setColumnVisibilityClientes((prev) => ({ ...prev, ...JSON.parse(c) as Partial<ColumnVisibilityClientes> }));
 
     const e = localStorage.getItem("colvis_empresas");
-    if (e) setColumnVisibilityEmpresas((prev) => ({ ...prev, ...JSON.parse(e) }));
+    if (e) setColumnVisibilityEmpresas((prev) => ({ ...prev, ...JSON.parse(e) as Partial<ColumnVisibilityEmpresas> }));
 
     const p = localStorage.getItem("colvis_proveedores");
-    if (p) setColumnVisibilityProveedores((prev) => ({ ...prev, ...JSON.parse(p) }));
+    if (p) setColumnVisibilityProveedores((prev) => ({ ...prev, ...JSON.parse(p) as Partial<ColumnVisibilityProveedores> }));
   }, []);
 
   useEffect(() => {
@@ -317,9 +371,15 @@ export default function ListadosPage() {
       provincia: filters.provincia,
       categoriaIVA: filters.categoriaIVA,
     });
-  }, [filters.etapa, filters.prioridad, filters.provincia, filters.categoriaIVA, setUrlParams]);
+  }, [
+    filters.etapa,
+    filters.prioridad,
+    filters.provincia,
+    filters.categoriaIVA,
+    setUrlParams,
+  ]);
 
-  // ---- Queries adicionales (prioridades solo clientes; podés extender a otros) ----
+  // ---- Queries adicionales (prioridades solo clientes) ----
   const { data: prioridadesUnicas } = useQuery<string[]>({
     queryKey: ["prioridades", listType],
     queryFn: async () => {
@@ -354,12 +414,12 @@ export default function ListadosPage() {
     filters.categoriaIVA,
   ]);
 
-  const { data, isLoading, isError, isFetching } = useQuery<any[]>({
+  type ListData = ClienteListado[] | Proveedor[] | Empresa[];
+
+  const { data, isLoading, isError, isFetching } = useQuery<ListData>({
     queryKey,
     queryFn: async () => {
-      const params: Record<string, string> = {
-        searchTerm: debouncedSearchTerm,
-      };
+      const params: Record<string, string> = { searchTerm: debouncedSearchTerm };
 
       if (listType === "clientes") {
         if (filters.etapa) params.etapa = filters.etapa;
@@ -370,12 +430,12 @@ export default function ListadosPage() {
       }
 
       const res = await axios.get(apiBase, { params });
-      return res.data.data;
+      return res.data.data as ListData;
     },
     placeholderData: keepPreviousData,
   });
 
-  // ---- CSV según tipo (mínimo viable; ajustable) ----
+  // ---- CSV según tipo ----
   const csvHeaders = useMemo(() => {
     if (listType === "clientes") {
       return [
@@ -414,7 +474,7 @@ export default function ListadosPage() {
     ];
   }, [listType]);
 
-  const csvData = data || [];
+  const csvData = (data || []) as object[]; // CSVLink espera object[]
 
   // ---- Handlers ----
   const handleTypeChange = (nextType: ListType) => {
@@ -422,29 +482,36 @@ export default function ListadosPage() {
     setUrlParams({ type: nextType });
   };
 
-  const handleFilterChange = (name: keyof typeof filters, value: string) => {
+  const handleFilterChange = (name: keyof FiltersState, value: string) => {
     setFilters((prev) => ({ ...prev, [name]: value }));
-    // URL se actualiza por los useEffect
   };
 
-  const toggleColumn = (column: string) => {
+  const toggleColumn = (
+    column:
+      | keyof ColumnVisibilityClientes
+      | keyof ColumnVisibilityEmpresas
+      | keyof ColumnVisibilityProveedores
+  ) => {
     if (listType === "clientes") {
       setColumnVisibilityClientes((prev) => ({
         ...prev,
-        [column]: !prev[column as keyof ColumnVisibilityClientes],
+        [column as keyof ColumnVisibilityClientes]:
+          !prev[column as keyof ColumnVisibilityClientes],
       }));
       return;
     }
     if (listType === "proveedores") {
       setColumnVisibilityProveedores((prev) => ({
         ...prev,
-        [column]: !prev[column as keyof ColumnVisibilityProveedores],
+        [column as keyof ColumnVisibilityProveedores]:
+          !prev[column as keyof ColumnVisibilityProveedores],
       }));
       return;
     }
     setColumnVisibilityEmpresas((prev) => ({
       ...prev,
-      [column]: !prev[column as keyof ColumnVisibilityEmpresas],
+      [column as keyof ColumnVisibilityEmpresas]:
+        !prev[column as keyof ColumnVisibilityEmpresas],
     }));
   };
 
@@ -465,8 +532,7 @@ export default function ListadosPage() {
   }, [listType, columnVisibilityClientes, columnVisibilityProveedores, columnVisibilityEmpresas]);
 
   if (isLoading) return <div className="p-10 text-center">Cargando...</div>;
-  if (isError)
-    return <div className="p-10 text-center text-red-600">Error al cargar.</div>;
+  if (isError) return <div className="p-10 text-center text-red-600">Error al cargar.</div>;
 
   return (
     <div className="mx-auto py-4 px-4 md:px-4">
@@ -474,7 +540,6 @@ export default function ListadosPage() {
         <div className="flex flex-col gap-3">
           <h1 className="text-3xl font-bold">{title}</h1>
 
-          {/* Switch 3 estados */}
           <Tabs value={listType} onValueChange={(v) => handleTypeChange(v as ListType)}>
             <TabsList>
               <TabsTrigger value="clientes">Clientes</TabsTrigger>
@@ -496,8 +561,10 @@ export default function ListadosPage() {
               {orderedColumns.map((column) => (
                 <DropdownMenuCheckboxItem
                   key={String(column)}
-                  checked={Boolean((currentVisibility as any)[column])}
-                  onCheckedChange={() => toggleColumn(String(column))}
+                  checked={Boolean(
+                    (currentVisibility as Record<string, boolean>)[String(column)]
+                  )}
+                  onCheckedChange={() => toggleColumn(column)}
                   onSelect={(e) => e.preventDefault()}
                 >
                   {String(column)}
@@ -520,7 +587,6 @@ export default function ListadosPage() {
             </Button>
           )}
 
-          {/* Acciones específicas por tipo (mínimo viable) */}
           {listType === "clientes" && (
             <>
               <ImportClientsDialog />
@@ -540,9 +606,6 @@ export default function ListadosPage() {
         </div>
       </div>
 
-      {/* Filtros:
-          Reuso tu ClientFilters solo para clientes.
-          Para proveedores/empresas, muestro filtros simples inline (provincia / categoriaIVA). */}
       {listType === "clientes" ? (
         <ClientFilters
           filters={{
@@ -551,7 +614,7 @@ export default function ListadosPage() {
             prioridad: filters.prioridad,
           }}
           onFilterChange={(name, value) =>
-            handleFilterChange(name as "searchTerm" | "etapa" | "prioridad", value)
+            handleFilterChange(name as keyof FiltersState, value)
           }
           prioridadesUnicas={prioridadesNormalizadas}
         />
@@ -599,59 +662,57 @@ export default function ListadosPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              {/* CLIENTES */}
               {listType === "clientes" && (
                 <>
-                  {(columnVisibilityClientes["Nombre Completo"] as boolean) && (
+                  {columnVisibilityClientes["Nombre Completo"] && (
                     <TableHead className="text-left">Nombre Completo</TableHead>
                   )}
-                  {(columnVisibilityClientes["Teléfono"] as boolean) && (
+                  {columnVisibilityClientes["Teléfono"] && (
                     <TableHead className="text-center">Teléfono</TableHead>
                   )}
-                  {(columnVisibilityClientes["Email"] as boolean) && (
+                  {columnVisibilityClientes["Email"] && (
                     <TableHead className="text-center">Email</TableHead>
                   )}
-                  {(columnVisibilityClientes["DNI"] as boolean) && (
+                  {columnVisibilityClientes["DNI"] && (
                     <TableHead className="text-center">DNI</TableHead>
                   )}
-                  {(columnVisibilityClientes["Dirección"] as boolean) && (
+                  {columnVisibilityClientes["Dirección"] && (
                     <TableHead className="text-center">Dirección</TableHead>
                   )}
-                  {(columnVisibilityClientes["Ciudad"] as boolean) && (
+                  {columnVisibilityClientes["Ciudad"] && (
                     <TableHead className="text-center">Ciudad</TableHead>
                   )}
-                  {(columnVisibilityClientes["País"] as boolean) && (
+                  {columnVisibilityClientes["País"] && (
                     <TableHead className="text-center">País</TableHead>
                   )}
-                  {(columnVisibilityClientes["Prioridad"] as boolean) && (
+                  {columnVisibilityClientes["Prioridad"] && (
                     <TableHead className="text-center">Prioridad</TableHead>
                   )}
-                  {(columnVisibilityClientes["Etapa"] as boolean) && (
+                  {columnVisibilityClientes["Etapa"] && (
                     <TableHead className="text-center">Etapa</TableHead>
                   )}
-                  {(columnVisibilityClientes["Origen de Contacto"] as boolean) && (
+                  {columnVisibilityClientes["Origen de Contacto"] && (
                     <TableHead className="text-center">Origen</TableHead>
                   )}
-                  {(columnVisibilityClientes["Empresa"] as boolean) && (
+                  {columnVisibilityClientes["Empresa"] && (
                     <TableHead className="text-center">Empresa</TableHead>
                   )}
-                  {(columnVisibilityClientes["Último Contacto"] as boolean) && (
+                  {columnVisibilityClientes["Último Contacto"] && (
                     <TableHead className="text-center">Último Contacto</TableHead>
                   )}
-                  {(columnVisibilityClientes["Fecha de Creación"] as boolean) && (
+                  {columnVisibilityClientes["Fecha de Creación"] && (
                     <TableHead className="text-center">Fecha de Creación</TableHead>
                   )}
-                  {(columnVisibilityClientes["Notas"] as boolean) && (
+                  {columnVisibilityClientes["Notas"] && (
                     <TableHead className="text-center">Notas</TableHead>
                   )}
-                  {(columnVisibilityClientes["Interacciones"] as boolean) && (
+                  {columnVisibilityClientes["Interacciones"] && (
                     <TableHead className="text-center">Interacciones</TableHead>
                   )}
                   <TableHead className="text-center">Acciones</TableHead>
                 </>
               )}
 
-              {/* PROVEEDORES */}
               {listType === "proveedores" && (
                 <>
                   {columnVisibilityProveedores["Razón Social"] && (
@@ -690,7 +751,6 @@ export default function ListadosPage() {
                 </>
               )}
 
-              {/* EMPRESAS */}
               {listType === "empresas" && (
                 <>
                   {columnVisibilityEmpresas["Razón Social"] && (
@@ -729,9 +789,8 @@ export default function ListadosPage() {
           </TableHeader>
 
           <TableBody>
-            {/* CLIENTES */}
             {listType === "clientes" &&
-              (data as Client[])?.map((cliente) => (
+              ((data || []) as ClienteListado[]).map((cliente) => (
                 <TableRow key={cliente._id}>
                   {columnVisibilityClientes["Nombre Completo"] && (
                     <TableCell className="font-medium text-left">
@@ -771,100 +830,88 @@ export default function ListadosPage() {
                   )}
 
                   {columnVisibilityClientes["DNI"] && (
-                    <TableCell className="text-center">{(cliente as any).dni || "-"}</TableCell>
+                    <TableCell className="text-center">{cliente.dni || "-"}</TableCell>
                   )}
 
                   {columnVisibilityClientes["Dirección"] && (
                     <TableCell className="text-center">
-                      {formatAndTruncate((cliente as any).direccion, 30)}
+                      {formatAndTruncate(cliente.direccion, 30)}
                     </TableCell>
                   )}
 
                   {columnVisibilityClientes["Ciudad"] && (
                     <TableCell className="text-center">
-                      {formatAndTruncate((cliente as any).ciudad, 20)}
+                      {formatAndTruncate(cliente.ciudad, 20)}
                     </TableCell>
                   )}
 
                   {columnVisibilityClientes["País"] && (
                     <TableCell className="text-center">
-                      {formatAndTruncate((cliente as any).pais, 20)}
+                      {formatAndTruncate(cliente.pais, 20)}
                     </TableCell>
                   )}
 
                   {columnVisibilityClientes["Prioridad"] && (
                     <TableCell className="text-center">
-                      {(cliente as any).prioridad
-                        ? formatAndTruncate((cliente as any).prioridad, 20)
-                        : "-"}
+                      {cliente.prioridad ? formatAndTruncate(cliente.prioridad, 20) : "-"}
                     </TableCell>
                   )}
 
                   {columnVisibilityClientes["Etapa"] && (
                     <TableCell className="text-center">
-                      {(cliente as any).etapa
-                        ? formatAndTruncate((cliente as any).etapa, 30)
-                        : "-"}
+                      {cliente.etapa ? formatAndTruncate(cliente.etapa, 30) : "-"}
                     </TableCell>
                   )}
 
                   {columnVisibilityClientes["Origen de Contacto"] && (
-                    <TableCell className="text-center">
-                      {(cliente as any).origenContacto || "-"}
-                    </TableCell>
+                    <TableCell className="text-center">{cliente.origenContacto || "-"}</TableCell>
                   )}
 
                   {columnVisibilityClientes["Empresa"] && (
                     <TableCell>
                       <div className="flex items-center text-center justify-center">
-                        {(cliente as any).empresaNombre || (cliente as any).empresa || "Sin Asignar"}
-                        <CompanyDataPopover client={cliente as any} />
+                        {cliente.empresaNombre || cliente.empresa || "Sin Asignar"}
+                        <CompanyDataPopover client={cliente} />
                       </div>
                     </TableCell>
                   )}
 
                   {columnVisibilityClientes["Último Contacto"] && (
                     <TableCell className="text-center">
-                      {(cliente as any).ultimoContacto
-                        ? format(new Date((cliente as any).ultimoContacto), "dd MMM yyyy", {
-                            locale: es,
-                          })
+                      {cliente.ultimoContacto
+                        ? format(new Date(cliente.ultimoContacto), "dd MMM yyyy", { locale: es })
                         : "Sin Contactar"}
                     </TableCell>
                   )}
 
                   {columnVisibilityClientes["Fecha de Creación"] && (
                     <TableCell className="text-center">
-                      {format(new Date((cliente as any).createdAt), "dd MMM yyyy", {
-                        locale: es,
-                      })}
+                      {cliente.createdAt
+                        ? format(new Date(cliente.createdAt), "dd MMM yyyy", { locale: es })
+                        : "-"}
                     </TableCell>
                   )}
 
                   {columnVisibilityClientes["Notas"] && (
                     <TableCell className="text-center">
-                      <TableCellActions client={cliente as any} actionType="notas" />
+                      <TableCellActions client={cliente} actionType="notas" />
                     </TableCell>
                   )}
 
                   {columnVisibilityClientes["Interacciones"] && (
                     <TableCell className="text-center">
-                      <TableCellActions client={cliente as any} actionType="interacciones" />
+                      <TableCellActions client={cliente} actionType="interacciones" />
                     </TableCell>
                   )}
 
                   <TableCell className="text-center">
-                    <ClientActions
-                      client={cliente as any}
-                      prioridadesOptions={prioridadesNormalizadas}
-                    />
+                    <ClientActions client={cliente} prioridadesOptions={prioridadesNormalizadas} />
                   </TableCell>
                 </TableRow>
               ))}
 
-            {/* PROVEEDORES */}
             {listType === "proveedores" &&
-              (data || []).map((p: any) => (
+              ((data || []) as Proveedor[]).map((p) => (
                 <TableRow key={p._id}>
                   {columnVisibilityProveedores["Razón Social"] && (
                     <TableCell className="font-medium text-left">
@@ -886,19 +933,13 @@ export default function ListadosPage() {
                     <TableCell className="text-center">{p.email || "-"}</TableCell>
                   )}
                   {columnVisibilityProveedores["Localidad"] && (
-                    <TableCell className="text-center">
-                      {formatAndTruncate(p.localidad, 20)}
-                    </TableCell>
+                    <TableCell className="text-center">{formatAndTruncate(p.localidad, 20)}</TableCell>
                   )}
                   {columnVisibilityProveedores["Provincia"] && (
-                    <TableCell className="text-center">
-                      {formatAndTruncate(p.provincia, 20)}
-                    </TableCell>
+                    <TableCell className="text-center">{formatAndTruncate(p.provincia, 20)}</TableCell>
                   )}
                   {columnVisibilityProveedores["Categoría IVA"] && (
-                    <TableCell className="text-center">
-                      {formatAndTruncate(p.categoriaIVA, 25)}
-                    </TableCell>
+                    <TableCell className="text-center">{formatAndTruncate(p.categoriaIVA, 25)}</TableCell>
                   )}
                   {columnVisibilityProveedores["Vto CAI"] && (
                     <TableCell className="text-center">
@@ -918,9 +959,8 @@ export default function ListadosPage() {
                 </TableRow>
               ))}
 
-            {/* EMPRESAS */}
             {listType === "empresas" &&
-              (data || []).map((e: any) => (
+              ((data || []) as Empresa[]).map((e) => (
                 <TableRow key={e._id}>
                   {columnVisibilityEmpresas["Razón Social"] && (
                     <TableCell className="font-medium text-left">
@@ -942,19 +982,13 @@ export default function ListadosPage() {
                     <TableCell className="text-center">{e.email || "-"}</TableCell>
                   )}
                   {columnVisibilityEmpresas["Localidad"] && (
-                    <TableCell className="text-center">
-                      {formatAndTruncate(e.localidad, 20)}
-                    </TableCell>
+                    <TableCell className="text-center">{formatAndTruncate(e.localidad, 20)}</TableCell>
                   )}
                   {columnVisibilityEmpresas["Provincia"] && (
-                    <TableCell className="text-center">
-                      {formatAndTruncate(e.provincia, 20)}
-                    </TableCell>
+                    <TableCell className="text-center">{formatAndTruncate(e.provincia, 20)}</TableCell>
                   )}
                   {columnVisibilityEmpresas["Categoría IVA"] && (
-                    <TableCell className="text-center">
-                      {formatAndTruncate(e.categoriaIVA, 25)}
-                    </TableCell>
+                    <TableCell className="text-center">{formatAndTruncate(e.categoriaIVA, 25)}</TableCell>
                   )}
                   {columnVisibilityEmpresas["Inscripto Ganancias"] && (
                     <TableCell className="text-center">
@@ -972,7 +1006,7 @@ export default function ListadosPage() {
         </Table>
       </div>
 
-      {/* Mobile list: dejo clientes como ya lo tenías; proveedores/empresas lo podés extender luego */}
+      {/* Mobile list */}
       <div className="md:hidden mt-4">
         {isLoading && (
           <div className="text-center">
@@ -981,27 +1015,27 @@ export default function ListadosPage() {
         )}
 
         {listType === "clientes" &&
-          (data as Client[])?.map((cliente) => (
+          ((data || []) as ClienteListado[]).map((cliente) => (
             <ClientMobileCard
               key={cliente._id}
-              client={cliente as any}
+              client={cliente}
               prioridadesOptions={prioridadesNormalizadas}
             />
           ))}
 
         {listType !== "clientes" &&
-          (data || []).map((row: any) => (
+          ((data || []) as Array<Proveedor | Empresa>).map((row) => (
             <div key={row._id} className="border rounded-md p-3 mb-3">
               <div className="font-medium">
-                {formatAndTruncate(row.razonSocial || row.nombreCompleto, 40)}
+                {formatAndTruncate((row as Empresa).razonSocial || (row as Proveedor).razonSocial, 40)}
               </div>
               <div className="text-sm text-muted-foreground">
-                {row.cuit ? `CUIT: ${row.cuit}` : row.email || "-"}
+                {"cuit" in row && row.cuit ? `CUIT: ${row.cuit}` : row.email || "-"}
               </div>
             </div>
           ))}
 
-        {!isLoading && (data?.length || 0) === 0 && (
+        {!isLoading && ((data || []) as unknown[]).length === 0 && (
           <div className="text-center text-muted-foreground py-10">
             No se encontraron resultados.
           </div>

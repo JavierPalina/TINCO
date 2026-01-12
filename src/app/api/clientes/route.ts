@@ -9,6 +9,9 @@ const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 type MatchFilter = Record<string, unknown> & {
   $or?: Array<Record<string, unknown>>;
+  empresaAsignada?: mongoose.Types.ObjectId;
+  etapa?: unknown;
+  prioridad?: unknown;
 };
 
 export async function GET(request: NextRequest) {
@@ -28,20 +31,19 @@ export async function GET(request: NextRequest) {
       matchFilter.empresaAsignada = new mongoose.Types.ObjectId(empresaIdRaw);
     }
 
-    // Etapa
+    // Etapa (case-insensitive exact match)
     if (etapaRaw) {
       const safeEtapa = escapeRegex(etapaRaw);
       matchFilter.etapa = { $regex: new RegExp(`^${safeEtapa}$`, "i") };
     }
 
-    // Prioridad
+    // Prioridad (case-insensitive exact match)
     if (prioridadRaw) {
       const safePrioridad = escapeRegex(prioridadRaw);
       matchFilter.prioridad = { $regex: new RegExp(`^${safePrioridad}$`, "i") };
     }
 
-    // Armamos pipeline con lookups (incluye empresas)
-    const pipeline: any[] = [
+    const pipeline: mongoose.PipelineStage[] = [
       { $match: matchFilter },
 
       // Empresa asignada
@@ -98,22 +100,24 @@ export async function GET(request: NextRequest) {
       const safeTerm = escapeRegex(searchTermRaw);
       const searchRegex = new RegExp(`^${safeTerm}`, "i");
 
-      pipeline.push({
+      const searchMatch: mongoose.PipelineStage.Match = {
         $match: {
           $or: [
             { nombreCompleto: { $regex: searchRegex } },
             { email: { $regex: searchRegex } },
             { telefono: { $regex: searchRegex } },
 
-            // legacy
+            // legacy (si todavía existen en algunos docs viejos)
             { empresa: { $regex: searchRegex } },
             { razonSocial: { $regex: searchRegex } },
 
-            // nuevo (de Empresa)
+            // nuevo (derivado de Empresa)
             { empresaNombre: { $regex: searchRegex } },
           ],
         },
-      });
+      };
+
+      pipeline.push(searchMatch);
     }
 
     pipeline.push(
@@ -138,6 +142,7 @@ export async function GET(request: NextRequest) {
           pais: 1,
           dni: 1,
 
+          // legacy empresa (recomendación: a futuro, eliminarlos del schema)
           direccionEmpresa: 1,
           ciudadEmpresa: 1,
           paisEmpresa: 1,
@@ -172,15 +177,17 @@ export async function POST(request: Request) {
   await dbConnect();
 
   try {
-    const body = await request.json();
+    const body = (await request.json()) as Record<string, unknown>;
 
-    // Si viene empresaAsignada como string, normalizamos a ObjectId
-    const empresaAsignada =
-      body.empresaAsignada && mongoose.Types.ObjectId.isValid(body.empresaAsignada)
-        ? new mongoose.Types.ObjectId(body.empresaAsignada)
-        : undefined;
+    // Normaliza empresaAsignada si viene
+    let empresaAsignada: mongoose.Types.ObjectId | undefined;
 
-    const clienteData = {
+    const rawEmpresa = body.empresaAsignada;
+    if (typeof rawEmpresa === "string" && mongoose.Types.ObjectId.isValid(rawEmpresa)) {
+      empresaAsignada = new mongoose.Types.ObjectId(rawEmpresa);
+    }
+
+    const clienteData: Record<string, unknown> = {
       ...body,
       empresaAsignada,
       vendedorAsignado: new mongoose.Types.ObjectId(session.user.id),
