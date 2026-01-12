@@ -88,11 +88,18 @@ interface Etapa {
   color: string;
 }
 
+type HistorialFormValue = string | number | boolean | string[] | undefined | null;
+
+type HistorialDatosFormulario = Record<string, HistorialFormValue> & {
+  __precioAnterior?: number;
+  __precioNuevo?: number;
+};
+
 interface Cotizacion {
   historialEtapas: {
     etapa: { _id: string; nombre: string };
     fecha: string;
-    datosFormulario?: any; // Add this property to match usage
+    datosFormulario?: HistorialDatosFormulario;
   }[];
   _id: string;
   codigo: string;
@@ -352,10 +359,13 @@ function QuoteCard({
 
   {(() => {
     const last = quote.historialEtapas?.[quote.historialEtapas.length - 1];
-    const df = last?.datosFormulario as any | undefined;
+    const df = last?.datosFormulario;
 
-    const prev = typeof df?.__precioAnterior === "number" ? df.__precioAnterior : null;
-    const next = typeof df?.__precioNuevo === "number" ? df.__precioNuevo : null;
+    const prev =
+      typeof df?.__precioAnterior === "number" ? df.__precioAnterior : null;
+      
+    const next =
+      typeof df?.__precioNuevo === "number" ? df.__precioNuevo : null;
 
     // Solo mostrar si realmente hubo cambio
     if (prev === null || next === null || prev === next) return null;
