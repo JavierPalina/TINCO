@@ -77,6 +77,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Client } from "@/types/client";
 import { StageFormModal } from "@/components/cotizaciones/StageFormModal";
 import { IFormField } from "@/types/IFormField";
+
 import { CreateStageDialog } from "@/components/cotizaciones/CreateStageDialog";
 import Link from "next/link";
 import axios, { AxiosError } from "axios";
@@ -88,7 +89,11 @@ interface Etapa {
 }
 
 interface Cotizacion {
-  historialEtapas: { etapa: { _id: string; nombre: string }; fecha: string }[];
+  historialEtapas: {
+    etapa: { _id: string; nombre: string };
+    fecha: string;
+    datosFormulario?: any; // Add this property to match usage
+  }[];
   _id: string;
   codigo: string;
   montoTotal: number;
@@ -107,6 +112,10 @@ interface Cotizacion {
 type Columns = Record<string, Cotizacion[]>;
 type ViewMode = "pipeline" | "table";
 type StageColorMap = { [key: string]: string };
+
+// Para precargar valores del modal
+type FormValue = string | number | boolean | string[] | undefined;
+type IFormularioData = Record<string, FormValue>;
 
 interface PipelineViewProps {
   etapas: Etapa[];
@@ -274,8 +283,7 @@ function QuoteCard({
                       className="text-red-600 focus:text-red-600"
                       onSelect={() => onUndo(quote._id)}
                     >
-                      <StepBackIcon className="mr-2 h-4 w-4" /> Deshacer última
-                      acción
+                      <StepBackIcon className="mr-2 h-4 w-4" /> Deshacer última acción
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-red-600 focus:text-red-600"
@@ -303,7 +311,7 @@ function QuoteCard({
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setFilesOpen(true)}
+                  onClick={() => {}}
                   title="Ver Archivos"
                   className="flex items-center gap-1 text-muted-foreground hover:text-primary"
                 >
@@ -313,15 +321,9 @@ function QuoteCard({
                   </span>
                 </button>
 
-                <TableCellActions
-                  client={quote?.cliente as Client}
-                  actionType="notas"
-                />
+                <TableCellActions client={quote?.cliente as Client} actionType="notas" />
                 <div style={{ marginLeft: -6 }}>
-                  <TableCellActions
-                    client={quote?.cliente as Client}
-                    actionType="interacciones"
-                  />
+                  <TableCellActions client={quote?.cliente as Client} actionType="interacciones" />
                 </div>
 
                 <button
@@ -342,10 +344,29 @@ function QuoteCard({
                 </button>
               </div>
 
-              <div className="flex items-center gap-1 font-semibold text-base whitespace-nowrap">
-                <DollarSign className="h-4 w-4" />
-                <span>{quote.montoTotal.toLocaleString("es-AR")}</span>
-              </div>
+              <div className="flex flex-col items-end">
+  <div className="flex items-center gap-1 font-semibold text-base whitespace-nowrap">
+    <DollarSign className="h-4 w-4" />
+    <span>{quote.montoTotal.toLocaleString("es-AR")}</span>
+  </div>
+
+  {(() => {
+    const last = quote.historialEtapas?.[quote.historialEtapas.length - 1];
+    const df = last?.datosFormulario as any | undefined;
+
+    const prev = typeof df?.__precioAnterior === "number" ? df.__precioAnterior : null;
+    const next = typeof df?.__precioNuevo === "number" ? df.__precioNuevo : null;
+
+    // Solo mostrar si realmente hubo cambio
+    if (prev === null || next === null || prev === next) return null;
+
+    return (
+      <div className="text-[11px] text-muted-foreground whitespace-nowrap">
+        Anterior: ${prev.toLocaleString("es-AR")} → Nuevo: ${next.toLocaleString("es-AR")}
+      </div>
+    );
+  })()}
+</div>
             </div>
           </CardContent>
         </Card>
@@ -419,7 +440,6 @@ function QuoteColumn({
                 <DropdownMenuItem
                   className="text-red-600 focus:text-red-600"
                   onSelect={() => {
-                    // UX: aviso rápido si ya sabemos que hay leads
                     if (quotes.length > 0) {
                       toast.error(
                         "No podés eliminar esta etapa porque tiene leads. Movelos a otra etapa antes de eliminar."
@@ -640,10 +660,7 @@ function PipelineView({
           <div className="flex h-full items-start overflow-x-auto w-full pb-2 pr-2 gap-3 snap-x snap-mandatory">
             <SortableContext items={etapas?.map((e: Etapa) => e._id) || []}>
               {etapas?.map((etapa: Etapa) => (
-                <div
-                  key={etapa._id}
-                  className="snap-start w-[92vw] max-w-[420px] flex-shrink-0"
-                >
+                <div key={etapa._id} className="snap-start w-[92vw] max-w-[420px] flex-shrink-0">
                   <QuoteColumn
                     id={etapa._id}
                     etapa={etapa}
@@ -686,11 +703,24 @@ function PipelineView({
   );
 }
 
+/** Normalización: mismo helper que en el modal para que coincidan los keys */
+const toFieldName = (title: string): string => {
+  return title
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_]/g, "");
+};
+
 export default function PipelinePage() {
   const [isStageFormModalOpen, setIsStageFormModalOpen] = useState(false);
   const [formFieldsForStage, setFormFieldsForStage] = useState<IFormField[]>([]);
   const [quoteToMove, setQuoteToMove] = useState<Cotizacion | null>(null);
   const [newStageId, setNewStageId] = useState<string | null>(null);
+
+  // NUEVO: datos iniciales para precargar (precio anterior, etc.)
+  const [initialFormData, setInitialFormData] = useState<IFormularioData>({});
 
   const { data: session } = useSession();
   const queryClient = useQueryClient();
@@ -823,15 +853,18 @@ export default function PipelinePage() {
     },
   });
 
+  // CAMBIO: permitimos enviar montoTotal en el move (para backend si lo querés aplicar)
   const updateQuoteWithFormData = useMutation({
     mutationFn: (data: {
       quoteId: string;
       newStageId: string;
       formData: Record<string, unknown>;
+      montoTotal?: number;
     }) =>
       axios.put(`/api/cotizaciones/${data.quoteId}/move`, {
         etapa: data.newStageId,
         historial: data.formData,
+        montoTotal: data.montoTotal, // backend puede ignorar si no implementaste
       }),
     onSuccess: () => {
       toast.success("Cotización movida y actualizada con éxito.");
@@ -861,43 +894,39 @@ export default function PipelinePage() {
     onError: () => toast.error("Error al eliminar la cotización."),
   });
 
-  // ✅ Eliminar etapa + su formulario (si el backend devuelve 409, avisamos que debe mover leads)
   type DeleteStageErrorPayload = {
-  success?: boolean;
-  error?: string;
-  code?: string;
-  leadsCount?: number;
-};
+    success?: boolean;
+    error?: string;
+    code?: string;
+    leadsCount?: number;
+  };
 
-const deleteStageMutation = useMutation({
-  mutationFn: (stageId: string) => axios.delete(`/api/etapas-cotizacion/${stageId}`),
-  onSuccess: async () => {
-    toast.success("Etapa eliminada con éxito.");
-    await queryClient.invalidateQueries({ queryKey: ["etapasCotizacion"] });
-    await queryClient.invalidateQueries({ queryKey });
-    setStageToDelete(null);
-  },
-  onError: (err: unknown) => {
-    // Default
-    let status: number | undefined;
-    let message = "No se pudo eliminar la etapa.";
+  const deleteStageMutation = useMutation({
+    mutationFn: (stageId: string) => axios.delete(`/api/etapas-cotizacion/${stageId}`),
+    onSuccess: async () => {
+      toast.success("Etapa eliminada con éxito.");
+      await queryClient.invalidateQueries({ queryKey: ["etapasCotizacion"] });
+      await queryClient.invalidateQueries({ queryKey });
+      setStageToDelete(null);
+    },
+    onError: (err: unknown) => {
+      let status: number | undefined;
+      let message = "No se pudo eliminar la etapa.";
 
-    // Axios error guard
-    if (err instanceof AxiosError) {
-      status = err.response?.status;
-      const payload = err.response?.data as DeleteStageErrorPayload | undefined;
-      message = payload?.error || err.message || message;
-    }
+      if (err instanceof AxiosError) {
+        status = err.response?.status;
+        const payload = err.response?.data as DeleteStageErrorPayload | undefined;
+        message = payload?.error || err.message || message;
+      }
 
-    // Caso: tiene leads
-    if (status === 409) {
+      if (status === 409) {
+        toast.error(message);
+        return;
+      }
+
       toast.error(message);
-      return;
-    }
-
-    toast.error(message);
-  },
-});
+    },
+  });
 
   function findContainer(id: string) {
     if (columns[id]) return id;
@@ -917,19 +946,16 @@ const deleteStageMutation = useMutation({
 
     const { active, over } = event;
 
-    if (!over || active.id === over.id) {
-      return;
-    }
+    if (!over || active.id === over.id) return;
 
     const activeId = active.id.toString();
     const overId = over.id.toString();
     const activeContainer = findContainer(activeId);
     const overContainer = findContainer(overId);
 
-    if (!activeContainer || !overContainer) {
-      return;
-    }
+    if (!activeContainer || !overContainer) return;
 
+    // Move entre columnas
     if (activeContainer !== overContainer) {
       const quote = columns[activeContainer].find((q) => q._id === activeId);
       if (!quote) return;
@@ -939,9 +965,18 @@ const deleteStageMutation = useMutation({
 
       try {
         const { data } = await axios.get(`/api/formularios-etapa/${overContainer}`);
-        const camposFormulario = data.data?.campos || [];
+        const camposFormulario: IFormField[] = data.data?.campos || [];
 
         if (camposFormulario.length > 0) {
+          // ====== NUEVO: precarga ======
+          // Estrategia base: si el campo es precio, precargar con quote.montoTotal (precio anterior)
+          const preload: IFormularioData = {};
+          camposFormulario.forEach((f) => {
+            const key = toFieldName(f.titulo);
+            if (f.tipo === "precio") preload[key] = quote.montoTotal;
+          });
+
+          setInitialFormData(preload);
           setFormFieldsForStage(camposFormulario);
           setQuoteToMove(quote);
           setNewStageId(overContainer);
@@ -950,6 +985,7 @@ const deleteStageMutation = useMutation({
           return;
         }
 
+        // Si no hay formulario, movemos normal
         setMoveBlockingLabel("Moviendo cotización...");
 
         const newSourceItems = [...columns[activeContainer]];
@@ -964,9 +1000,7 @@ const deleteStageMutation = useMutation({
         const [movedItem] = newSourceItems.splice(quoteIndex, 1);
 
         const nuevaEtapa = etapas?.find((e) => e._id === overContainer);
-        if (nuevaEtapa) {
-          movedItem.etapa = nuevaEtapa;
-        }
+        if (nuevaEtapa) movedItem.etapa = nuevaEtapa;
 
         newDestItems.unshift(movedItem);
         setColumns((prev) => ({
@@ -990,11 +1024,7 @@ const deleteStageMutation = useMutation({
                 estadoActual: null,
               });
 
-              toast.success(
-                `Proyecto creado para ${
-                  movedItem.cliente?.nombreCompleto || "el cliente"
-                }`
-              );
+              toast.success(`Proyecto creado para ${movedItem.cliente?.nombreCompleto || "el cliente"}`);
             } catch (error) {
               console.error("Error creando proyecto desde cotización", error);
               toast.error("Se movió la cotización pero no se pudo crear el proyecto.");
@@ -1016,6 +1046,7 @@ const deleteStageMutation = useMutation({
         setMoveBlockingLabel("");
       }
     } else {
+      // Reorder dentro de misma columna
       const activeIndex = columns[activeContainer].findIndex((q) => q._id === activeId);
       const overIndex = columns[overContainer].findIndex((q) => q._id === overId);
 
@@ -1066,11 +1097,20 @@ const deleteStageMutation = useMutation({
 
         <StageFormModal
           isOpen={isStageFormModalOpen}
-          onOpenChange={setIsStageFormModalOpen}
+          onOpenChange={(open) => {
+            setIsStageFormModalOpen(open);
+            if (!open) {
+              // limpieza
+              setInitialFormData({});
+              setQuoteToMove(null);
+              setNewStageId(null);
+            }
+          }}
           title="Completa los datos para esta etapa"
           description="Agrega la información requerida antes de mover la cotización."
           formFields={formFieldsForStage}
           quoteId={quoteToMove?._id || ""}
+          initialData={initialFormData}
           onSave={async (formData) => {
             if (!quoteToMove || !newStageId) return;
 
@@ -1078,17 +1118,29 @@ const deleteStageMutation = useMutation({
             const overContainer = newStageId;
             const quoteId = quoteToMove._id;
 
+            // ====== NUEVO: detectar precio editado ======
+            // Si hay un campo tipo precio en el formulario, usarlo como nuevo montoTotal
+            let newMontoTotal = quoteToMove.montoTotal;
+            const precioField = formFieldsForStage.find((f) => f.tipo === "precio");
+            if (precioField) {
+              const key = toFieldName(precioField.titulo);
+              const raw = formData[key];
+              const parsed = typeof raw === "number" ? raw : Number(raw);
+              if (Number.isFinite(parsed)) newMontoTotal = parsed;
+            }
+
             const newEtapa = etapas?.find((e) => e._id === overContainer);
+
             const movedQuote: Cotizacion = {
               ...quoteToMove,
+              montoTotal: newMontoTotal, // UI actualiza el total
               etapa: newEtapa || quoteToMove.etapa,
             };
 
+            // Optimistic UI
             setColumns((prev) => {
               const newPrev = { ...prev };
-              const newSourceItems = newPrev[activeContainer].filter(
-                (q) => q._id !== quoteId
-              );
+              const newSourceItems = newPrev[activeContainer].filter((q) => q._id !== quoteId);
               const newDestItems = [movedQuote, ...newPrev[overContainer]];
               return {
                 ...newPrev,
@@ -1105,6 +1157,7 @@ const deleteStageMutation = useMutation({
                 quoteId: quoteToMove._id,
                 newStageId,
                 formData,
+                montoTotal: newMontoTotal, // backend puede aplicar
               });
 
               if (newEtapa?.nombre === "Proyecto por Iniciar") {
@@ -1116,9 +1169,7 @@ const deleteStageMutation = useMutation({
                     estadoActual: null,
                   });
                   toast.success(
-                    `Proyecto creado para ${
-                      quoteToMove.cliente?.nombreCompleto || "el cliente"
-                    }`
+                    `Proyecto creado para ${quoteToMove.cliente?.nombreCompleto || "el cliente"}`
                   );
                 } catch (error) {
                   console.error("Error creando proyecto desde cotización", error);
@@ -1130,6 +1181,7 @@ const deleteStageMutation = useMutation({
               setMoveBlockingLabel("");
               setQuoteToMove(null);
               setNewStageId(null);
+              setInitialFormData({});
             }
           }}
         />
