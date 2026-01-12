@@ -7,7 +7,6 @@ import {
   useQueryClient,
   keepPreviousData,
 } from "@tanstack/react-query";
-import axios from "axios";
 import {
   DndContext,
   DragEndEvent,
@@ -80,6 +79,7 @@ import { StageFormModal } from "@/components/cotizaciones/StageFormModal";
 import { IFormField } from "@/types/IFormField";
 import { CreateStageDialog } from "@/components/cotizaciones/CreateStageDialog";
 import Link from "next/link";
+import axios, { AxiosError } from "axios";
 
 interface Etapa {
   _id: string;
@@ -862,26 +862,42 @@ export default function PipelinePage() {
   });
 
   // ✅ Eliminar etapa + su formulario (si el backend devuelve 409, avisamos que debe mover leads)
-  const deleteStageMutation = useMutation({
-    mutationFn: (stageId: string) => axios.delete(`/api/etapas-cotizacion/${stageId}`),
-    onSuccess: async () => {
-      toast.success("Etapa eliminada con éxito.");
-      await queryClient.invalidateQueries({ queryKey: ["etapasCotizacion"] });
-      await queryClient.invalidateQueries({ queryKey });
-      setStageToDelete(null);
-    },
-    onError: (err: any) => {
-      const status = err?.response?.status;
-      const message =
-        err?.response?.data?.error || "No se pudo eliminar la etapa.";
+  type DeleteStageErrorPayload = {
+  success?: boolean;
+  error?: string;
+  code?: string;
+  leadsCount?: number;
+};
 
-      if (status === 409) {
-        toast.error(message);
-      } else {
-        toast.error(message);
-      }
-    },
-  });
+const deleteStageMutation = useMutation({
+  mutationFn: (stageId: string) => axios.delete(`/api/etapas-cotizacion/${stageId}`),
+  onSuccess: async () => {
+    toast.success("Etapa eliminada con éxito.");
+    await queryClient.invalidateQueries({ queryKey: ["etapasCotizacion"] });
+    await queryClient.invalidateQueries({ queryKey });
+    setStageToDelete(null);
+  },
+  onError: (err: unknown) => {
+    // Default
+    let status: number | undefined;
+    let message = "No se pudo eliminar la etapa.";
+
+    // Axios error guard
+    if (err instanceof AxiosError) {
+      status = err.response?.status;
+      const payload = err.response?.data as DeleteStageErrorPayload | undefined;
+      message = payload?.error || err.message || message;
+    }
+
+    // Caso: tiene leads
+    if (status === 409) {
+      toast.error(message);
+      return;
+    }
+
+    toast.error(message);
+  },
+});
 
   function findContainer(id: string) {
     if (columns[id]) return id;
