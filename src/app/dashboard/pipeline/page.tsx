@@ -352,31 +352,31 @@ function QuoteCard({
               </div>
 
               <div className="flex flex-col items-end">
-  <div className="flex items-center gap-1 font-semibold text-base whitespace-nowrap">
-    <DollarSign className="h-4 w-4" />
-    <span>{quote.montoTotal.toLocaleString("es-AR")}</span>
-  </div>
+                <div className="flex items-center gap-1 font-semibold text-base whitespace-nowrap">
+                  <DollarSign className="h-4 w-4" />
+                  <span>{quote.montoTotal.toLocaleString("es-AR")}</span>
+                </div>
 
-  {(() => {
-    const last = quote.historialEtapas?.[quote.historialEtapas.length - 1];
-    const df = last?.datosFormulario;
+                {(() => {
+                  const last = quote.historialEtapas?.[quote.historialEtapas.length - 1];
+                  const df = last?.datosFormulario;
+                
+                  const prev =
+                    typeof df?.__precioAnterior === "number" ? df.__precioAnterior : null;
 
-    const prev =
-      typeof df?.__precioAnterior === "number" ? df.__precioAnterior : null;
-      
-    const next =
-      typeof df?.__precioNuevo === "number" ? df.__precioNuevo : null;
-
-    // Solo mostrar si realmente hubo cambio
-    if (prev === null || next === null || prev === next) return null;
-
-    return (
-      <div className="text-[11px] text-muted-foreground whitespace-nowrap">
-        Anterior: ${prev.toLocaleString("es-AR")} → Nuevo: ${next.toLocaleString("es-AR")}
-      </div>
-    );
-  })()}
-</div>
+                  const next =
+                    typeof df?.__precioNuevo === "number" ? df.__precioNuevo : null;
+                
+                  // Solo mostrar si realmente hubo cambio
+                  if (prev === null || next === null || prev === next) return null;
+                
+                  return (
+                    <div className="text-[11px] text-muted-foreground whitespace-nowrap">
+                      Anterior: ${prev.toLocaleString("es-AR")} → Nuevo: ${next.toLocaleString("es-AR")}
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           </CardContent>
         </Card>
