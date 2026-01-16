@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useDebounce } from "use-debounce";
 import {
@@ -12,7 +12,6 @@ import {
   Mail,
   Pencil,
   Plus,
-  QrCode,
   Trash2,
   CreditCard,
   Image as ImageIcon,
@@ -20,13 +19,10 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type Sucursal = {
@@ -36,8 +32,8 @@ type Sucursal = {
   linkPagoAbierto?: string;
   cbu?: string;
   email?: string;
-  qrPagoAbiertoImg?: string; // data-uri base64 o URL
-  aliasImg?: string; // data-uri base64 o URL
+  qrPagoAbiertoImg?: string;
+  aliasImg?: string;
   createdAt?: string | Date;
   updatedAt?: string | Date;
 };
@@ -76,6 +72,16 @@ async function fileToDataUrl(file: File): Promise<string> {
     reader.onload = () => resolve(String(reader.result || ""));
     reader.readAsDataURL(file);
   });
+}
+
+function getAxiosErrorMessage(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    const ax = err as AxiosError<{ message?: string }>;
+    return ax.response?.data?.message || ax.message || "Error de red";
+  }
+  if (err instanceof Error) return err.message;
+  if (typeof err === "string") return err;
+  return "Error inesperado";
 }
 
 function FieldRow({
@@ -185,7 +191,6 @@ function UpsertSucursalDialog({
 }) {
   const [form, setForm] = useState<SucursalFormState>(initial);
   const [saving, setSaving] = useState(false);
-
   const [imgPreview, setImgPreview] = useState<{ title: string; src: string } | null>(null);
 
   useEffect(() => {
@@ -225,8 +230,8 @@ function UpsertSucursalDialog({
         mode
       );
       onOpenChange(false);
-    } catch (e: any) {
-      alert(e?.response?.data?.message || e?.message || "Error al guardar.");
+    } catch (e: unknown) {
+      alert(getAxiosErrorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -350,9 +355,7 @@ function UpsertSucursalDialog({
                   <Button
                     type="button"
                     size="sm"
-                    onClick={() =>
-                      form.aliasImg && setImgPreview({ title: "Alias (Imagen)", src: form.aliasImg })
-                    }
+                    onClick={() => form.aliasImg && setImgPreview({ title: "Alias (Imagen)", src: form.aliasImg })}
                     disabled={!form.aliasImg}
                   >
                     Ver
@@ -377,7 +380,6 @@ function UpsertSucursalDialog({
         </DialogContent>
       </Dialog>
 
-      {/* Preview imagen */}
       <Dialog open={Boolean(imgPreview)} onOpenChange={(v) => !v && setImgPreview(null)}>
         <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
@@ -405,15 +407,12 @@ export default function ConfiguracionPage() {
   const { data, isLoading, isError, isFetching } = useQuery<Sucursal[]>({
     queryKey,
     queryFn: async () => {
-      const res = await axios.get("/api/sucursales", {
-        params: { searchTerm: debouncedSearchTerm },
-      });
+      const res = await axios.get("/api/sucursales", { params: { searchTerm: debouncedSearchTerm } });
       return res.data.data as Sucursal[];
     },
     placeholderData: keepPreviousData,
   });
 
-  // Upsert
   const [upsertOpen, setUpsertOpen] = useState(false);
   const [upsertMode, setUpsertMode] = useState<"create" | "edit">("create");
   const [editing, setEditing] = useState<Sucursal | null>(null);
@@ -443,7 +442,6 @@ export default function ConfiguracionPage() {
     setUpsertOpen(true);
   };
 
-  // Delete
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState<Sucursal | null>(null);
   const [deletingBusy, setDeletingBusy] = useState(false);
@@ -455,14 +453,15 @@ export default function ConfiguracionPage() {
 
   const confirmDelete = async () => {
     if (!deleting?._id) return;
+
     try {
       setDeletingBusy(true);
       await axios.delete(`/api/sucursales/${deleting._id}`);
       setDeleteOpen(false);
       setDeleting(null);
       await qc.invalidateQueries({ queryKey: ["sucursales"] });
-    } catch (e: any) {
-      alert(e?.response?.data?.message || e?.message || "Error al eliminar.");
+    } catch (e: unknown) {
+      alert(getAxiosErrorMessage(e));
     } finally {
       setDeletingBusy(false);
     }
@@ -473,13 +472,11 @@ export default function ConfiguracionPage() {
       await axios.post("/api/sucursales", payload);
     } else {
       if (!editing?._id) throw new Error("Sucursal inválida para editar.");
-      // Si agregaste PUT en el API podés usar axios.put(...)
       await axios.patch(`/api/sucursales/${editing._id}`, payload);
     }
     await qc.invalidateQueries({ queryKey: ["sucursales"] });
   };
 
-  // Preview imagen desde cards
   const [imgPreview, setImgPreview] = useState<{ title: string; src: string } | null>(null);
 
   const rows = data || [];
@@ -489,7 +486,6 @@ export default function ConfiguracionPage() {
 
   return (
     <div className="mx-auto py-6 px-4 md:px-6">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 border-b pb-4">
         <div className="space-y-1">
           <h1 className="text-3xl font-bold">Configuración</h1>
@@ -504,7 +500,6 @@ export default function ConfiguracionPage() {
         </div>
       </div>
 
-      {/* Search + status */}
       <div className="mt-4 flex flex-col md:flex-row md:items-end gap-3">
         <div className="grid gap-1 flex-1">
           <Label className="text-sm">Buscar</Label>
@@ -533,7 +528,6 @@ export default function ConfiguracionPage() {
         </div>
       </div>
 
-      {/* Cards */}
       <div
         className={cn(
           "mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3",
@@ -557,7 +551,6 @@ export default function ConfiguracionPage() {
 
         {rows.map((s) => (
           <Card key={s._id} className="overflow-hidden p-0">
-            {/* Header con acento primary */}
             <div className="border-b bg-primary/5">
               <div className="p-4 flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -590,12 +583,7 @@ export default function ConfiguracionPage() {
                 label="Link de Pago Abierto"
                 value={
                   s.linkPagoAbierto ? (
-                    <a
-                      href={s.linkPagoAbierto}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="hover:underline text-primary"
-                    >
+                    <a href={s.linkPagoAbierto} target="_blank" rel="noreferrer" className="hover:underline text-primary">
                       {truncate(s.linkPagoAbierto, 60)}
                     </a>
                   ) : (
@@ -646,7 +634,6 @@ export default function ConfiguracionPage() {
         ))}
       </div>
 
-      {/* Upsert */}
       <UpsertSucursalDialog
         open={upsertOpen}
         onOpenChange={setUpsertOpen}
@@ -655,7 +642,6 @@ export default function ConfiguracionPage() {
         onSubmit={onSubmitUpsert}
       />
 
-      {/* Delete confirm */}
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
@@ -666,7 +652,6 @@ export default function ConfiguracionPage() {
         busy={deletingBusy}
       />
 
-      {/* Preview imagen desde cards */}
       <Dialog open={Boolean(imgPreview)} onOpenChange={(v) => !v && setImgPreview(null)}>
         <DialogContent className="sm:max-w-3xl">
           <DialogHeader>

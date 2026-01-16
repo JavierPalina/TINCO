@@ -10,6 +10,22 @@ function isValidObjectId(id: string) {
   return mongoose.Types.ObjectId.isValid(id);
 }
 
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "string") return err;
+  return "Error inesperado";
+}
+
+type PatchSucursalBody = {
+  nombre?: unknown;
+  direccion?: unknown;
+  linkPagoAbierto?: unknown;
+  cbu?: unknown;
+  email?: unknown;
+  qrPagoAbiertoImg?: unknown;
+  aliasImg?: unknown;
+};
+
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   try {
     await dbConnect();
@@ -25,9 +41,9 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     }
 
     return NextResponse.json({ ok: true, data: doc }, { status: 200 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { ok: false, message: error?.message || "Error en GET /api/sucursales/[id]" },
+      { ok: false, message: getErrorMessage(error) || "Error en GET /api/sucursales/[id]" },
       { status: 500 }
     );
   }
@@ -42,37 +58,42 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       return NextResponse.json({ ok: false, message: "ID inválido" }, { status: 400 });
     }
 
-    const body = await req.json();
+    const body = (await req.json()) as PatchSucursalBody;
 
-    if (body?.direccion !== undefined && !String(body.direccion).trim()) {
+    // Validaciones (si se envían)
+    if (body.nombre !== undefined && !String(body.nombre).trim()) {
+      return NextResponse.json(
+        { ok: false, message: "El nombre no puede quedar vacío." },
+        { status: 400 }
+      );
+    }
+    if (body.direccion !== undefined && !String(body.direccion).trim()) {
       return NextResponse.json(
         { ok: false, message: "La dirección no puede quedar vacía." },
         { status: 400 }
       );
     }
 
-    const updated = await Sucursal.findByIdAndUpdate(
-      id,
-      {
-        ...(body.nombre !== undefined ? { nombre: String(body.nombre).trim() } : {}),
-        ...(body.direccion !== undefined ? { direccion: String(body.direccion).trim() } : {}),
-        ...(body.linkPagoAbierto !== undefined ? { linkPagoAbierto: String(body.linkPagoAbierto).trim() } : {}),
-        ...(body.cbu !== undefined ? { cbu: String(body.cbu).trim() } : {}),
-        ...(body.email !== undefined ? { email: String(body.email).trim() } : {}),
-        ...(body.qrPagoAbiertoImg !== undefined ? { qrPagoAbiertoImg: String(body.qrPagoAbiertoImg) } : {}),
-        ...(body.aliasImg !== undefined ? { aliasImg: String(body.aliasImg) } : {}),
-      },
-      { new: true }
-    ).lean();
+    const update: Record<string, string> = {};
+
+    if (body.nombre !== undefined) update.nombre = String(body.nombre).trim();
+    if (body.direccion !== undefined) update.direccion = String(body.direccion).trim();
+    if (body.linkPagoAbierto !== undefined) update.linkPagoAbierto = String(body.linkPagoAbierto).trim();
+    if (body.cbu !== undefined) update.cbu = String(body.cbu).trim();
+    if (body.email !== undefined) update.email = String(body.email).trim();
+    if (body.qrPagoAbiertoImg !== undefined) update.qrPagoAbiertoImg = String(body.qrPagoAbiertoImg);
+    if (body.aliasImg !== undefined) update.aliasImg = String(body.aliasImg);
+
+    const updated = await Sucursal.findByIdAndUpdate(id, update, { new: true }).lean();
 
     if (!updated) {
       return NextResponse.json({ ok: false, message: "Sucursal no encontrada" }, { status: 404 });
     }
 
     return NextResponse.json({ ok: true, data: updated }, { status: 200 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { ok: false, message: error?.message || "Error en PATCH /api/sucursales/[id]" },
+      { ok: false, message: getErrorMessage(error) || "Error en PATCH /api/sucursales/[id]" },
       { status: 500 }
     );
   }
@@ -93,9 +114,9 @@ export async function DELETE(_: Request, { params }: { params: { id: string } })
     }
 
     return NextResponse.json({ ok: true }, { status: 200 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { ok: false, message: error?.message || "Error en DELETE /api/sucursales/[id]" },
+      { ok: false, message: getErrorMessage(error) || "Error en DELETE /api/sucursales/[id]" },
       { status: 500 }
     );
   }
