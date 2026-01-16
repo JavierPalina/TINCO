@@ -1,11 +1,13 @@
-// src/components/Header.tsx
 "use client";
 
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import axios from "axios";
 import { useTheme } from "@/components/ThemeProvider";
 import { useSession, signOut } from "next-auth/react";
+import { useQuery } from "@tanstack/react-query";
+
 import {
   Menu,
   X,
@@ -29,6 +31,7 @@ import {
   ClipboardList,
   Factory,
   Layers,
+  ShieldCheck,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -44,8 +47,27 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { NotificationBell } from "./NotificationBell";
 
-import { canAccessSection, canAccessProyectoStage } from "@/lib/roles";
+import type { UserRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
+
+type SectionKey =
+  | "pipeline"
+  | "proyectos"
+  | "clientes"
+  | "servicios"
+  | "stock"
+  | "users"
+  | "notificaciones";
+
+type ProyectoStageKey = "tareas";
+
+type RoleAccessDoc = {
+  role: UserRole;
+  sections: Record<SectionKey, boolean>;
+  proyectoStages: Record<ProyectoStageKey, boolean>;
+};
+
+type RoleAccessResponse = { ok: boolean; data: RoleAccessDoc[] };
 
 type ListItemProps = {
   href: string;
@@ -77,27 +99,74 @@ const NavLink = ({ href, children, className }: NavLinkProps) => (
     href={href}
     className={cn(
       "text-sm font-medium text-muted-foreground hover:text-primary transition-colors",
-      className,
+      className
     )}
   >
     {children}
   </Link>
 );
 
+function emptyRoleAccess(role: UserRole): RoleAccessDoc {
+  return {
+    role,
+    sections: {
+      pipeline: false,
+      proyectos: false,
+      clientes: false,
+      servicios: false,
+      stock: false,
+      users: false,
+      notificaciones: false,
+    },
+    proyectoStages: {
+      tareas: false,
+    },
+  };
+}
+
 export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { setTheme, resolvedTheme } = useTheme();
   const { data: session } = useSession();
 
-  const role = session?.user?.rol;
+  const role = session?.user?.rol as UserRole | undefined;
 
-  const showPipeline = canAccessSection(role, "pipeline");
-  const showProyectos = canAccessSection(role, "proyectos");
-  const showClientes = canAccessSection(role, "clientes");
-  const showServicios = canAccessSection(role, "servicios");
-  const showStock = canAccessSection(role, "stock");
-  const showUsers = canAccessSection(role, "users");
-  const showNotificaciones = canAccessSection(role, "notificaciones");
+  // ✅ permisos desde DB
+  const { data: roleAccessDocs } = useQuery<RoleAccessDoc[]>({
+    queryKey: ["role-access"],
+    queryFn: async () => {
+      const res = await axios.get<RoleAccessResponse>("/api/role-access");
+      return res.data.data;
+    },
+    enabled: Boolean(role),
+    staleTime: 1000 * 60 * 3,
+    retry: 0,
+  });
+
+  const roleConfig: RoleAccessDoc | null = useMemo(() => {
+    if (!role) return null;
+    const found = (roleAccessDocs || []).find((d) => d.role === role);
+    // ✅ si no existe config, por seguridad: todo false
+    return found ?? emptyRoleAccess(role);
+  }, [role, roleAccessDocs]);
+
+  const canSection = (section: SectionKey): boolean => {
+    if (!roleConfig) return false;
+    return Boolean(roleConfig.sections?.[section]);
+  };
+
+  const canStage = (stage: ProyectoStageKey): boolean => {
+    if (!roleConfig) return false;
+    return Boolean(roleConfig.proyectoStages?.[stage]);
+  };
+
+  const showPipeline = canSection("pipeline");
+  const showProyectos = canSection("proyectos");
+  const showClientes = canSection("clientes");
+  const showServicios = canSection("servicios");
+  const showStock = canSection("stock");
+  const showUsers = canSection("users");
+  const showNotificaciones = canSection("notificaciones");
 
   const proyectosLinks = useMemo(() => {
     const items: Array<{
@@ -108,8 +177,7 @@ export function Header() {
       desc: string;
     }> = [];
 
-    // Header de proyectos: SOLO agenda + tabla
-    if (canAccessProyectoStage(role, "tareas")) {
+    if (canStage("tareas")) {
       items.push({
         key: "tareas_agenda",
         href: "/dashboard/proyectos/tareas/agenda",
@@ -128,59 +196,46 @@ export function Header() {
     }
 
     return items;
-  }, [role]);
+  }, [roleConfig]);
 
   const stockLinks = useMemo(() => {
-    const items: Array<{
-      key: "stock_items" | "stock_balances" | "stock_movements" | "stock_reservations" | "stock_boms";
-      href: string;
-      icon: React.ElementType;
-      title: string;
-      desc: string;
-    }> = [];
-
-    // Rutas que te pasé en el módulo de stock
-    items.push({
-      key: "stock_balances",
-      href: "/dashboard/stock/balances",
-      icon: Boxes,
-      title: "Balances",
-      desc: "Disponible, reservado y físico por depósito",
-    });
-
-    items.push({
-      key: "stock_movements",
-      href: "/dashboard/stock/movements",
-      icon: ArrowRightLeft,
-      title: "Movimientos",
-      desc: "Ingresos, egresos, ajustes y transferencias",
-    });
-
-    items.push({
-      key: "stock_reservations",
-      href: "/dashboard/stock/reservations",
-      icon: ClipboardList,
-      title: "Reservas",
-      desc: "Reserva/liberación de stock por referencia",
-    });
-
-    items.push({
-      key: "stock_boms",
-      href: "/dashboard/stock/boms",
-      icon: Layers,
-      title: "BOM (Kits)",
-      desc: "Recetas de consumo por SKU terminado",
-    });
-
-    items.push({
-      key: "stock_items",
-      href: "/dashboard/stock/items",
-      icon: Package,
-      title: "Items (SKU)",
-      desc: "Catálogo de productos y componentes",
-    });
-
-    return items;
+    return [
+      {
+        key: "stock_balances" as const,
+        href: "/dashboard/stock/balances",
+        icon: Boxes,
+        title: "Balances",
+        desc: "Disponible, reservado y físico por depósito",
+      },
+      {
+        key: "stock_movements" as const,
+        href: "/dashboard/stock/movements",
+        icon: ArrowRightLeft,
+        title: "Movimientos",
+        desc: "Ingresos, egresos, ajustes y transferencias",
+      },
+      {
+        key: "stock_reservations" as const,
+        href: "/dashboard/stock/reservations",
+        icon: ClipboardList,
+        title: "Reservas",
+        desc: "Reserva/liberación de stock por referencia",
+      },
+      {
+        key: "stock_boms" as const,
+        href: "/dashboard/stock/boms",
+        icon: Layers,
+        title: "BOM (Kits)",
+        desc: "Recetas de consumo por SKU terminado",
+      },
+      {
+        key: "stock_items" as const,
+        href: "/dashboard/stock/items",
+        icon: Package,
+        title: "Items (SKU)",
+        desc: "Catálogo de productos y componentes",
+      },
+    ];
   }, []);
 
   const homeHref = showPipeline
@@ -296,7 +351,6 @@ export function Header() {
               </DropdownMenu>
             )}
 
-            {/* STOCK: ahora como dropdown con subsecciones */}
             {showStock && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -400,6 +454,15 @@ export function Header() {
 
               {showUsers && (
                 <DropdownMenuItem asChild>
+                  <Link href="/dashboard/configuracion/accesos">
+                    <ShieldCheck className="mr-2 h-4 w-4" />
+                    <span>Accesos por Roles</span>
+                  </Link>
+                </DropdownMenuItem>
+              )}
+
+              {showUsers && (
+                <DropdownMenuItem asChild>
                   <Link href="/dashboard/users">
                     <UsersRound className="mr-2 h-4 w-4" />
                     <span>Usuarios</span>
@@ -485,7 +548,6 @@ export function Header() {
                   </>
                 )}
 
-                {/* STOCK MOBILE: subsecciones */}
                 {showStock && (
                   <>
                     <DropdownMenuSeparator />
@@ -499,6 +561,19 @@ export function Header() {
                         </Link>
                       </DropdownMenuItem>
                     ))}
+                  </>
+                )}
+
+                {showUsers && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Administración</DropdownMenuLabel>
+                    <DropdownMenuItem asChild>
+                      <Link href="/dashboard/configuracion/accesos">Accesos por Roles</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/dashboard/users">Usuarios</Link>
+                    </DropdownMenuItem>
                   </>
                 )}
 
