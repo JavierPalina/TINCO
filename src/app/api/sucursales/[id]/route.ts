@@ -1,4 +1,4 @@
-// /app/api/sucursales/[id]/route.ts
+// src/app/api/sucursales/[id]/route.ts
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import { Sucursal } from "@/models/Sucursal";
@@ -6,15 +6,9 @@ import mongoose from "mongoose";
 
 export const dynamic = "force-dynamic";
 
-function isValidObjectId(id: string) {
-  return mongoose.Types.ObjectId.isValid(id);
-}
-
-function getErrorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (typeof err === "string") return err;
-  return "Error inesperado";
-}
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
 
 type PatchSucursalBody = {
   nombre?: unknown;
@@ -26,11 +20,22 @@ type PatchSucursalBody = {
   aliasImg?: unknown;
 };
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+function isValidObjectId(id: string) {
+  return mongoose.Types.ObjectId.isValid(id);
+}
+
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "string") return err;
+  return "Error inesperado";
+}
+
+export async function GET(_: Request, context: RouteContext) {
   try {
     await dbConnect();
 
-    const id = params.id;
+    const { id } = await context.params;
+
     if (!isValidObjectId(id)) {
       return NextResponse.json({ ok: false, message: "ID inválido" }, { status: 400 });
     }
@@ -49,24 +54,25 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
   }
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, context: RouteContext) {
   try {
     await dbConnect();
 
-    const id = params.id;
+    const { id } = await context.params;
+
     if (!isValidObjectId(id)) {
       return NextResponse.json({ ok: false, message: "ID inválido" }, { status: 400 });
     }
 
     const body = (await req.json()) as PatchSucursalBody;
 
-    // Validaciones (si se envían)
     if (body.nombre !== undefined && !String(body.nombre).trim()) {
       return NextResponse.json(
         { ok: false, message: "El nombre no puede quedar vacío." },
         { status: 400 }
       );
     }
+
     if (body.direccion !== undefined && !String(body.direccion).trim()) {
       return NextResponse.json(
         { ok: false, message: "La dirección no puede quedar vacía." },
@@ -99,11 +105,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_: Request, context: RouteContext) {
   try {
     await dbConnect();
 
-    const id = params.id;
+    const { id } = await context.params;
+
     if (!isValidObjectId(id)) {
       return NextResponse.json({ ok: false, message: "ID inválido" }, { status: 400 });
     }
