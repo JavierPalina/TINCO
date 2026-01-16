@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
+
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -27,14 +28,23 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
 import type {
   IContactData,
   IFinancieraLegalData,
   ILaboralData,
   IPersonalData,
 } from "@/models/User";
-
 import type { UserRole } from "@/lib/roles";
+
+type SucursalLite = { _id: string; nombre: string };
 
 export interface IUser2 {
   _id: string;
@@ -42,11 +52,21 @@ export interface IUser2 {
   email: string;
   rol: UserRole;
   activo: boolean;
+
+  sucursal?: SucursalLite | null;
+
   personalData?: IPersonalData;
   contactData?: IContactData;
   laboralData?: ILaboralData;
   financieraLegalData?: IFinancieraLegalData;
 }
+
+type ApiListResponse<T> = {
+  success: boolean;
+  data: T;
+  error?: string;
+  message?: string;
+};
 
 function getErrorMessage(err: unknown): string {
   if (axios.isAxiosError(err)) {
@@ -57,11 +77,20 @@ function getErrorMessage(err: unknown): string {
   return "Error";
 }
 
+type Sucursal = {
+  _id: string;
+  nombre: string;
+  direccion: string;
+};
+
 export default function UsersPage() {
   const queryClient = useQueryClient();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<IUser2 | undefined>(undefined);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
+
+  // ✅ NUEVO: loading por fila al asignar sucursal
+  const [assigningUserId, setAssigningUserId] = useState<string | null>(null);
 
   const roleLabel: Record<UserRole, string> = useMemo(
     () => ({
@@ -75,14 +104,48 @@ export default function UsersPage() {
       post_venta: "Post Venta",
       admin: "Admin",
     }),
-    [],
+    []
   );
 
   const { data: users, isLoading, error } = useQuery<IUser2[]>({
     queryKey: ["users"],
     queryFn: async () => {
-      const { data } = await axios.get("/api/users");
-      return data.data as IUser2[];
+      const { data } = await axios.get<ApiListResponse<IUser2[]>>("/api/users");
+      return data.data;
+    },
+  });
+
+  const { data: sucursales } = useQuery<Sucursal[]>({
+    queryKey: ["sucursales-lite"],
+    queryFn: async () => {
+      const { data } = await axios.get<{ ok: boolean; data: Sucursal[] }>("/api/sucursales");
+      return data.data;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const assignSucursalMutation = useMutation({
+    mutationFn: async (payload: { userId: string; sucursalId: string | null }) => {
+      const res = await axios.put(`/api/users/${payload.userId}`, {
+        sucursalId: payload.sucursalId,
+      });
+      return res.data;
+    },
+    onMutate: async (payload) => {
+      setAssigningUserId(payload.userId);
+
+      // (Opcional) Optimistic UI minimal: no tocamos cache para evitar inconsistencias con populate.
+      // Si querés optimistic real, te lo armo también.
+    },
+    onSuccess: () => {
+      toast.success("Sucursal asignada correctamente.");
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: (err: unknown) => {
+      toast.error(getErrorMessage(err) || "Error al asignar la sucursal.");
+    },
+    onSettled: () => {
+      setAssigningUserId(null);
     },
   });
 
@@ -106,11 +169,11 @@ export default function UsersPage() {
 
   const handleEdit = async (userSummary: IUser2) => {
     const promise = async (): Promise<IUser2> => {
-      const { data } = await axios.get(`/api/users/${userSummary._id}`);
+      const { data } = await axios.get<ApiListResponse<IUser2>>(`/api/users/${userSummary._id}`);
       if (!data.success) {
         throw new Error(data.error || "No se pudieron cargar los datos del usuario.");
       }
-      return data.data as IUser2;
+      return data.data;
     };
 
     toast.promise(promise(), {
@@ -129,6 +192,11 @@ export default function UsersPage() {
     setIsFormOpen(true);
   };
 
+  const onSucursalChange = (userId: string, value: string) => {
+    const sucursalId = value === "none" ? null : value;
+    assignSucursalMutation.mutate({ userId, sucursalId });
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -138,11 +206,7 @@ export default function UsersPage() {
   }
 
   if (error) {
-    return (
-      <div className="text-center text-red-500">
-        Error: No se pudieron cargar los usuarios.
-      </div>
-    );
+    return <div className="text-center text-red-500">Error: No se pudieron cargar los usuarios.</div>;
   }
 
   return (
@@ -161,50 +225,85 @@ export default function UsersPage() {
             <TableHead>Email</TableHead>
             <TableHead>Rol</TableHead>
             <TableHead>Estado</TableHead>
+            <TableHead>Sucursal</TableHead>
             <TableHead className="text-right">Acciones</TableHead>
           </TableRow>
         </TableHeader>
 
         <TableBody>
-          {users?.map((user) => (
-            <TableRow key={user._id}>
-              <TableCell className="font-medium">{user.name}</TableCell>
-              <TableCell>{user.email}</TableCell>
+          {users?.map((user) => {
+            const currentValue = user.sucursal?._id ?? "none";
+            const rowSaving = assigningUserId === user._id;
 
-              <TableCell>
-                <Badge variant="secondary">{roleLabel[user.rol] ?? user.rol}</Badge>
-              </TableCell>
+            return (
+              <TableRow key={user._id}>
+                <TableCell className="font-medium">{user.name}</TableCell>
+                <TableCell>{user.email}</TableCell>
 
-              <TableCell>
-                <Badge variant={user.activo ? "default" : "destructive"}>
-                  {user.activo ? "Activo" : "Inactivo"}
-                </Badge>
-              </TableCell>
+                <TableCell>
+                  <Badge variant="secondary">{roleLabel[user.rol] ?? user.rol}</Badge>
+                </TableCell>
 
-              <TableCell className="text-right">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mr-2"
-                  onClick={() => handleEdit(user)}
-                  aria-label="Editar usuario"
-                  title="Editar"
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
+                <TableCell>
+                  <Badge variant={user.activo ? "default" : "destructive"}>
+                    {user.activo ? "Activo" : "Inactivo"}
+                  </Badge>
+                </TableCell>
 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleDeleteClick(user._id)}
-                  aria-label="Eliminar usuario"
-                  title="Eliminar"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
+                <TableCell>
+                  <div className="min-w-[240px]">
+                    <Select
+                      value={currentValue}
+                      onValueChange={(v) => onSucursalChange(user._id, v)}
+                      disabled={rowSaving}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Asignar sucursal" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin asignar</SelectItem>
+                        {(sucursales || []).map((s) => (
+                          <SelectItem key={s._id} value={s._id}>
+                            {s.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {rowSaving ? (
+                      <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Guardando...
+                      </div>
+                    ) : null}
+                  </div>
+                </TableCell>
+
+                <TableCell className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mr-2"
+                    onClick={() => handleEdit(user)}
+                    aria-label="Editar usuario"
+                    title="Editar"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteClick(user._id)}
+                    aria-label="Eliminar usuario"
+                    title="Eliminar"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
 

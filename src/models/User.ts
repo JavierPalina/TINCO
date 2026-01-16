@@ -1,5 +1,5 @@
 // src/models/User.ts
-import mongoose, { Schema, Document } from "mongoose";
+import mongoose, { Schema, Document, Types } from "mongoose";
 import { ROLES, type UserRole } from "@/lib/roles";
 
 export interface IPersonalData {
@@ -52,6 +52,9 @@ export interface IUser extends Document {
 
   image?: string | null;
 
+  // ✅ NUEVO
+  sucursal?: Types.ObjectId | null;
+
   personalData?: IPersonalData;
   contactData?: IContactData;
   laboralData?: ILaboralData;
@@ -73,8 +76,10 @@ const UserSchema: Schema = new Schema(
 
     activo: { type: Boolean, default: true },
 
-    // ✅ NUEVO: avatar / foto perfil
     image: { type: String, default: null },
+
+    // ✅ NUEVO: sucursal asignada (puede ser null)
+    sucursal: { type: Schema.Types.ObjectId, ref: "Sucursal", default: null },
 
     personalData: {
       cuil: String,
@@ -117,7 +122,7 @@ const UserSchema: Schema = new Schema(
       numeroAfiliado: String,
     },
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
 export default mongoose.models.User || mongoose.model<IUser>("User", UserSchema);

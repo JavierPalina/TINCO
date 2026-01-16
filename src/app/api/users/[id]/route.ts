@@ -1,18 +1,35 @@
+// src/app/api/users/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import User from "@/models/User";
 import { ObjectId } from "mongodb";
 import { ROLES } from "@/lib/roles";
+import mongoose from "mongoose";
+import { Sucursal } from "@/models/Sucursal";
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
+function isValidObjectId(id: string) {
+  return mongoose.Types.ObjectId.isValid(id);
+}
+
+export async function GET(req: NextRequest, context: RouteContext) {
   await dbConnect();
+
   try {
-    const { id } = await params;
+    const { id } = await context.params;
+
     if (!ObjectId.isValid(id)) {
       return NextResponse.json({ success: false, error: "ID de usuario inválido." }, { status: 400 });
     }
 
-    const user = await User.findById(id).select("-password");
+    const user = await User.findById(id)
+      .select("-password")
+      .populate("sucursal", "_id nombre")
+      .lean();
+
     if (!user) {
       return NextResponse.json({ success: false, error: "Usuario no encontrado." }, { status: 404 });
     }
@@ -24,35 +41,79 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 }
 
-export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PUT(req: NextRequest, context: RouteContext) {
   await dbConnect();
+
   try {
-    const { id } = await params;
+    const { id } = await context.params;
+
     if (!ObjectId.isValid(id)) {
       return NextResponse.json({ success: false, error: "ID de usuario inválido." }, { status: 400 });
     }
 
-    const body = await req.json();
+    const body: unknown = await req.json();
+    const b = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
 
-    // ✅ whitelist para evitar que te metan campos peligrosos
+    // ✅ whitelist
     const allowed: Record<string, unknown> = {};
 
-    if (typeof body.name === "string") allowed.name = body.name;
-    if (typeof body.email === "string") allowed.email = body.email;
-    if (typeof body.activo === "boolean") allowed.activo = body.activo;
+    if (typeof b.name === "string") allowed.name = b.name;
+    if (typeof b.email === "string") allowed.email = b.email;
+    if (typeof b.activo === "boolean") allowed.activo = b.activo;
 
-    if (typeof body.rol === "string" && (ROLES as readonly string[]).includes(body.rol)) {
-      allowed.rol = body.rol;
+    if (typeof b.rol === "string" && (ROLES as readonly string[]).includes(b.rol)) {
+      allowed.rol = b.rol;
     }
 
-    if (body.personalData && typeof body.personalData === "object") allowed.personalData = body.personalData;
-    if (body.contactData && typeof body.contactData === "object") allowed.contactData = body.contactData;
-    if (body.laboralData && typeof body.laboralData === "object") allowed.laboralData = body.laboralData;
-    if (body.financieraLegalData && typeof body.financieraLegalData === "object") {
-      allowed.financieraLegalData = body.financieraLegalData;
+    if (b.personalData && typeof b.personalData === "object") allowed.personalData = b.personalData;
+    if (b.contactData && typeof b.contactData === "object") allowed.contactData = b.contactData;
+    if (b.laboralData && typeof b.laboralData === "object") allowed.laboralData = b.laboralData;
+    if (b.financieraLegalData && typeof b.financieraLegalData === "object") {
+      allowed.financieraLegalData = b.financieraLegalData;
     }
 
-    const user = await User.findByIdAndUpdate(id, allowed, { new: true, runValidators: true }).select("-password");
+    // ✅ NUEVO: asignación de sucursal
+    // Espera: sucursalId: string | null
+    if ("sucursalId" in b) {
+      const sucursalId = b.sucursalId;
+
+      if (sucursalId === null) {
+        allowed.sucursal = null;
+      } else if (typeof sucursalId === "string") {
+        const trimmed = sucursalId.trim();
+        if (!trimmed) {
+          allowed.sucursal = null;
+        } else {
+          if (!isValidObjectId(trimmed)) {
+            return NextResponse.json(
+              { success: false, error: "ID de sucursal inválido." },
+              { status: 400 }
+            );
+          }
+
+          const exists = await Sucursal.findById(trimmed).select("_id").lean();
+          if (!exists) {
+            return NextResponse.json(
+              { success: false, error: "Sucursal no encontrada." },
+              { status: 404 }
+            );
+          }
+
+          allowed.sucursal = new mongoose.Types.ObjectId(trimmed);
+        }
+      } else {
+        return NextResponse.json(
+          { success: false, error: "sucursalId debe ser string o null." },
+          { status: 400 }
+        );
+      }
+    }
+
+    const user = await User.findByIdAndUpdate(id, allowed, { new: true, runValidators: true })
+      .select("-password")
+      .populate("sucursal", "_id nombre")
+      .lean();
+
     if (!user) {
       return NextResponse.json({ success: false, error: "Usuario no encontrado." }, { status: 404 });
     }
@@ -64,10 +125,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, context: RouteContext) {
   await dbConnect();
+
   try {
-    const { id } = await params;
+    const { id } = await context.params;
+
     if (!ObjectId.isValid(id)) {
       return NextResponse.json({ success: false, error: "ID de usuario inválido." }, { status: 400 });
     }

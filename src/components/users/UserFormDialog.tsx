@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -54,11 +54,18 @@ type LaboralDataForm = Omit<ILaboralData, "fechaIngreso"> & {
   fechaIngreso?: string;
 };
 
+type SucursalLite = { _id: string; nombre: string };
+type SucursalApiRow = { _id: string; nombre: string; direccion: string };
+
 interface IUserFormData {
   name: string;
   email: string;
   rol: UserRole;
   password?: string;
+
+  // ✅ NUEVO: para asignación desde dialog
+  // "none" => sin asignar
+  sucursalId?: string;
 
   personalData?: PersonalDataForm;
   contactData?: IContactData;
@@ -95,18 +102,33 @@ function getErrorMessage(err: unknown): string {
 export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogProps) {
   const queryClient = useQueryClient();
 
-  const { register, handleSubmit, reset, setValue } = useForm<IUserFormData>({
+  const { register, handleSubmit, reset, setValue, watch } = useForm<IUserFormData>({
     defaultValues: {
       name: "",
       email: "",
       rol: "vendedor",
       password: "",
+      sucursalId: "none",
       personalData: {},
       contactData: {},
       laboralData: {},
       financieraLegalData: {},
     },
   });
+
+  // ✅ Traer sucursales para el select
+  const { data: sucursales, isLoading: loadingSucursales } = useQuery<SucursalApiRow[]>({
+    queryKey: ["sucursales-lite"],
+    queryFn: async () => {
+      const { data } = await axios.get<{ ok: boolean; data: SucursalApiRow[] }>("/api/sucursales");
+      return data.data;
+    },
+    staleTime: 1000 * 60 * 5,
+    enabled: isOpen,
+  });
+
+  // Mantener Select controlado (para que se refleje al reset)
+  const sucursalIdValue = watch("sucursalId") || "none";
 
   useEffect(() => {
     if (user) {
@@ -120,11 +142,17 @@ export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogPro
         fechaIngreso: formatDateForInput(user.laboralData?.fechaIngreso),
       };
 
+      const currentSucursalId =
+        (user.sucursal && typeof user.sucursal === "object"
+          ? (user.sucursal as SucursalLite)._id
+          : null) || null;
+
       reset({
         name: user.name,
         email: user.email,
         rol: user.rol,
         password: "",
+        sucursalId: currentSucursalId ?? "none",
         personalData,
         contactData: user.contactData ?? {},
         laboralData,
@@ -138,6 +166,7 @@ export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogPro
         email: "",
         rol: "vendedor",
         password: "",
+        sucursalId: "none",
         personalData: {},
         contactData: {},
         laboralData: {},
@@ -147,7 +176,14 @@ export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogPro
   }, [user, reset, setValue]);
 
   const createMutation = useMutation<unknown, unknown, IUserFormData>({
-    mutationFn: (data) => axios.post("/api/create-user", data),
+    mutationFn: (data) => {
+      // ✅ Normalizar sucursalId para backend: string | null
+      const payload = {
+        ...data,
+        sucursalId: data.sucursalId && data.sucursalId !== "none" ? data.sucursalId : null,
+      };
+      return axios.post("/api/create-user", payload);
+    },
     onSuccess: () => {
       toast.success("Usuario creado con éxito!");
       queryClient.invalidateQueries({ queryKey: ["users"] });
@@ -159,7 +195,14 @@ export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogPro
   });
 
   const updateMutation = useMutation<unknown, unknown, IUserFormData>({
-    mutationFn: (data) => axios.put(`/api/users/${user!._id}`, data),
+    mutationFn: (data) => {
+      // ✅ Normalizar sucursalId para backend: string | null
+      const payload = {
+        ...data,
+        sucursalId: data.sucursalId && data.sucursalId !== "none" ? data.sucursalId : null,
+      };
+      return axios.put(`/api/users/${user!._id}`, payload);
+    },
     onSuccess: () => {
       toast.success("Usuario actualizado con éxito!");
       queryClient.invalidateQueries({ queryKey: ["users"] });
@@ -203,10 +246,10 @@ export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogPro
               <div className="space-y-2">
                 <Label htmlFor="rol">Rol*</Label>
                 <Select
+                  value={watch("rol")}
                   onValueChange={(value) => setValue("rol", value as UserRole)}
-                  defaultValue={user?.rol ?? "vendedor"}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Seleccionar rol..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -221,6 +264,36 @@ export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogPro
                     <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* ✅ NUEVO: Sucursal */}
+              <div className="space-y-2">
+                <Label>Sucursal</Label>
+
+                <Select
+                  value={sucursalIdValue}
+                  onValueChange={(value) => setValue("sucursalId", value)}
+                  disabled={loadingSucursales}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleccionar sucursal..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin asignar</SelectItem>
+                    {(sucursales || []).map((s) => (
+                      <SelectItem key={s._id} value={s._id}>
+                        {s.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {loadingSucursales ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Cargando sucursales...
+                  </div>
+                ) : null}
               </div>
 
               {!user && (
@@ -264,7 +337,7 @@ export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogPro
                       }
                       defaultValue={user?.personalData?.estadoCivil}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Seleccionar..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -392,10 +465,7 @@ export function UserFormDialog({ isOpen, onOpenChange, user }: UserFormDialogPro
           </Accordion>
 
           <DialogFooter className="mt-6">
-            <Button
-              type="submit"
-              disabled={createMutation.isPending || updateMutation.isPending}
-            >
+            <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
               {createMutation.isPending || updateMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Procesando...
