@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import axios from "axios";
+import { useDebounce } from "use-debounce";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Edit, Trash2 } from "lucide-react";
+import { Loader2, Plus, Edit, Trash2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { UserFormDialog } from "@/components/users/UserFormDialog";
 import {
@@ -52,7 +53,6 @@ export interface IUser2 {
   email: string;
   rol: UserRole;
   activo: boolean;
-
   sucursal?: SucursalLite | null;
 
   personalData?: IPersonalData;
@@ -68,6 +68,12 @@ type ApiListResponse<T> = {
   message?: string;
 };
 
+type Sucursal = {
+  _id: string;
+  nombre: string;
+  direccion: string;
+};
+
 function getErrorMessage(err: unknown): string {
   if (axios.isAxiosError(err)) {
     const data = err.response?.data as { error?: string; message?: string } | undefined;
@@ -77,19 +83,20 @@ function getErrorMessage(err: unknown): string {
   return "Error";
 }
 
-type Sucursal = {
-  _id: string;
-  nombre: string;
-  direccion: string;
-};
-
 export default function UsersPage() {
   const queryClient = useQueryClient();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<IUser2 | undefined>(undefined);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
 
-  // ✅ NUEVO: loading por fila al asignar sucursal
+  // ✅ filtros
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 400);
+
+  // "all" | "none" | ObjectId
+  const [sucursalFilter, setSucursalFilter] = useState<string>("all");
+
+  // ✅ loading por fila asignación
   const [assigningUserId, setAssigningUserId] = useState<string | null>(null);
 
   const roleLabel: Record<UserRole, string> = useMemo(
@@ -107,14 +114,7 @@ export default function UsersPage() {
     []
   );
 
-  const { data: users, isLoading, error } = useQuery<IUser2[]>({
-    queryKey: ["users"],
-    queryFn: async () => {
-      const { data } = await axios.get<ApiListResponse<IUser2[]>>("/api/users");
-      return data.data;
-    },
-  });
-
+  // ✅ sucursales para el filtro y para el selector de asignación
   const { data: sucursales } = useQuery<Sucursal[]>({
     queryKey: ["sucursales-lite"],
     queryFn: async () => {
@@ -122,6 +122,27 @@ export default function UsersPage() {
       return data.data;
     },
     staleTime: 1000 * 60 * 5,
+  });
+
+  const usersQueryKey = useMemo(
+    () => ["users", debouncedSearchTerm, sucursalFilter],
+    [debouncedSearchTerm, sucursalFilter]
+  );
+
+  const { data: users, isLoading, error, isFetching } = useQuery<IUser2[]>({
+    queryKey: usersQueryKey,
+    queryFn: async () => {
+      const params: Record<string, string> = {};
+      if (debouncedSearchTerm.trim()) params.searchTerm = debouncedSearchTerm.trim();
+
+      if (sucursalFilter !== "all") {
+        params.sucursalId = sucursalFilter; // "none" o ObjectId
+      }
+
+      const { data } = await axios.get<ApiListResponse<IUser2[]>>("/api/users", { params });
+      return data.data;
+    },
+    placeholderData: keepPreviousData,
   });
 
   const assignSucursalMutation = useMutation({
@@ -133,9 +154,6 @@ export default function UsersPage() {
     },
     onMutate: async (payload) => {
       setAssigningUserId(payload.userId);
-
-      // (Opcional) Optimistic UI minimal: no tocamos cache para evitar inconsistencias con populate.
-      // Si querés optimistic real, te lo armo también.
     },
     onSuccess: () => {
       toast.success("Sucursal asignada correctamente.");
@@ -211,101 +229,155 @@ export default function UsersPage() {
 
   return (
     <div className="p-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Gestión de Usuarios</h1>
+      <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-6 border-b pb-4">
+        <div>
+          <h1 className="text-3xl font-bold">Gestión de Usuarios</h1>
+          <div className="text-sm text-muted-foreground mt-1">
+            Buscá por nombre/email y filtrá por sucursal.
+          </div>
+        </div>
+
         <Button onClick={handleAdd}>
           <Plus className="mr-2 h-4 w-4" /> Agregar Usuario
         </Button>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Nombre</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Rol</TableHead>
-            <TableHead>Estado</TableHead>
-            <TableHead>Sucursal</TableHead>
-            <TableHead className="text-right">Acciones</TableHead>
-          </TableRow>
-        </TableHeader>
+      {/* ✅ Filtros */}
+      <div className="grid gap-3 md:grid-cols-3 items-end">
+        <div className="grid gap-1 md:col-span-2">
+          <label className="text-sm font-medium">Buscar</label>
+          <div className="relative">
+            <Search className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Nombre o email..."
+              className="h-10 w-full rounded-md border bg-background pl-9 pr-3 text-sm"
+            />
+          </div>
+        </div>
 
-        <TableBody>
-          {users?.map((user) => {
-            const currentValue = user.sucursal?._id ?? "none";
-            const rowSaving = assigningUserId === user._id;
+        <div className="grid gap-1">
+          <label className="text-sm font-medium">Sucursal</label>
+          <Select value={sucursalFilter} onValueChange={setSucursalFilter}>
+            <SelectTrigger className="h-10">
+              <SelectValue placeholder="Todas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="none">Sin asignar</SelectItem>
+              {(sucursales || []).map((s) => (
+                <SelectItem key={s._id} value={s._id}>
+                  {s.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-            return (
-              <TableRow key={user._id}>
-                <TableCell className="font-medium">{user.name}</TableCell>
-                <TableCell>{user.email}</TableCell>
+        {isFetching ? (
+          <div className="md:col-span-3 flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Actualizando...
+          </div>
+        ) : null}
+      </div>
 
-                <TableCell>
-                  <Badge variant="secondary">{roleLabel[user.rol] ?? user.rol}</Badge>
-                </TableCell>
+      <div className="mt-6">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nombre</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Rol</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead>Sucursal (asignación rápida)</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
 
-                <TableCell>
-                  <Badge variant={user.activo ? "default" : "destructive"}>
-                    {user.activo ? "Activo" : "Inactivo"}
-                  </Badge>
-                </TableCell>
+          <TableBody>
+            {(users || []).map((user) => {
+              const currentValue = user.sucursal?._id ?? "none";
+              const rowSaving = assigningUserId === user._id;
 
-                <TableCell>
-                  <div className="min-w-[240px]">
-                    <Select
-                      value={currentValue}
-                      onValueChange={(v) => onSucursalChange(user._id, v)}
-                      disabled={rowSaving}
+              return (
+                <TableRow key={user._id}>
+                  <TableCell className="font-medium">{user.name}</TableCell>
+                  <TableCell>{user.email}</TableCell>
+
+                  <TableCell>
+                    <Badge variant="secondary">{roleLabel[user.rol] ?? user.rol}</Badge>
+                  </TableCell>
+
+                  <TableCell>
+                    <Badge variant={user.activo ? "default" : "destructive"}>
+                      {user.activo ? "Activo" : "Inactivo"}
+                    </Badge>
+                  </TableCell>
+
+                  <TableCell>
+                    <div className="min-w-[240px]">
+                      <Select
+                        value={currentValue}
+                        onValueChange={(v) => onSucursalChange(user._id, v)}
+                        disabled={rowSaving}
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Asignar sucursal" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Sin asignar</SelectItem>
+                          {(sucursales || []).map((s) => (
+                            <SelectItem key={s._id} value={s._id}>
+                              {s.nombre}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      {rowSaving ? (
+                        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Guardando...
+                        </div>
+                      ) : null}
+                    </div>
+                  </TableCell>
+
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mr-2"
+                      onClick={() => handleEdit(user)}
+                      aria-label="Editar usuario"
+                      title="Editar"
                     >
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Asignar sucursal" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sin asignar</SelectItem>
-                        {(sucursales || []).map((s) => (
-                          <SelectItem key={s._id} value={s._id}>
-                            {s.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      <Edit className="h-4 w-4" />
+                    </Button>
 
-                    {rowSaving ? (
-                      <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        Guardando...
-                      </div>
-                    ) : null}
-                  </div>
-                </TableCell>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteClick(user._id)}
+                      aria-label="Eliminar usuario"
+                      title="Eliminar"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
 
-                <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="mr-2"
-                    onClick={() => handleEdit(user)}
-                    aria-label="Editar usuario"
-                    title="Editar"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteClick(user._id)}
-                    aria-label="Eliminar usuario"
-                    title="Eliminar"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+        {(users || []).length === 0 ? (
+          <div className="text-center text-muted-foreground py-10">
+            No se encontraron usuarios con esos filtros.
+          </div>
+        ) : null}
+      </div>
 
       <UserFormDialog isOpen={isFormOpen} onOpenChange={setIsFormOpen} user={editingUser} />
 
