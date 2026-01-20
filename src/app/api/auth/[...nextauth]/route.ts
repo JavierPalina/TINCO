@@ -1,10 +1,11 @@
 import NextAuth, { type NextAuthOptions } from "next-auth";
-import { MongoDBAdapter } from "@next-auth/mongodb-adapter";
-import clientPromise from "@/lib/mongodb";
 import CredentialsProvider from "next-auth/providers/credentials";
+import { MongoDBAdapter } from "@next-auth/mongodb-adapter";
+import bcrypt from "bcrypt";
+
+import clientPromise from "@/lib/mongodb";
 import dbConnect from "@/lib/dbConnect";
 import UserModel from "@/models/User";
-import bcrypt from "bcrypt";
 import { ROLES, type UserRole } from "@/lib/roles";
 
 type AppUser = {
@@ -12,9 +13,7 @@ type AppUser = {
   name?: string | null;
   email?: string | null;
   rol: UserRole;
-
-  // ✅ sucursal como string (ObjectId)
-  sucursal: string | null;
+  sucursal: string | null; // ObjectId -> string
 };
 
 type SessionUpdate = {
@@ -31,9 +30,14 @@ function toSessionUpdate(v: unknown): SessionUpdate {
   if (!isRecord(v)) return {};
   const out: SessionUpdate = {};
 
-  if ("name" in v && (typeof v.name === "string" || v.name === null)) out.name = v.name;
-  if ("image" in v && (typeof v.image === "string" || v.image === null)) out.image = v.image;
-  if ("sucursal" in v && (typeof v.sucursal === "string" || v.sucursal === null)) out.sucursal = v.sucursal;
+  const name = v["name"];
+  if (typeof name === "string" || name === null) out.name = name;
+
+  const image = v["image"];
+  if (typeof image === "string" || image === null) out.image = image;
+
+  const sucursal = v["sucursal"];
+  if (typeof sucursal === "string" || sucursal === null) out.sucursal = sucursal;
 
   return out;
 }
@@ -41,11 +45,13 @@ function toSessionUpdate(v: unknown): SessionUpdate {
 function isAppUser(v: unknown): v is AppUser {
   if (!isRecord(v)) return false;
 
-  const idOk = typeof v.id === "string";
-  const rolOk = typeof v.rol === "string";
-  const sucOk =
-    "sucursal" in v &&
-    (typeof (v as any).sucursal === "string" || (v as any).sucursal === null);
+  const id = v["id"];
+  const rol = v["rol"];
+  const sucursal = v["sucursal"];
+
+  const idOk = typeof id === "string";
+  const rolOk = typeof rol === "string";
+  const sucOk = typeof sucursal === "string" || sucursal === null;
 
   return idOk && rolOk && sucOk;
 }
@@ -93,8 +99,6 @@ export const authOptions: NextAuthOptions = {
           name: user.name ?? null,
           email: user.email ?? null,
           rol,
-
-          // ✅ clave: leer sucursal desde user (ObjectId -> string)
           sucursal: user.sucursal ? user.sucursal.toString() : null,
         };
 
@@ -113,41 +117,34 @@ export const authOptions: NextAuthOptions = {
       if (user && isAppUser(user)) {
         token.id = user.id;
         token.rol = user.rol;
+        token.sucursal = user.sucursal;
 
-        // ✅ sucursal al token
-        (token as any).sucursal = user.sucursal;
-
-        // opcional
         token.name = user.name ?? token.name ?? null;
         token.email = user.email ?? token.email ?? null;
       } else {
-        // defensivo
-        (token as any).sucursal = typeof (token as any).sucursal === "string" ? (token as any).sucursal : null;
+        // defensivo: normalizar sucursal si viene mal tipada
+        token.sucursal = typeof token.sucursal === "string" ? token.sucursal : null;
       }
 
-      // ✅ permitir update({ sucursal })
+      // permitir update({ sucursal, name })
       if (trigger === "update") {
         const upd = toSessionUpdate(session);
 
         if (upd.name !== undefined) token.name = upd.name;
-        if (upd.sucursal !== undefined) (token as any).sucursal = upd.sucursal;
+        if (upd.sucursal !== undefined) token.sucursal = upd.sucursal;
       }
 
       return token;
     },
 
     async session({ session, token }) {
-      if (session.user) {
-        (session.user as any).id = typeof (token as any).id === "string" ? (token as any).id : "";
-        (session.user as any).rol = (token as any).rol as UserRole;
+      // con la augmentación, session.user tiene id/rol/sucursal
+      session.user.id = typeof token.id === "string" ? token.id : "";
+      session.user.rol = (token.rol ?? "vendedor") as UserRole;
+      session.user.sucursal = token.sucursal ?? null;
 
-        // ✅ sucursal a la sesión
-        (session.user as any).sucursal = ((token as any).sucursal as string | null) ?? null;
-
-        // opcional
-        session.user.name = (token.name as string | null) ?? session.user.name ?? null;
-        session.user.email = (token.email as string | null) ?? session.user.email ?? null;
-      }
+      session.user.name = (token.name as string | null) ?? session.user.name ?? null;
+      session.user.email = (token.email as string | null) ?? session.user.email ?? null;
 
       return session;
     },
