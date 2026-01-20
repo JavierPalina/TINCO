@@ -19,6 +19,11 @@ function canFilterAnySucursal(rol?: string) {
   return rol === "admin" || rol === "superadmin" || rol === "gerente";
 }
 
+type ProveedorCreateBody = Record<string, unknown> & {
+  sucursal?: unknown;
+  creadoPor?: unknown;
+};
+
 export async function GET(request: NextRequest) {
   await dbConnect();
 
@@ -33,7 +38,7 @@ export async function GET(request: NextRequest) {
     const provinciaRaw = (searchParams.get("provincia") || "").trim();
     const categoriaIVARaw = (searchParams.get("categoriaIVA") || "").trim();
 
-    // ✅ Nuevo: sucursalId opcional (solo roles autorizados)
+    // ✅ sucursalId opcional (solo roles autorizados)
     const sucursalIdRaw = (searchParams.get("sucursalId") || "").trim();
 
     const matchFilter: MatchFilter = {};
@@ -137,16 +142,13 @@ export async function POST(request: Request) {
   await dbConnect();
 
   try {
-    const body = await request.json();
+    const body = (await request.json()) as ProveedorCreateBody;
 
-    // ✅ Por seguridad, ignoramos sucursal/creadoPor del body
-    if (body && typeof body === "object") {
-      delete (body as any).sucursal;
-      delete (body as any).creadoPor;
-    }
+    // ✅ ignoramos sucursal/creadoPor del body sin delete ni any
+    const { sucursal: _ignoredSucursal, creadoPor: _ignoredCreadoPor, ...rest } = body;
 
     const proveedor = await Proveedor.create({
-      ...body,
+      ...rest,
       creadoPor: new mongoose.Types.ObjectId(session.user.id),
       sucursal: new mongoose.Types.ObjectId(session.user.sucursal),
     });

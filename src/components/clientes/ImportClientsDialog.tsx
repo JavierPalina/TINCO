@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
+import axios, { type AxiosError } from "axios";
 import Papa from "papaparse";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,15 @@ type ImportedClient = {
   [key: string]: string | undefined;
 };
 
+type ApiErrorShape = {
+  error?: string;
+  message?: string;
+};
+
+function isApiErrorShape(v: unknown): v is ApiErrorShape {
+  return typeof v === "object" && v !== null && ("error" in v || "message" in v);
+}
+
 export function ImportClientsDialog() {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -43,15 +52,25 @@ export function ImportClientsDialog() {
       setFile(null);
     },
     onError: (error: unknown) => {
-      const msg = axios.isAxiosError(error)
-        ? (error.response?.data as any)?.error
-        : "No se pudieron importar los clientes.";
+      let msg = "No se pudieron importar los clientes.";
+
+      if (axios.isAxiosError(error)) {
+        const ax = error as AxiosError<unknown>;
+        const data = ax.response?.data;
+
+        if (isApiErrorShape(data)) {
+          msg = data.error ?? data.message ?? msg;
+        } else if (typeof ax.message === "string" && ax.message.trim()) {
+          msg = ax.message;
+        }
+      }
+
       toast.error("Error en la importación", { description: msg });
     },
   });
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files) setFile(event.target.files[0]);
+    if (event.target.files && event.target.files[0]) setFile(event.target.files[0]);
   };
 
   const handleImport = () => {
@@ -71,6 +90,7 @@ export function ImportClientsDialog() {
           empresa: row["Empresa"] || row["empresa"],
           prioridad: row["Prioridad"] || row["prioridad"],
         }));
+
         mutation.mutate(mappedData);
       },
       error: () => {
@@ -87,17 +107,25 @@ export function ImportClientsDialog() {
           Importar
         </Button>
       </DialogTrigger>
+
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Importar Clientes desde CSV</DialogTitle>
           <DialogDescription>
-            Selecciona un archivo CSV. Asegúrate de que las columnas coincidan: `Nombre Completo`, `Teléfono`, `Email`, `Empresa`, `Prioridad`.
+            Selecciona un archivo CSV. Asegúrate de que las columnas coincidan: `Nombre
+            Completo`, `Teléfono`, `Email`, `Empresa`, `Prioridad`.
           </DialogDescription>
         </DialogHeader>
+
         <div className="py-4 space-y-4">
           <Input type="file" accept=".csv" onChange={handleFileChange} />
-          {file && <p className="text-sm text-muted-foreground">Archivo seleccionado: {file.name}</p>}
+          {file && (
+            <p className="text-sm text-muted-foreground">
+              Archivo seleccionado: {file.name}
+            </p>
+          )}
         </div>
+
         <Button onClick={handleImport} disabled={mutation.isPending}>
           {mutation.isPending ? "Importando..." : "Iniciar Importación"}
         </Button>

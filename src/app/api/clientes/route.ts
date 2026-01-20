@@ -20,6 +20,12 @@ function canFilterAnySucursal(rol?: string) {
   return rol === "admin" || rol === "superadmin" || rol === "gerente";
 }
 
+type ClienteCreateBody = Record<string, unknown> & {
+  empresaAsignada?: unknown;
+  sucursal?: unknown; // puede venir, pero la ignoramos
+  vendedorAsignado?: unknown; // puede venir, pero lo forzamos
+};
+
 export async function GET(request: NextRequest) {
   await dbConnect();
 
@@ -36,13 +42,13 @@ export async function GET(request: NextRequest) {
     const prioridadRaw = (searchParams.get("prioridad") || "").trim();
     const empresaIdRaw = (searchParams.get("empresaId") || "").trim();
 
-    // ✅ Nuevo: sucursalId opcional (solo roles autorizados)
+    // ✅ sucursalId opcional (solo roles autorizados)
     const sucursalIdRaw = (searchParams.get("sucursalId") || "").trim();
 
     const matchFilter: MatchFilter = {};
 
-    // Determina sucursal efectiva:
-    // - si el rol puede, usa sucursalId (si es válido)
+    // Sucursal efectiva:
+    // - si el rol puede, usa sucursalId (si válido)
     // - si no puede, usa la sucursal del usuario
     // - si no hay sucursal (y no puede filtrar), devuelve vacío
     const userRol = session.user.rol;
@@ -57,7 +63,7 @@ export async function GET(request: NextRequest) {
       matchFilter.sucursal = new mongoose.Types.ObjectId(session.user.sucursal);
     }
 
-    // Filtro por empresa asignada
+    // Empresa asignada
     if (empresaIdRaw && mongoose.Types.ObjectId.isValid(empresaIdRaw)) {
       matchFilter.empresaAsignada = new mongoose.Types.ObjectId(empresaIdRaw);
     }
@@ -210,30 +216,27 @@ export async function POST(request: Request) {
   await dbConnect();
 
   try {
-    const body = (await request.json()) as Record<string, unknown>;
+    const body = (await request.json()) as ClienteCreateBody;
+
+    // Sacamos sucursal/vendedorAsignado del body para ignorarlos sin delete/cast
+    const { sucursal: _ignoredSucursal, vendedorAsignado: _ignoredVendedor, ...rest } = body;
 
     // Normaliza empresaAsignada si viene
     let empresaAsignada: mongoose.Types.ObjectId | undefined;
-    const rawEmpresa = body.empresaAsignada;
+    const rawEmpresa = rest.empresaAsignada;
     if (typeof rawEmpresa === "string" && mongoose.Types.ObjectId.isValid(rawEmpresa)) {
       empresaAsignada = new mongoose.Types.ObjectId(rawEmpresa);
     }
 
-    // ✅ Forzamos sucursal del usuario + vendedorAsignado del usuario
+    // Payload final: forzamos sucursal + vendedorAsignado del usuario
     const clienteData: Record<string, unknown> = {
-      ...body,
+      ...rest,
       empresaAsignada,
       vendedorAsignado: new mongoose.Types.ObjectId(session.user.id),
       sucursal: new mongoose.Types.ObjectId(session.user.sucursal),
     };
 
-    // ✅ Por seguridad, ignoramos cualquier sucursal del body
-    delete (clienteData as any).sucursal;
-
-    const cliente = await Cliente.create({
-      ...clienteData,
-      sucursal: new mongoose.Types.ObjectId(session.user.sucursal),
-    });
+    const cliente = await Cliente.create(clienteData);
 
     return NextResponse.json({ success: true, data: cliente }, { status: 201 });
   } catch (error) {

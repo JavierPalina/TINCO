@@ -1,4 +1,4 @@
-import { NextAuthOptions, DefaultSession, DefaultUser } from "next-auth";
+import { type NextAuthOptions } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import { MongoDBAdapter } from "@next-auth/mongodb-adapter";
 import clientPromise from "@/lib/mongodb";
@@ -16,7 +16,7 @@ type AppUser = {
   rol: UserRole;
   image?: string | null;
 
-  // ✅ NUEVO
+  // ✅ sucursal como string (ObjectId)
   sucursal: string | null;
 };
 
@@ -33,16 +33,27 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 function toSessionUpdate(v: unknown): SessionUpdate {
   if (!isRecord(v)) return {};
   const out: SessionUpdate = {};
-  if ("name" in v && (typeof v.name === "string" || v.name === null)) out.name = v.name;
-  if ("image" in v && (typeof v.image === "string" || v.image === null)) out.image = v.image;
+
+  const name = v["name"];
+  if (typeof name === "string" || name === null) out.name = name;
+
+  const image = v["image"];
+  if (typeof image === "string" || image === null) out.image = image;
+
   return out;
 }
 
 function isAppUser(v: unknown): v is AppUser {
   if (!isRecord(v)) return false;
-  const idOk = typeof v.id === "string";
-  const rolOk = typeof v.rol === "string";
-  const sucOk = ("sucursal" in v) && (typeof (v as any).sucursal === "string" || (v as any).sucursal === null);
+
+  const id = v["id"];
+  const rol = v["rol"];
+  const sucursal = v["sucursal"];
+
+  const idOk = typeof id === "string";
+  const rolOk = typeof rol === "string";
+  const sucOk = typeof sucursal === "string" || sucursal === null;
+
   return idOk && rolOk && sucOk;
 }
 
@@ -91,8 +102,6 @@ export const authOptions: NextAuthOptions = {
           email: user.email ?? null,
           rol,
           image: user.image ?? null,
-
-          // ✅ NUEVO
           sucursal: user.sucursal ? user.sucursal.toString() : null,
         };
 
@@ -111,13 +120,10 @@ export const authOptions: NextAuthOptions = {
         token.rol = user.rol;
         token.name = user.name ?? token.name ?? null;
         token.image = user.image ?? token.image ?? null;
-
-        // ✅ NUEVO
         token.sucursal = user.sucursal;
       } else {
+        // defensivo: normalizar
         token.id = typeof token.id === "string" ? token.id : token.sub ?? "";
-      
-        // ✅ NUEVO (defensivo)
         token.sucursal = typeof token.sucursal === "string" ? token.sucursal : null;
       }
 
@@ -132,15 +138,18 @@ export const authOptions: NextAuthOptions = {
     },
 
     async session({ session, token }) {
+      // Nota: esto asume que ya tenés module augmentation en src/types/next-auth.d.ts
+      // para session.user.id / rol / sucursal, como en el ajuste anterior.
       if (session.user) {
         session.user.id = typeof token.id === "string" ? token.id : "";
-        session.user.rol = token.rol as UserRole;
+        session.user.rol = (token.rol ?? "vendedor") as UserRole;
+
         session.user.name = (token.name as JWT["name"]) ?? session.user.name ?? null;
         session.user.image = (token.image as JWT["image"]) ?? session.user.image ?? null;
-            
-        // ✅ NUEVO
-        session.user.sucursal = (token.sucursal as string | null) ?? null;
+
+        session.user.sucursal = token.sucursal ?? null;
       }
+
       return session;
     },
   },
