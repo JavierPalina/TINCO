@@ -56,7 +56,8 @@ function isAppUser(v: unknown): v is AppUser {
   return idOk && rolOk && sucOk;
 }
 
-export const authOptions: NextAuthOptions = {
+// ✅ IMPORTANTE: en route.ts NO se puede exportar authOptions
+const authOptions: NextAuthOptions = {
   adapter: MongoDBAdapter(clientPromise),
 
   providers: [
@@ -138,7 +139,6 @@ export const authOptions: NextAuthOptions = {
     },
 
     async session({ session, token }) {
-      // con la augmentación, session.user tiene id/rol/sucursal
       session.user.id = typeof token.id === "string" ? token.id : "";
       session.user.rol = (token.rol ?? "vendedor") as UserRole;
       session.user.sucursal = token.sucursal ?? null;
