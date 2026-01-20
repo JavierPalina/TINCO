@@ -294,15 +294,6 @@ export default function ListadosPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allowSucursalFilter]);
 
-  // Si puede filtrar y no hay sucursalId, seteamos por defecto su sucursal (si existe)
-  useEffect(() => {
-    if (!allowSucursalFilter) return;
-    if (filters.sucursalId) return;
-    if (!userSucursal) return;
-    setFilters((prev) => ({ ...prev, sucursalId: userSucursal }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allowSucursalFilter, userSucursal]);
-
   const [debouncedSearchTerm] = useDebounce(filters.searchTerm, 500);
 
   // ---- Columnas por tipo ----
@@ -666,6 +657,7 @@ export default function ListadosPage() {
                     className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                     disabled={loadingSucursales}
                   >
+                    <option value="">Todas</option>
                     {(sucursalesOptions || []).map((s) => (
                       <option key={s._id} value={s._id}>
                         {s.nombre || s._id}
@@ -702,7 +694,7 @@ export default function ListadosPage() {
                     handleFilterChange("provincia", "");
                     handleFilterChange("categoriaIVA", "");
                     if (allowSucursalFilter) {
-                      handleFilterChange("sucursalId", userSucursal || "");
+                      handleFilterChange("sucursalId", "");
                     }
                   }}
                 >

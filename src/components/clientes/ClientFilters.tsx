@@ -78,6 +78,7 @@ export function ClientFilters({
                   className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                   disabled={loadingSucursales}
                 >
+                  <option value="">Todas</option>
                   {sucursalesOptions.map((s) => (
                     <option key={s._id} value={s._id}>
                       {s.nombre || s._id}
@@ -126,7 +127,7 @@ export function ClientFilters({
                 onClick={() => {
                   onFilterChange("etapa", "");
                   onFilterChange("prioridad", "");
-                  // sucursal: si querés, no la limpiamos acá (se decide en la pantalla).
+                  onFilterChange("sucursalId", "");
                 }}
               >
                 Limpiar

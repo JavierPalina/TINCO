@@ -51,12 +51,18 @@ export async function GET(request: NextRequest) {
     // - si el rol puede, usa sucursalId (si válido)
     // - si no puede, usa la sucursal del usuario
     // - si no hay sucursal (y no puede filtrar), devuelve vacío
+
     const userRol = session.user.rol;
     const allowAny = canFilterAnySucursal(userRol);
-
-    if (allowAny && sucursalIdRaw && mongoose.Types.ObjectId.isValid(sucursalIdRaw)) {
-      matchFilter.sucursal = new mongoose.Types.ObjectId(sucursalIdRaw);
+      
+    if (allowAny) {
+      // Admin/gerente: sucursal opcional
+      if (sucursalIdRaw && mongoose.Types.ObjectId.isValid(sucursalIdRaw)) {
+        matchFilter.sucursal = new mongoose.Types.ObjectId(sucursalIdRaw);
+      }
+      // si NO viene sucursalId -> no filtra por sucursal (trae todo)
     } else {
+      // Rol sin permiso: sucursal obligatoria del usuario
       if (!session.user.sucursal) {
         return NextResponse.json({ success: true, data: [] }, { status: 200 });
       }
