@@ -13,6 +13,7 @@ import { Client } from "@/types/client";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
+import { useSearchParams } from "next/navigation";
 
 type EmpresaLite = {
   _id: string;
@@ -33,10 +34,21 @@ export function CompanyDataPopover({ client }: { client: ClientWithEmpresa }) {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
 
+  // ✅ comportamiento #2: respetar sucursal seleccionada en filtros (URL)
+  const searchParams = useSearchParams();
+  const sucursalId = (searchParams.get("sucursalId") || "").trim();
+
   const { data: empresasLite, isLoading } = useQuery<EmpresaLite[]>({
-    queryKey: ["empresas-lite", search],
+    // ✅ incluir sucursalId para cache correcto
+    queryKey: ["empresas-lite", search, sucursalId],
     queryFn: async () => {
-      const { data } = await axios.get("/api/empresas/simple", { params: { q: search } });
+      const { data } = await axios.get("/api/empresas/simple", {
+        params: {
+          q: search,
+          // ✅ backend debe aceptar sucursalId (y validarlo por rol)
+          ...(sucursalId ? { sucursalId } : {}),
+        },
+      });
       return data.data;
     },
     staleTime: 1000 * 60 * 5,
@@ -79,8 +91,9 @@ export function CompanyDataPopover({ client }: { client: ClientWithEmpresa }) {
     onSuccess: async () => {
       toast.success("Empresa actualizada");
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["clientes"] }),
-        queryClient.invalidateQueries({ queryKey: ["cliente", client._id] }),
+        // ✅ invalidar en modo no-exacto para cubrir filtros/sucursal
+        queryClient.invalidateQueries({ queryKey: ["clientes"], exact: false }),
+        queryClient.invalidateQueries({ queryKey: ["cliente", client._id], exact: false }),
       ]);
     },
     onError: () => {

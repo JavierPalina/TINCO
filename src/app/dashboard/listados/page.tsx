@@ -7,6 +7,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 import {
   Table,
@@ -42,7 +43,7 @@ import { ClientFilters } from "@/components/clientes/ClientFilters";
 import { ClientMobileCard } from "@/components/clientes/ClientMobileCard";
 
 import { CSVLink } from "react-csv";
-import { Download, Loader2 } from "lucide-react";
+import { Download, Loader2, Filter } from "lucide-react";
 import { useDebounce } from "use-debounce";
 import { cn } from "@/lib/utils";
 
@@ -243,7 +244,15 @@ type FiltersState = {
   prioridad: string;
   provincia: string;
   categoriaIVA: string;
+  sucursalId: string; // ✅ nuevo
 };
+
+type SucursalOption = { _id: string; nombre?: string };
+
+// Ajustá según tus roles reales
+function canFilterAnySucursal(rol?: string) {
+  return rol === "admin" || rol === "superadmin" || rol === "gerente";
+}
 
 // -----------------------------
 // Página
@@ -252,6 +261,11 @@ export default function ListadosPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  const { data: session } = useSession();
+  const userRol = session?.user?.rol;
+  const userSucursal = session?.user?.sucursal || "";
+  const allowSucursalFilter = canFilterAnySucursal(userRol);
 
   // ---- Tipo desde URL ----
   const typeFromUrl = (searchParams.get("type") || "clientes") as ListType;
@@ -269,7 +283,25 @@ export default function ListadosPage() {
     prioridad: searchParams.get("prioridad") || "",
     provincia: searchParams.get("provincia") || "",
     categoriaIVA: searchParams.get("categoriaIVA") || "",
+    sucursalId: searchParams.get("sucursalId") || "",
   });
+
+  // Si el usuario NO puede filtrar sucursal, limpiamos sucursalId para que no viaje
+  useEffect(() => {
+    if (!allowSucursalFilter && filters.sucursalId) {
+      setFilters((prev) => ({ ...prev, sucursalId: "" }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allowSucursalFilter]);
+
+  // Si puede filtrar y no hay sucursalId, seteamos por defecto su sucursal (si existe)
+  useEffect(() => {
+    if (!allowSucursalFilter) return;
+    if (filters.sucursalId) return;
+    if (!userSucursal) return;
+    setFilters((prev) => ({ ...prev, sucursalId: userSucursal }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allowSucursalFilter, userSucursal]);
 
   const [debouncedSearchTerm] = useDebounce(filters.searchTerm, 500);
 
@@ -305,9 +337,16 @@ export default function ListadosPage() {
       apply("provincia", next.provincia ?? filters.provincia);
       apply("categoriaIVA", next.categoriaIVA ?? filters.categoriaIVA);
 
+      // ✅ sucursal dentro de filtros: solo si rol permite
+      if (allowSucursalFilter) {
+        apply("sucursalId", next.sucursalId ?? filters.sucursalId);
+      } else {
+        params.delete("sucursalId");
+      }
+
       router.replace(`${pathname}?${params.toString()}`);
     },
-    [filters, listType, pathname, router, searchParams]
+    [allowSucursalFilter, filters, listType, pathname, router, searchParams]
   );
 
   // ---- Sync estado desde URL (back/forward / link compartido) ----
@@ -326,21 +365,37 @@ export default function ListadosPage() {
       prioridad: searchParams.get("prioridad") || "",
       provincia: searchParams.get("provincia") || "",
       categoriaIVA: searchParams.get("categoriaIVA") || "",
+      sucursalId: allowSucursalFilter ? searchParams.get("sucursalId") || "" : "",
     });
-  }, [searchParams]);
+  }, [searchParams, allowSucursalFilter]);
 
   // ---- Persistencia de columnas (por tipo) ----
   useEffect(() => {
     setIsClient(true);
 
     const c = localStorage.getItem("colvis_clientes");
-    if (c) setColumnVisibilityClientes((prev) => ({ ...prev, ...JSON.parse(c) as Partial<ColumnVisibilityClientes> }));
+    if (c) {
+      setColumnVisibilityClientes((prev) => ({
+        ...prev,
+        ...(JSON.parse(c) as Partial<ColumnVisibilityClientes>),
+      }));
+    }
 
     const e = localStorage.getItem("colvis_empresas");
-    if (e) setColumnVisibilityEmpresas((prev) => ({ ...prev, ...JSON.parse(e) as Partial<ColumnVisibilityEmpresas> }));
+    if (e) {
+      setColumnVisibilityEmpresas((prev) => ({
+        ...prev,
+        ...(JSON.parse(e) as Partial<ColumnVisibilityEmpresas>),
+      }));
+    }
 
     const p = localStorage.getItem("colvis_proveedores");
-    if (p) setColumnVisibilityProveedores((prev) => ({ ...prev, ...JSON.parse(p) as Partial<ColumnVisibilityProveedores> }));
+    if (p) {
+      setColumnVisibilityProveedores((prev) => ({
+        ...prev,
+        ...(JSON.parse(p) as Partial<ColumnVisibilityProveedores>),
+      }));
+    }
   }, []);
 
   useEffect(() => {
@@ -370,14 +425,29 @@ export default function ListadosPage() {
       prioridad: filters.prioridad,
       provincia: filters.provincia,
       categoriaIVA: filters.categoriaIVA,
+      sucursalId: filters.sucursalId,
     });
   }, [
     filters.etapa,
     filters.prioridad,
     filters.provincia,
     filters.categoriaIVA,
+    filters.sucursalId,
     setUrlParams,
   ]);
+
+  // ✅ Sucursales (para selects dentro de Dropdown)
+  const { data: sucursalesOptions, isLoading: loadingSucursales } = useQuery<
+    SucursalOption[]
+  >({
+    queryKey: ["sucursales", allowSucursalFilter ? "all" : "own"],
+    queryFn: async () => {
+      const { data } = await axios.get("/api/sucursales");
+      return (data?.data || []) as SucursalOption[];
+    },
+    enabled: Boolean(session?.user?.id),
+    staleTime: 1000 * 60 * 5,
+  });
 
   // ---- Queries adicionales (prioridades solo clientes) ----
   const { data: prioridadesUnicas } = useQuery<string[]>({
@@ -401,10 +471,11 @@ export default function ListadosPage() {
   const { apiBase, title, exportName } = LIST_CONFIG[listType];
 
   const queryKey = useMemo(() => {
+    const sucKey = allowSucursalFilter ? filters.sucursalId : "locked";
     if (listType === "clientes") {
-      return [listType, debouncedSearchTerm, filters.etapa, filters.prioridad];
+      return [listType, debouncedSearchTerm, filters.etapa, filters.prioridad, sucKey];
     }
-    return [listType, debouncedSearchTerm, filters.provincia, filters.categoriaIVA];
+    return [listType, debouncedSearchTerm, filters.provincia, filters.categoriaIVA, sucKey];
   }, [
     listType,
     debouncedSearchTerm,
@@ -412,6 +483,8 @@ export default function ListadosPage() {
     filters.prioridad,
     filters.provincia,
     filters.categoriaIVA,
+    filters.sucursalId,
+    allowSucursalFilter,
   ]);
 
   type ListData = ClienteListado[] | Proveedor[] | Empresa[];
@@ -427,6 +500,11 @@ export default function ListadosPage() {
       } else {
         if (filters.provincia) params.provincia = filters.provincia;
         if (filters.categoriaIVA) params.categoriaIVA = filters.categoriaIVA;
+      }
+
+      // ✅ sucursalId via params (solo si rol puede)
+      if (allowSucursalFilter && filters.sucursalId) {
+        params.sucursalId = filters.sucursalId;
       }
 
       const res = await axios.get(apiBase, { params });
@@ -474,7 +552,7 @@ export default function ListadosPage() {
     ];
   }, [listType]);
 
-  const csvData = (data || []) as object[]; // CSVLink espera object[]
+  const csvData = (data || []) as object[];
 
   // ---- Handlers ----
   const handleTypeChange = (nextType: ListType) => {
@@ -517,22 +595,130 @@ export default function ListadosPage() {
 
   const orderedColumns = useMemo(() => {
     if (listType === "clientes") {
-      return Object.keys(DEFAULT_VISIBILITY_CLIENTES) as (keyof ColumnVisibilityClientes)[];
+      return Object.keys(
+        DEFAULT_VISIBILITY_CLIENTES
+      ) as (keyof ColumnVisibilityClientes)[];
     }
     if (listType === "proveedores") {
-      return Object.keys(DEFAULT_VISIBILITY_PROVEEDORES) as (keyof ColumnVisibilityProveedores)[];
+      return Object.keys(
+        DEFAULT_VISIBILITY_PROVEEDORES
+      ) as (keyof ColumnVisibilityProveedores)[];
     }
-    return Object.keys(DEFAULT_VISIBILITY_EMPRESAS) as (keyof ColumnVisibilityEmpresas)[];
+    return Object.keys(
+      DEFAULT_VISIBILITY_EMPRESAS
+    ) as (keyof ColumnVisibilityEmpresas)[];
   }, [listType]);
 
   const currentVisibility = useMemo(() => {
     if (listType === "clientes") return columnVisibilityClientes;
     if (listType === "proveedores") return columnVisibilityProveedores;
     return columnVisibilityEmpresas;
-  }, [listType, columnVisibilityClientes, columnVisibilityProveedores, columnVisibilityEmpresas]);
+  }, [
+    listType,
+    columnVisibilityClientes,
+    columnVisibilityProveedores,
+    columnVisibilityEmpresas,
+  ]);
+
+  // --- UI helpers: Dropdown de filtros para Empresas/Proveedores ---
+  const renderNonClientFilters = () => {
+    const hasAnyExtra =
+      Boolean(filters.provincia) ||
+      Boolean(filters.categoriaIVA) ||
+      (allowSucursalFilter && Boolean(filters.sucursalId));
+
+    return (
+      <div className="flex items-end gap-3 mt-3 flex-wrap">
+        <div className="grid gap-1 w-full md:max-w-md">
+          <label className="text-sm font-medium">Buscar</label>
+          <input
+            value={filters.searchTerm}
+            onChange={(e) => handleFilterChange("searchTerm", e.target.value)}
+            placeholder="CUIT, razón social, email..."
+            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+          />
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant={hasAnyExtra ? "default" : "outline"} className="gap-2">
+              <Filter className="h-4 w-4" />
+              Filtros
+            </Button>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent align="end" className="w-80 p-3">
+            <div className="space-y-3">
+              <div>
+                <div className="text-sm font-semibold">Filtros Adicionales</div>
+                <div className="text-xs text-muted-foreground">
+                  Refina tu búsqueda de{" "}
+                  {listType === "empresas" ? "empresas" : "proveedores"}.
+                </div>
+              </div>
+
+              {allowSucursalFilter && (
+                <div className="grid gap-1">
+                  <label className="text-sm font-medium">Sucursal</label>
+                  <select
+                    value={filters.sucursalId}
+                    onChange={(e) => handleFilterChange("sucursalId", e.target.value)}
+                    className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                    disabled={loadingSucursales}
+                  >
+                    {(sucursalesOptions || []).map((s) => (
+                      <option key={s._id} value={s._id}>
+                        {s.nombre || s._id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="grid gap-1">
+                <label className="text-sm font-medium">Provincia</label>
+                <input
+                  value={filters.provincia}
+                  onChange={(e) => handleFilterChange("provincia", e.target.value)}
+                  placeholder="Ej: Buenos Aires"
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                />
+              </div>
+
+              <div className="grid gap-1">
+                <label className="text-sm font-medium">Categoría IVA</label>
+                <input
+                  value={filters.categoriaIVA}
+                  onChange={(e) => handleFilterChange("categoriaIVA", e.target.value)}
+                  placeholder="Ej: Responsable Inscripto"
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    handleFilterChange("provincia", "");
+                    handleFilterChange("categoriaIVA", "");
+                    if (allowSucursalFilter) {
+                      handleFilterChange("sucursalId", userSucursal || "");
+                    }
+                  }}
+                >
+                  Limpiar
+                </Button>
+              </div>
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
+  };
 
   if (isLoading) return <div className="p-10 text-center">Cargando...</div>;
-  if (isError) return <div className="p-10 text-center text-red-600">Error al cargar.</div>;
+  if (isError)
+    return <div className="p-10 text-center text-red-600">Error al cargar.</div>;
 
   return (
     <div className="mx-auto py-4 px-4 md:px-4">
@@ -561,9 +747,7 @@ export default function ListadosPage() {
               {orderedColumns.map((column) => (
                 <DropdownMenuCheckboxItem
                   key={String(column)}
-                  checked={Boolean(
-                    (currentVisibility as Record<string, boolean>)[String(column)]
-                  )}
+                  checked={Boolean((currentVisibility as Record<string, boolean>)[String(column)])}
                   onCheckedChange={() => toggleColumn(column)}
                   onSelect={(e) => e.preventDefault()}
                 >
@@ -606,50 +790,23 @@ export default function ListadosPage() {
         </div>
       </div>
 
+      {/* ✅ Filtros */}
       {listType === "clientes" ? (
         <ClientFilters
           filters={{
             searchTerm: filters.searchTerm,
             etapa: filters.etapa,
             prioridad: filters.prioridad,
+            sucursalId: filters.sucursalId,
           }}
-          onFilterChange={(name, value) =>
-            handleFilterChange(name as keyof FiltersState, value)
-          }
+          onFilterChange={(name, value) => handleFilterChange(name as keyof FiltersState, value)}
           prioridadesUnicas={prioridadesNormalizadas}
+          allowSucursalFilter={allowSucursalFilter}
+          sucursalesOptions={sucursalesOptions || []}
+          loadingSucursales={loadingSucursales}
         />
       ) : (
-        <div className="grid gap-3 md:grid-cols-3 mt-3">
-          <div className="grid gap-1">
-            <label className="text-sm font-medium">Buscar</label>
-            <input
-              value={filters.searchTerm}
-              onChange={(e) => handleFilterChange("searchTerm", e.target.value)}
-              placeholder="CUIT, razón social, email..."
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-            />
-          </div>
-
-          <div className="grid gap-1">
-            <label className="text-sm font-medium">Provincia</label>
-            <input
-              value={filters.provincia}
-              onChange={(e) => handleFilterChange("provincia", e.target.value)}
-              placeholder="Ej: Buenos Aires"
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-            />
-          </div>
-
-          <div className="grid gap-1">
-            <label className="text-sm font-medium">Categoría IVA</label>
-            <input
-              value={filters.categoriaIVA}
-              onChange={(e) => handleFilterChange("categoriaIVA", e.target.value)}
-              placeholder="Ej: Responsable Inscripto"
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-            />
-          </div>
-        </div>
+        renderNonClientFilters()
       )}
 
       {/* Desktop table */}
@@ -794,10 +951,7 @@ export default function ListadosPage() {
                 <TableRow key={cliente._id}>
                   {columnVisibilityClientes["Nombre Completo"] && (
                     <TableCell className="font-medium text-left">
-                      <Link
-                        href={`/dashboard/listados/${cliente._id}`}
-                        className="hover:underline"
-                      >
+                      <Link href={`/dashboard/listados/${cliente._id}`} className="hover:underline">
                         {formatAndTruncate(cliente.nombreCompleto, 25)}
                       </Link>
                     </TableCell>
@@ -846,9 +1000,7 @@ export default function ListadosPage() {
                   )}
 
                   {columnVisibilityClientes["País"] && (
-                    <TableCell className="text-center">
-                      {formatAndTruncate(cliente.pais, 20)}
-                    </TableCell>
+                    <TableCell className="text-center">{formatAndTruncate(cliente.pais, 20)}</TableCell>
                   )}
 
                   {columnVisibilityClientes["Prioridad"] && (
@@ -871,6 +1023,8 @@ export default function ListadosPage() {
                     <TableCell>
                       <div className="flex items-center text-center justify-center">
                         {cliente.empresaNombre || cliente.empresa || "Sin Asignar"}
+
+                        {/* ✅ NUEVO: pasa sucursalId seleccionada */}
                         <CompanyDataPopover client={cliente} />
                       </div>
                     </TableCell>
@@ -943,12 +1097,18 @@ export default function ListadosPage() {
                   )}
                   {columnVisibilityProveedores["Vto CAI"] && (
                     <TableCell className="text-center">
-                      {p.fechaVtoCAI ? format(new Date(p.fechaVtoCAI), "dd MMM yyyy", { locale: es }) : "-"}
+                      {p.fechaVtoCAI
+                        ? format(new Date(p.fechaVtoCAI), "dd MMM yyyy", { locale: es })
+                        : "-"}
                     </TableCell>
                   )}
                   {columnVisibilityProveedores["Inscripto Ganancias"] && (
                     <TableCell className="text-center">
-                      {typeof p.inscriptoGanancias === "boolean" ? (p.inscriptoGanancias ? "Sí" : "No") : "-"}
+                      {typeof p.inscriptoGanancias === "boolean"
+                        ? p.inscriptoGanancias
+                          ? "Sí"
+                          : "No"
+                        : "-"}
                     </TableCell>
                   )}
                   {columnVisibilityProveedores["Fecha de Creación"] && (
@@ -992,7 +1152,11 @@ export default function ListadosPage() {
                   )}
                   {columnVisibilityEmpresas["Inscripto Ganancias"] && (
                     <TableCell className="text-center">
-                      {typeof e.inscriptoGanancias === "boolean" ? (e.inscriptoGanancias ? "Sí" : "No") : "-"}
+                      {typeof e.inscriptoGanancias === "boolean"
+                        ? e.inscriptoGanancias
+                          ? "Sí"
+                          : "No"
+                        : "-"}
                     </TableCell>
                   )}
                   {columnVisibilityEmpresas["Fecha de Creación"] && (
@@ -1016,11 +1180,7 @@ export default function ListadosPage() {
 
         {listType === "clientes" &&
           ((data || []) as ClienteListado[]).map((cliente) => (
-            <ClientMobileCard
-              key={cliente._id}
-              client={cliente}
-              prioridadesOptions={prioridadesNormalizadas}
-            />
+            <ClientMobileCard key={cliente._id} client={cliente} prioridadesOptions={prioridadesNormalizadas} />
           ))}
 
         {listType !== "clientes" &&
@@ -1036,9 +1196,7 @@ export default function ListadosPage() {
           ))}
 
         {!isLoading && ((data || []) as unknown[]).length === 0 && (
-          <div className="text-center text-muted-foreground py-10">
-            No se encontraron resultados.
-          </div>
+          <div className="text-center text-muted-foreground py-10">No se encontraron resultados.</div>
         )}
       </div>
     </div>

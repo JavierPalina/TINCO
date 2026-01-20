@@ -1,14 +1,21 @@
 "use client";
 
-import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
-import Papa from 'papaparse';
-import { toast } from 'sonner';
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
+import Papa from "papaparse";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Upload } from 'lucide-react';
+import { Upload } from "lucide-react";
 
 type ImportedClient = {
   nombreCompleto?: string;
@@ -25,17 +32,22 @@ export function ImportClientsDialog() {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: (clientes: ImportedClient[]) => axios.post('/api/clientes/import', { clientes }),
+    mutationFn: (clientes: ImportedClient[]) => axios.post("/api/clientes/import", { clientes }),
     onSuccess: (response) => {
       toast.success("Importación completada", { description: response.data.message });
-      queryClient.invalidateQueries({ queryKey: ['clientes'] });
+
+      // ✅ importante: invalidar no-exacto para cubrir filtros/sucursal
+      queryClient.invalidateQueries({ queryKey: ["clientes"], exact: false });
+
       setOpen(false);
       setFile(null);
     },
     onError: (error: unknown) => {
-      const msg = axios.isAxiosError(error) ? error.response?.data?.error : "No se pudieron importar los clientes.";
+      const msg = axios.isAxiosError(error)
+        ? (error.response?.data as any)?.error
+        : "No se pudieron importar los clientes.";
       toast.error("Error en la importación", { description: msg });
-    }
+    },
   });
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -63,14 +75,17 @@ export function ImportClientsDialog() {
       },
       error: () => {
         toast.error("Error al procesar el archivo CSV.");
-      }
+      },
     });
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline"><Upload className="mr-2 h-4 w-4" />Importar</Button>
+        <Button variant="outline">
+          <Upload className="mr-2 h-4 w-4" />
+          Importar
+        </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

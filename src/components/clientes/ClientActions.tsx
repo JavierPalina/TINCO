@@ -41,7 +41,6 @@ type ClientWithExtras = Client & {
   creadoPor?: string;
   ultimoContacto?: string | Date | null;
   ultimaCotizacionMonto?: number | null;
-  // campos opcionales por si tu tipo Client no los incluye
   dni?: string | null;
   cuil?: string | null;
   direccion?: string | null;
@@ -53,8 +52,6 @@ type ClientWithExtras = Client & {
   ciudadEmpresa?: string | null;
   paisEmpresa?: string | null;
 };
-
-const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const safeStr = (v: unknown) => {
   const s = String(v ?? "").trim();
@@ -84,7 +81,6 @@ const fmtDateTime = (d: Date) =>
     second: "2-digit",
   });
 
-// --- COLOR: lee --primary de shadcn (ej: "222.2 47.4% 11.2%") y lo convierte a RGB ---
 const hslToRgb = (h: number, s: number, l: number) => {
   s /= 100;
   l /= 100;
@@ -129,7 +125,7 @@ const hslToRgb = (h: number, s: number, l: number) => {
 };
 
 const getPrimaryRgb = () => {
-  if (typeof window === "undefined") return { r: 16, g: 185, b: 129 }; // fallback
+  if (typeof window === "undefined") return { r: 16, g: 185, b: 129 };
   const raw = getComputedStyle(document.documentElement).getPropertyValue("--primary").trim();
   const cleaned = raw.replace(/^hsl\(|\)$/g, "").trim();
   const parts = cleaned.split(/\s+/);
@@ -140,7 +136,6 @@ const getPrimaryRgb = () => {
   return hslToRgb(h, s, l);
 };
 
-// --- Logo helper: carga /logo.png y devuelve dataURL para jsPDF ---
 const fetchAsDataUrl = async (src: string) => {
   const res = await fetch(src);
   if (!res.ok) throw new Error("No se pudo cargar el logo");
@@ -178,7 +173,6 @@ async function generateClientPdf(client: ClientWithExtras) {
   };
 
   const setOpacity = (opacity: number) => {
-    // jsPDF no tipa GState bien; lo manejamos sin any usando unknown
     const d = doc as unknown as {
       GState?: new (o: { opacity: number }) => unknown;
       setGState?: (g: unknown) => void;
@@ -189,26 +183,20 @@ async function generateClientPdf(client: ClientWithExtras) {
     }
   };
 
-  // ---------- Header (más pro) ----------
   doc.setFillColor(249, 250, 251);
   doc.rect(0, 0, pageW, 34, "F");
 
-  // línea inferior con primary
   doc.setDrawColor(primary.r, primary.g, primary.b);
   doc.setLineWidth(0.8);
   doc.line(marginX, 34, pageW - marginX, 34);
 
-  // Logo (46x14)
   try {
     const logoDataUrl = await fetchAsDataUrl("/logo.png");
     const imgH = 14;
     const imgW = 46;
     doc.addImage(logoDataUrl, "PNG", marginX, 10, imgW, imgH);
-  } catch {
-    // sin logo -> no rompe
-  }
+  } catch {}
 
-  // Título a la derecha
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
   setPrimary();
@@ -219,17 +207,14 @@ async function generateClientPdf(client: ClientWithExtras) {
   setMuted();
   doc.text(`Generado: ${fmtDateTime(new Date())}`, pageW - marginX, 22, { align: "right" });
 
-  // ---------- Body ----------
   let y = 44;
 
   const sectionCard = (title: string, height: number) => {
-    // Card background
     doc.setFillColor(255, 255, 255);
     doc.setDrawColor(229, 231, 235);
     doc.setLineWidth(0.6);
     doc.roundedRect(marginX, y, contentW, height, 3, 3, "FD");
 
-    // Title band (primary 8% opacity)
     doc.setFillColor(primary.r, primary.g, primary.b);
     setOpacity(0.08);
     doc.roundedRect(marginX, y, contentW, 9, 3, 3, "F");
@@ -240,28 +225,7 @@ async function generateClientPdf(client: ClientWithExtras) {
     setPrimary();
     doc.text(title, marginX + 4, y + 6.2);
 
-    return y + 14; // inner start
-  };
-
-  const chip = (text: string, x: number, yChip: number) => {
-    const t = safeStr(text);
-    const paddingX = 2.2;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-
-    const w = doc.getTextWidth(t) + paddingX * 2;
-
-    // chip bg (primary 12% opacity)
-    doc.setFillColor(primary.r, primary.g, primary.b);
-    setOpacity(0.12);
-    doc.roundedRect(x, yChip, w, 6.8, 3.4, 3.4, "F");
-    setOpacity(1);
-
-    setPrimary();
-    doc.text(t, x + paddingX, yChip + 4.7);
-
-    return x + w + 2;
+    return y + 14;
   };
 
   const kv = (label: string, value: string, x: number, y0: number, w: number) => {
@@ -292,14 +256,9 @@ async function generateClientPdf(client: ClientWithExtras) {
     return y0 + Math.max(h1, h2) + 3;
   };
 
-  // ---------- Datos personales ----------
   y = ensureSpace(80, y);
   const cardH1 = 72;
   let innerY = sectionCard("Datos personales", cardH1);
-
-  // chips arriba a la derecha dentro de la card
-  const chipsStartX = pageW - marginX - 6 - 70;
-  const chipY = y + 4.2;
 
   innerY = twoCol(["Nombre completo", safeStr(client.nombreCompleto)], ["Origen", safeStr(client.origenContacto)], innerY);
   innerY = twoCol(["Teléfono", safeStr(client.telefono)], ["Email", safeStr(client.email)], innerY);
@@ -307,7 +266,6 @@ async function generateClientPdf(client: ClientWithExtras) {
 
   y += cardH1 + 10;
 
-  // ---------- Dirección ----------
   y = ensureSpace(60, y);
   const cardH2 = 50;
   innerY = sectionCard("Dirección", cardH2);
@@ -316,7 +274,6 @@ async function generateClientPdf(client: ClientWithExtras) {
 
   y += cardH2 + 10;
 
-  // ---------- Empresa ----------
   y = ensureSpace(86, y);
   const cardH3 = 72;
   innerY = sectionCard("Datos de empresa", cardH3);
@@ -326,14 +283,12 @@ async function generateClientPdf(client: ClientWithExtras) {
 
   y += cardH3 + 10;
 
-  // ---------- Seguimiento ----------
   y = ensureSpace(66, y);
   const cardH4 = 52;
   innerY = sectionCard("Registro y seguimiento", cardH4);
   innerY = twoCol(["Creado por", safeStr(client.creadoPor)], ["Fecha creación", formatDate((client as Client).createdAt)], innerY);
   innerY = twoCol(["Último contacto", formatDate(client.ultimoContacto)], ["ID Cliente", safeStr(client._id)], innerY);
 
-  // ---------- Footer ----------
   doc.setDrawColor(229, 231, 235);
   doc.setLineWidth(0.5);
   doc.line(marginX, pageH - 16, pageW - marginX, pageH - 16);
@@ -363,7 +318,8 @@ export function ClientActions({
     mutationFn: (clientId: string) => axios.delete(`/api/clientes/${clientId}`),
     onSuccess: () => {
       toast.success("Cliente eliminado con éxito");
-      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      // ✅ importante: invalidar no-exacto para cubrir filtros/sucursal
+      queryClient.invalidateQueries({ queryKey: ["clientes"], exact: false });
     },
     onError: () => {
       toast.error("Error al eliminar el cliente.");

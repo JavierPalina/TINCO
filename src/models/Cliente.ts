@@ -1,14 +1,12 @@
-import mongoose, { Schema, Document } from "mongoose";
+// src/models/Cliente.ts
+import mongoose, { Schema, Document, Types } from "mongoose";
 
 export interface ICliente extends Document {
   nombreCompleto: string;
   email?: string;
   telefono: string;
 
-  // Compatibilidad: texto libre (podés dejarlo o ir migrando al ref)
   empresa?: string;
-
-  // Nuevo: empresa asignada (relación)
   empresaAsignada?: mongoose.Schema.Types.ObjectId;
 
   direccionEmpresa?: string;
@@ -36,6 +34,9 @@ export interface ICliente extends Document {
 
   vendedorAsignado: mongoose.Schema.Types.ObjectId;
 
+  // ✅ NUEVO
+  sucursal?: Types.ObjectId | null;
+
   motivoRechazo?: string;
   detalleRechazo?: string;
 }
@@ -46,9 +47,8 @@ const ClienteSchema: Schema = new Schema(
     email: { type: String, trim: true, lowercase: true },
     telefono: { type: String, required: true, trim: true },
 
-    empresa: { type: String, trim: true }, // legacy
-
-    empresaAsignada: { type: Schema.Types.ObjectId, ref: "Empresa" }, // NUEVO
+    empresa: { type: String, trim: true },
+    empresaAsignada: { type: Schema.Types.ObjectId, ref: "Empresa" },
 
     direccionEmpresa: { type: String, trim: true },
     ciudadEmpresa: { type: String, trim: true },
@@ -69,18 +69,14 @@ const ClienteSchema: Schema = new Schema(
     etapa: {
       type: String,
       required: true,
-      enum: [
-        "Nuevo",
-        "Contactado",
-        "Cotizado",
-        "Negociación",
-        "Ganado",
-        "Perdido",
-      ],
+      enum: ["Nuevo", "Contactado", "Cotizado", "Negociación", "Ganado", "Perdido"],
       default: "Nuevo",
     },
 
     vendedorAsignado: { type: Schema.Types.ObjectId, ref: "User", required: true },
+
+    // ✅ NUEVO
+    sucursal: { type: Schema.Types.ObjectId, ref: "Sucursal", default: null, index: true },
 
     motivoRechazo: { type: String, trim: true },
     detalleRechazo: { type: String, trim: true },
@@ -88,5 +84,4 @@ const ClienteSchema: Schema = new Schema(
   { timestamps: true }
 );
 
-export default mongoose.models.Cliente ||
-  mongoose.model<ICliente>("Cliente", ClienteSchema);
+export default mongoose.models.Cliente || mongoose.model<ICliente>("Cliente", ClienteSchema);

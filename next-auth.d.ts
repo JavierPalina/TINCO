@@ -8,12 +8,18 @@ declare module "next-auth" {
     user: DefaultSession["user"] & {
       id: string;
       rol: UserRole;
+
+      // ✅ NUEVO
+      sucursal: string | null;
     };
   }
 
   interface User extends DefaultUser {
     id: string;
     rol: UserRole;
+
+    // ✅ NUEVO
+    sucursal: string | null;
   }
 }
 
@@ -23,5 +29,8 @@ declare module "next-auth/jwt" {
     rol: UserRole;
     name?: string | null;
     image?: string | null;
+
+    // ✅ NUEVO
+    sucursal: string | null;
   }
 }

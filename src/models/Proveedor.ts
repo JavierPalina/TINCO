@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from "mongoose";
+import mongoose, { Schema, Document, Types } from "mongoose";
 
 export interface IProveedor extends Document {
   proveedorId?: string; // si querés un ID humano interno aparte del _id de Mongo
@@ -23,6 +23,7 @@ export interface IProveedor extends Document {
   notas?: string;
 
   creadoPor: mongoose.Schema.Types.ObjectId;
+  sucursal?: Types.ObjectId | null;
 }
 
 const ProveedorSchema: Schema = new Schema(
@@ -50,6 +51,7 @@ const ProveedorSchema: Schema = new Schema(
     notas: { type: String, trim: true },
 
     creadoPor: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    sucursal: { type: Schema.Types.ObjectId, ref: "Sucursal", default: null, index: true },
   },
   { timestamps: true }
 );

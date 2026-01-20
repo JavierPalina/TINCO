@@ -9,10 +9,23 @@ const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 type MatchFilter = Record<string, unknown> & {
   $or?: Array<Record<string, unknown>>;
+  provincia?: unknown;
+  categoriaIVA?: unknown;
+  sucursal?: mongoose.Types.ObjectId;
 };
+
+function canFilterAnySucursal(rol?: string) {
+  // Ajustá según tus roles reales
+  return rol === "admin" || rol === "superadmin" || rol === "gerente";
+}
 
 export async function GET(request: NextRequest) {
   await dbConnect();
+
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
+  }
 
   try {
     const { searchParams } = new URL(request.url);
@@ -20,7 +33,22 @@ export async function GET(request: NextRequest) {
     const provinciaRaw = (searchParams.get("provincia") || "").trim();
     const categoriaIVARaw = (searchParams.get("categoriaIVA") || "").trim();
 
+    // ✅ Nuevo: sucursalId opcional (solo roles autorizados)
+    const sucursalIdRaw = (searchParams.get("sucursalId") || "").trim();
+
     const matchFilter: MatchFilter = {};
+
+    const userRol = session.user.rol;
+    const allowAny = canFilterAnySucursal(userRol);
+
+    if (allowAny && sucursalIdRaw && mongoose.Types.ObjectId.isValid(sucursalIdRaw)) {
+      matchFilter.sucursal = new mongoose.Types.ObjectId(sucursalIdRaw);
+    } else {
+      if (!session.user.sucursal) {
+        return NextResponse.json({ success: true, data: [] }, { status: 200 });
+      }
+      matchFilter.sucursal = new mongoose.Types.ObjectId(session.user.sucursal);
+    }
 
     if (searchTermRaw) {
       const safeTerm = escapeRegex(searchTermRaw);
@@ -99,21 +127,33 @@ export async function POST(request: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
   }
+  if (!session.user.sucursal) {
+    return NextResponse.json(
+      { success: false, error: "Usuario sin sucursal asignada" },
+      { status: 400 }
+    );
+  }
 
   await dbConnect();
 
   try {
     const body = await request.json();
 
+    // ✅ Por seguridad, ignoramos sucursal/creadoPor del body
+    if (body && typeof body === "object") {
+      delete (body as any).sucursal;
+      delete (body as any).creadoPor;
+    }
+
     const proveedor = await Proveedor.create({
       ...body,
       creadoPor: new mongoose.Types.ObjectId(session.user.id),
+      sucursal: new mongoose.Types.ObjectId(session.user.sucursal),
     });
 
     return NextResponse.json({ success: true, data: proveedor }, { status: 201 });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Ocurrió un error desconocido";
+    const errorMessage = error instanceof Error ? error.message : "Ocurrió un error desconocido";
     return NextResponse.json({ success: false, error: errorMessage }, { status: 400 });
   }
 }

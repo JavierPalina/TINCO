@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from "mongoose";
+import mongoose, { Schema, Document, Types } from "mongoose";
 
 export interface IEmpresa extends Document {
   razonSocial: string;
@@ -23,6 +23,7 @@ export interface IEmpresa extends Document {
   // Interno
   notas?: string;
   creadoPor: mongoose.Schema.Types.ObjectId;
+  sucursal?: Types.ObjectId | null;
 }
 
 const EmpresaSchema: Schema = new Schema(
@@ -47,6 +48,7 @@ const EmpresaSchema: Schema = new Schema(
     notas: { type: String, trim: true },
 
     creadoPor: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    sucursal: { type: Schema.Types.ObjectId, ref: "Sucursal", default: null, index: true },
   },
   { timestamps: true }
 );

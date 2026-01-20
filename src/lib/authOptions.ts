@@ -15,6 +15,9 @@ type AppUser = {
   name?: string | null;
   rol: UserRole;
   image?: string | null;
+
+  // ✅ NUEVO
+  sucursal: string | null;
 };
 
 /** Payload permitido en useSession().update(...) */
@@ -39,7 +42,8 @@ function isAppUser(v: unknown): v is AppUser {
   if (!isRecord(v)) return false;
   const idOk = typeof v.id === "string";
   const rolOk = typeof v.rol === "string";
-  return idOk && rolOk;
+  const sucOk = ("sucursal" in v) && (typeof (v as any).sucursal === "string" || (v as any).sucursal === null);
+  return idOk && rolOk && sucOk;
 }
 
 export const authOptions: NextAuthOptions = {
@@ -87,6 +91,9 @@ export const authOptions: NextAuthOptions = {
           email: user.email ?? null,
           rol,
           image: user.image ?? null,
+
+          // ✅ NUEVO
+          sucursal: user.sucursal ? user.sucursal.toString() : null,
         };
 
         return appUser;
@@ -104,9 +111,14 @@ export const authOptions: NextAuthOptions = {
         token.rol = user.rol;
         token.name = user.name ?? token.name ?? null;
         token.image = user.image ?? token.image ?? null;
+
+        // ✅ NUEVO
+        token.sucursal = user.sucursal;
       } else {
-        // Fallback defensivo: asegurar id string
         token.id = typeof token.id === "string" ? token.id : token.sub ?? "";
+      
+        // ✅ NUEVO (defensivo)
+        token.sucursal = typeof token.sucursal === "string" ? token.sucursal : null;
       }
 
       // useSession().update({ name, image })
@@ -123,9 +135,11 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = typeof token.id === "string" ? token.id : "";
         session.user.rol = token.rol as UserRole;
-
         session.user.name = (token.name as JWT["name"]) ?? session.user.name ?? null;
         session.user.image = (token.image as JWT["image"]) ?? session.user.image ?? null;
+            
+        // ✅ NUEVO
+        session.user.sucursal = (token.sucursal as string | null) ?? null;
       }
       return session;
     },

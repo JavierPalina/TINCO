@@ -12,19 +12,50 @@ type MatchFilter = Record<string, unknown> & {
   empresaAsignada?: mongoose.Types.ObjectId;
   etapa?: unknown;
   prioridad?: unknown;
+  sucursal?: mongoose.Types.ObjectId;
 };
+
+function canFilterAnySucursal(rol?: string) {
+  // Ajustá según tus roles reales
+  return rol === "admin" || rol === "superadmin" || rol === "gerente";
+}
 
 export async function GET(request: NextRequest) {
   await dbConnect();
 
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
+
     const searchTermRaw = (searchParams.get("searchTerm") || "").trim();
     const etapaRaw = (searchParams.get("etapa") || "").trim();
     const prioridadRaw = (searchParams.get("prioridad") || "").trim();
     const empresaIdRaw = (searchParams.get("empresaId") || "").trim();
 
+    // ✅ Nuevo: sucursalId opcional (solo roles autorizados)
+    const sucursalIdRaw = (searchParams.get("sucursalId") || "").trim();
+
     const matchFilter: MatchFilter = {};
+
+    // Determina sucursal efectiva:
+    // - si el rol puede, usa sucursalId (si es válido)
+    // - si no puede, usa la sucursal del usuario
+    // - si no hay sucursal (y no puede filtrar), devuelve vacío
+    const userRol = session.user.rol;
+    const allowAny = canFilterAnySucursal(userRol);
+
+    if (allowAny && sucursalIdRaw && mongoose.Types.ObjectId.isValid(sucursalIdRaw)) {
+      matchFilter.sucursal = new mongoose.Types.ObjectId(sucursalIdRaw);
+    } else {
+      if (!session.user.sucursal) {
+        return NextResponse.json({ success: true, data: [] }, { status: 200 });
+      }
+      matchFilter.sucursal = new mongoose.Types.ObjectId(session.user.sucursal);
+    }
 
     // Filtro por empresa asignada
     if (empresaIdRaw && mongoose.Types.ObjectId.isValid(empresaIdRaw)) {
@@ -100,24 +131,22 @@ export async function GET(request: NextRequest) {
       const safeTerm = escapeRegex(searchTermRaw);
       const searchRegex = new RegExp(safeTerm, "i");
 
-      const searchMatch: mongoose.PipelineStage.Match = {
+      pipeline.push({
         $match: {
           $or: [
             { nombreCompleto: { $regex: searchRegex } },
             { email: { $regex: searchRegex } },
             { telefono: { $regex: searchRegex } },
 
-            // legacy (si todavía existen en algunos docs viejos)
+            // legacy
             { empresa: { $regex: searchRegex } },
             { razonSocial: { $regex: searchRegex } },
 
-            // nuevo (derivado de Empresa)
+            // derivado de Empresa
             { empresaNombre: { $regex: searchRegex } },
           ],
         },
-      };
-
-      pipeline.push(searchMatch);
+      });
     }
 
     pipeline.push(
@@ -130,7 +159,6 @@ export async function GET(request: NextRequest) {
           prioridad: 1,
           origenContacto: 1,
 
-          // legacy + nuevo
           empresa: 1,
           empresaAsignada: 1,
           empresaNombre: 1,
@@ -142,7 +170,6 @@ export async function GET(request: NextRequest) {
           pais: 1,
           dni: 1,
 
-          // legacy empresa (recomendación: a futuro, eliminarlos del schema)
           direccionEmpresa: 1,
           ciudadEmpresa: 1,
           paisEmpresa: 1,
@@ -173,6 +200,12 @@ export async function POST(request: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
   }
+  if (!session.user.sucursal) {
+    return NextResponse.json(
+      { success: false, error: "Usuario sin sucursal asignada" },
+      { status: 400 }
+    );
+  }
 
   await dbConnect();
 
@@ -181,19 +214,26 @@ export async function POST(request: Request) {
 
     // Normaliza empresaAsignada si viene
     let empresaAsignada: mongoose.Types.ObjectId | undefined;
-
     const rawEmpresa = body.empresaAsignada;
     if (typeof rawEmpresa === "string" && mongoose.Types.ObjectId.isValid(rawEmpresa)) {
       empresaAsignada = new mongoose.Types.ObjectId(rawEmpresa);
     }
 
+    // ✅ Forzamos sucursal del usuario + vendedorAsignado del usuario
     const clienteData: Record<string, unknown> = {
       ...body,
       empresaAsignada,
       vendedorAsignado: new mongoose.Types.ObjectId(session.user.id),
+      sucursal: new mongoose.Types.ObjectId(session.user.sucursal),
     };
 
-    const cliente = await Cliente.create(clienteData);
+    // ✅ Por seguridad, ignoramos cualquier sucursal del body
+    delete (clienteData as any).sucursal;
+
+    const cliente = await Cliente.create({
+      ...clienteData,
+      sucursal: new mongoose.Types.ObjectId(session.user.sucursal),
+    });
 
     return NextResponse.json({ success: true, data: cliente }, { status: 201 });
   } catch (error) {
