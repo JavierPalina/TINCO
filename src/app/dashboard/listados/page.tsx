@@ -48,6 +48,8 @@ import { useDebounce } from "use-debounce";
 import { cn } from "@/lib/utils";
 
 import { Client } from "@/types/client";
+import { ProveedorActions } from "@/components/proveedores/ProveedorActions";
+import { EmpresaActions } from "@/components/empresas/EmpresaActions";
 
 type ListType = "clientes" | "proveedores" | "empresas";
 
@@ -897,6 +899,7 @@ export default function ListadosPage() {
                   {columnVisibilityProveedores["Fecha de Creación"] && (
                     <TableHead className="text-center">Creación</TableHead>
                   )}
+                  <TableHead className="text-center">Acciones</TableHead>
                 </>
               )}
 
@@ -932,6 +935,7 @@ export default function ListadosPage() {
                   {columnVisibilityEmpresas["Fecha de Creación"] && (
                     <TableHead className="text-center">Creación</TableHead>
                   )}
+                  <TableHead className="text-center">Acciones</TableHead>
                 </>
               )}
             </TableRow>
@@ -1073,10 +1077,31 @@ export default function ListadosPage() {
                     <TableCell className="text-center">{p.cuit || "-"}</TableCell>
                   )}
                   {columnVisibilityProveedores["Teléfono"] && (
-                    <TableCell className="text-center">{p.telefono || "-"}</TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-2 group">
+                        <span>{p.telefono || "-"}</span>
+                        {p.telefono && (
+                          <div className="group-hover:opacity-100 transition-opacity">
+                            <WhatsAppButton telefono={p.telefono} />
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
                   )}
+                  
                   {columnVisibilityProveedores["Email"] && (
-                    <TableCell className="text-center">{p.email || "-"}</TableCell>
+                    <TableCell className="text-center">
+                      {p.email ? (
+                        <div className="flex items-center justify-center gap-2 group">
+                          <span>{p.email}</span>
+                          <div className="group-hover:opacity-100 transition-opacity">
+                            <EmailButton email={p.email} />
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
                   )}
                   {columnVisibilityProveedores["Localidad"] && (
                     <TableCell className="text-center">{formatAndTruncate(p.localidad, 20)}</TableCell>
@@ -1108,6 +1133,9 @@ export default function ListadosPage() {
                       {p.createdAt ? format(new Date(p.createdAt), "dd MMM yyyy", { locale: es }) : "-"}
                     </TableCell>
                   )}
+                  <TableCell className="text-center">
+                    <ProveedorActions proveedor={p} />
+                  </TableCell>
                 </TableRow>
               ))}
 
@@ -1128,10 +1156,31 @@ export default function ListadosPage() {
                     <TableCell className="text-center">{e.cuit || "-"}</TableCell>
                   )}
                   {columnVisibilityEmpresas["Teléfono"] && (
-                    <TableCell className="text-center">{e.telefono || "-"}</TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-2 group">
+                        <span>{e.telefono || "-"}</span>
+                        {e.telefono && (
+                          <div className="group-hover:opacity-100 transition-opacity">
+                            <WhatsAppButton telefono={e.telefono} />
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
                   )}
+
                   {columnVisibilityEmpresas["Email"] && (
-                    <TableCell className="text-center">{e.email || "-"}</TableCell>
+                    <TableCell className="text-center">
+                      {e.email ? (
+                        <div className="flex items-center justify-center gap-2 group">
+                          <span>{e.email}</span>
+                          <div className="group-hover:opacity-100 transition-opacity">
+                            <EmailButton email={e.email} />
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
                   )}
                   {columnVisibilityEmpresas["Localidad"] && (
                     <TableCell className="text-center">{formatAndTruncate(e.localidad, 20)}</TableCell>
@@ -1156,6 +1205,9 @@ export default function ListadosPage() {
                       {e.createdAt ? format(new Date(e.createdAt), "dd MMM yyyy", { locale: es }) : "-"}
                     </TableCell>
                   )}
+                  <TableCell className="text-center">
+                    <EmpresaActions empresa={e} />
+                  </TableCell>
                 </TableRow>
               ))}
           </TableBody>

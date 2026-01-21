@@ -40,7 +40,7 @@ export function ClientFilters({
     (allowSucursalFilter && Boolean(filters.sucursalId));
 
   return (
-    <div className="flex items-end justify-between gap-3 mt-3 flex-wrap">
+    <div className="flex items-end gap-3 mt-3 flex-wrap">
       <div className="grid gap-1 w-full md:max-w-md">
         <label className="text-sm font-medium">Buscar</label>
         <input
