@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useForm, SubmitHandler, Controller } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
@@ -23,14 +23,15 @@ import { Combobox } from "@/components/ui/combobox";
 
 import { AddPrioridadDialog } from "@/components/prioridades/AddPrioridadDialog";
 import { usePrioridades } from "@/features/prioridades/prioridades.queries";
+import { useSucursales } from "@/features/sucursales/sucursales.queries";
 
 type FormInputs = {
   nombreCompleto: string;
   email?: string;
   telefono: string;
 
-  // PRIORIDAD COMO STRING (vacío al iniciar)
-  prioridad: string;
+  prioridad: string;     // string (vacío al iniciar)
+  sucursalId: string;    // ID (como se envía ahora)
 
   origenContacto?: string;
   direccion?: string;
@@ -44,6 +45,7 @@ export function AddClientDialog() {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
 
+  // PRIORIDADES
   const {
     data: prioridades = [],
     isLoading: prioridadesLoading,
@@ -51,20 +53,56 @@ export function AddClientDialog() {
   } = usePrioridades();
 
   const opcionesDePrioridad = useMemo(() => {
-    // Si querés siempre incluir Alta/Media/Baja aunque no estén en DB:
     const defaults = ["Alta", "Media", "Baja"];
     const nombresDb = prioridades.map((p) => p.nombre).filter(Boolean);
-
     const combined = Array.from(new Set([...defaults, ...nombresDb]));
     return combined.map((n) => ({ value: n, label: n }));
   }, [prioridades]);
 
-  const { register, handleSubmit, reset, control, setValue } =
+  // SUCURSALES
+  const {
+    data: sucursales = [],
+    isLoading: sucursalesLoading,
+    isError: sucursalesError,
+  } = useSucursales();
+
+  // CLAVE: value = _id, label = nombre
+  const opcionesDeSucursal = useMemo(() => {
+    return sucursales.map((s) => ({ value: s._id, label: s.nombre }));
+  }, [sucursales]);
+
+  const { register, handleSubmit, reset, control, setValue, getValues } =
     useForm<FormInputs>({
       defaultValues: {
-        prioridad: "", // <- ARRANCA VACÍO
+        prioridad: "",
+        sucursalId: "",
       },
     });
+
+  // Al abrir: setea sucursalId con el ID del usuario (si existe)
+  useEffect(() => {
+    if (!open) return;
+
+    const current = (getValues("sucursalId") ?? "").trim();
+    if (current) return;
+
+    // En tu caso, parece ser un ID (ej: 696a...)
+    const sucursalUsuarioId = (session?.user as any)?.sucursal as
+      | string
+      | undefined;
+
+    if (sucursalUsuarioId?.trim()) {
+      setValue("sucursalId", sucursalUsuarioId, { shouldValidate: true });
+      return;
+    }
+
+    // Fallback: primera sucursal si no vino en session
+    if (opcionesDeSucursal.length) {
+      setValue("sucursalId", opcionesDeSucursal[0].value, {
+        shouldValidate: true,
+      });
+    }
+  }, [open, session, opcionesDeSucursal, setValue, getValues]);
 
   const mutation = useMutation({
     mutationFn: (newClient: FormInputs & { vendedorAsignado: string }) => {
@@ -76,8 +114,8 @@ export function AddClientDialog() {
       );
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
 
-      // Reset dejando prioridad VACÍA
-      reset({ prioridad: "" });
+      // Reset: prioridad vacía, sucursalId vacía (se re-setea al abrir por effect)
+      reset({ prioridad: "", sucursalId: "" });
       setOpen(false);
     },
     onError: () => {
@@ -91,6 +129,13 @@ export function AddClientDialog() {
   const onSubmit: SubmitHandler<FormInputs> = (data) => {
     if (!session?.user?.id) return alert("You must be logged in.");
 
+    if (!data.sucursalId?.trim()) {
+      toast.error("Sucursal requerida", {
+        description: "Seleccioná una sucursal antes de guardar.",
+      });
+      return;
+    }
+
     if (!data.prioridad?.trim()) {
       toast.error("Prioridad requerida", {
         description: "Seleccioná una prioridad antes de guardar.",
@@ -102,6 +147,7 @@ export function AddClientDialog() {
   };
 
   const bloquearPrioridad = prioridadesLoading || prioridadesError;
+  const bloquearSucursal = sucursalesLoading || sucursalesError;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -158,12 +204,45 @@ export function AddClientDialog() {
               <Input {...register("pais")} />
             </div>
 
-            {/* Prioridad ocupa 2 columnas para que no se corte */}
+            {/* SUCURSAL (por ID) */}
+            <div className="space-y-2">
+              <Label>Sucursal *</Label>
+
+              <div className={bloquearSucursal ? "pointer-events-none opacity-60" : ""}>
+                <Controller
+                  name="sucursalId"
+                  control={control}
+                  rules={{ required: "La sucursal es obligatoria" }}
+                  render={({ field }) => (
+                    <Combobox
+                      options={opcionesDeSucursal}
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder={
+                        sucursalesLoading
+                          ? "Cargando sucursales..."
+                          : sucursalesError
+                          ? "Error cargando sucursales"
+                          : "Selecciona una sucursal..."
+                      }
+                    />
+                  )}
+                />
+              </div>
+            </div>
+
+            {/* PRIORIDAD (string vacío al iniciar) */}
             <div className="space-y-2 md:col-span-2">
               <Label>Prioridad *</Label>
 
               <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                <div className={bloquearPrioridad ? "pointer-events-none opacity-60 flex-1 min-w-0" : "flex-1 min-w-0"}>
+                <div
+                  className={
+                    bloquearPrioridad
+                      ? "pointer-events-none opacity-60 flex-1 min-w-0"
+                      : "flex-1 min-w-0"
+                  }
+                >
                   <Controller
                     name="prioridad"
                     control={control}
@@ -188,7 +267,6 @@ export function AddClientDialog() {
                 <div className={bloquearPrioridad ? "pointer-events-none opacity-60" : ""}>
                   <AddPrioridadDialog
                     onCreated={(p) => {
-                      // Al crear, selecciona esa prioridad (string)
                       setValue("prioridad", p.nombre, { shouldValidate: true });
                     }}
                   />
