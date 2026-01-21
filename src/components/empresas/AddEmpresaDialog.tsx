@@ -41,16 +41,16 @@ type EmpresaFormInputs = {
   categoriaIVA?: string;
   inscriptoGanancias?: boolean;
 
-  // NUEVO
   sucursalId: string;
 };
+
+type SessionUserSucursal = { sucursal?: string };
 
 export function AddEmpresaDialog() {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
   const { data: session } = useSession();
 
-  // SUCURSALES
   const {
     data: sucursales = [],
     isLoading: sucursalesLoading,
@@ -80,24 +80,20 @@ export function AddEmpresaDialog() {
     },
   });
 
-  // Default sucursal del usuario al abrir
   useEffect(() => {
     if (!open) return;
 
     const current = (form.getValues("sucursalId") ?? "").trim();
     if (current) return;
 
-    // AJUSTÁ si tu session lo guarda con otro nombre
-    const sucursalUsuarioId = (session?.user as any)?.sucursal as
-      | string
-      | undefined;
+    const sucursalUsuarioId = (session?.user as unknown as SessionUserSucursal)
+      ?.sucursal;
 
     if (sucursalUsuarioId?.trim()) {
       form.setValue("sucursalId", sucursalUsuarioId, { shouldValidate: true });
       return;
     }
 
-    // fallback: primera sucursal
     if (opcionesDeSucursal.length) {
       form.setValue("sucursalId", opcionesDeSucursal[0].value, {
         shouldValidate: true,
@@ -106,7 +102,8 @@ export function AddEmpresaDialog() {
   }, [open, session, opcionesDeSucursal, form]);
 
   const mutation = useMutation({
-    mutationFn: async (payload: EmpresaFormInputs) => axios.post("/api/empresas", payload),
+    mutationFn: async (payload: EmpresaFormInputs) =>
+      axios.post("/api/empresas", payload),
     onSuccess: async () => {
       toast.success("Empresa creada con éxito.");
       form.reset();
@@ -116,7 +113,8 @@ export function AddEmpresaDialog() {
     },
     onError: () => {
       toast.error("Error al crear la empresa", {
-        description: "No se pudo guardar la empresa. Por favor, intenta de nuevo.",
+        description:
+          "No se pudo guardar la empresa. Por favor, intenta de nuevo.",
       });
     },
   });
@@ -143,7 +141,8 @@ export function AddEmpresaDialog() {
         <DialogHeader>
           <DialogTitle>Crear Empresa</DialogTitle>
           <DialogDescription>
-            Completa la información comercial y de contacto para registrar una nueva empresa.
+            Completa la información comercial y de contacto para registrar una
+            nueva empresa.
           </DialogDescription>
         </DialogHeader>
 
@@ -156,7 +155,11 @@ export function AddEmpresaDialog() {
             {/* SUCURSAL */}
             <div className="space-y-2">
               <Label>Sucursal *</Label>
-              <div className={bloquearSucursal ? "pointer-events-none opacity-60" : ""}>
+              <div
+                className={
+                  bloquearSucursal ? "pointer-events-none opacity-60" : ""
+                }
+              >
                 <Controller
                   name="sucursalId"
                   control={form.control}
@@ -196,7 +199,10 @@ export function AddEmpresaDialog() {
 
             <div className="space-y-2">
               <Label>Categoría IVA</Label>
-              <Input {...form.register("categoriaIVA")} placeholder="Ej: Monotributo" />
+              <Input
+                {...form.register("categoriaIVA")}
+                placeholder="Ej: Monotributo"
+              />
             </div>
 
             <div className="space-y-2 md:col-span-2">

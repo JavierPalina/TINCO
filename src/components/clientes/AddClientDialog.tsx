@@ -30,8 +30,8 @@ type FormInputs = {
   email?: string;
   telefono: string;
 
-  prioridad: string;     // string (vacío al iniciar)
-  sucursalId: string;    // ID (como se envía ahora)
+  prioridad: string; // string (vacío al iniciar)
+  sucursalId: string; // ID (como se envía ahora)
 
   origenContacto?: string;
   direccion?: string;
@@ -39,6 +39,8 @@ type FormInputs = {
   pais?: string;
   dni?: string;
 };
+
+type SessionUserSucursal = { sucursal?: string };
 
 export function AddClientDialog() {
   const [open, setOpen] = useState(false);
@@ -66,7 +68,6 @@ export function AddClientDialog() {
     isError: sucursalesError,
   } = useSucursales();
 
-  // CLAVE: value = _id, label = nombre
   const opcionesDeSucursal = useMemo(() => {
     return sucursales.map((s) => ({ value: s._id, label: s.nombre }));
   }, [sucursales]);
@@ -86,17 +87,14 @@ export function AddClientDialog() {
     const current = (getValues("sucursalId") ?? "").trim();
     if (current) return;
 
-    // En tu caso, parece ser un ID (ej: 696a...)
-    const sucursalUsuarioId = (session?.user as any)?.sucursal as
-      | string
-      | undefined;
+    const sucursalUsuarioId = (session?.user as unknown as SessionUserSucursal)
+      ?.sucursal;
 
     if (sucursalUsuarioId?.trim()) {
       setValue("sucursalId", sucursalUsuarioId, { shouldValidate: true });
       return;
     }
 
-    // Fallback: primera sucursal si no vino en session
     if (opcionesDeSucursal.length) {
       setValue("sucursalId", opcionesDeSucursal[0].value, {
         shouldValidate: true,
@@ -113,8 +111,6 @@ export function AddClientDialog() {
         `Cliente "${res.data.data.nombreCompleto}" creado con éxito.`
       );
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
-
-      // Reset: prioridad vacía, sucursalId vacía (se re-setea al abrir por effect)
       reset({ prioridad: "", sucursalId: "" });
       setOpen(false);
     },
@@ -208,7 +204,11 @@ export function AddClientDialog() {
             <div className="space-y-2">
               <Label>Sucursal *</Label>
 
-              <div className={bloquearSucursal ? "pointer-events-none opacity-60" : ""}>
+              <div
+                className={
+                  bloquearSucursal ? "pointer-events-none opacity-60" : ""
+                }
+              >
                 <Controller
                   name="sucursalId"
                   control={control}
@@ -231,7 +231,7 @@ export function AddClientDialog() {
               </div>
             </div>
 
-            {/* PRIORIDAD (string vacío al iniciar) */}
+            {/* PRIORIDAD */}
             <div className="space-y-2 md:col-span-2">
               <Label>Prioridad *</Label>
 
@@ -264,7 +264,11 @@ export function AddClientDialog() {
                   />
                 </div>
 
-                <div className={bloquearPrioridad ? "pointer-events-none opacity-60" : ""}>
+                <div
+                  className={
+                    bloquearPrioridad ? "pointer-events-none opacity-60" : ""
+                  }
+                >
                   <AddPrioridadDialog
                     onCreated={(p) => {
                       setValue("prioridad", p.nombre, { shouldValidate: true });

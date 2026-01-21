@@ -51,6 +51,8 @@ type ProveedorApiPayload = Omit<ProveedorFormInputs, "fechaVtoCAI"> & {
   fechaVtoCAI?: Date;
 };
 
+type SessionUserSucursal = { sucursal?: string };
+
 function onlyDigits(value: string) {
   return (value ?? "").replace(/\D/g, "");
 }
@@ -60,7 +62,6 @@ export function AddProveedorDialog() {
   const queryClient = useQueryClient();
   const { data: session } = useSession();
 
-  // SUCURSALES
   const {
     data: sucursales = [],
     isLoading: sucursalesLoading,
@@ -91,23 +92,20 @@ export function AddProveedorDialog() {
     },
   });
 
-  // Al abrir: setear sucursalId desde usuario (ID)
   useEffect(() => {
     if (!open) return;
 
     const current = (form.getValues("sucursalId") ?? "").trim();
     if (current) return;
 
-    const sucursalUsuarioId = (session?.user as any)?.sucursal as
-      | string
-      | undefined;
+    const sucursalUsuarioId = (session?.user as unknown as SessionUserSucursal)
+      ?.sucursal;
 
     if (sucursalUsuarioId?.trim()) {
       form.setValue("sucursalId", sucursalUsuarioId, { shouldValidate: true });
       return;
     }
 
-    // fallback si no hay en session
     if (opcionesDeSucursal.length) {
       form.setValue("sucursalId", opcionesDeSucursal[0].value, {
         shouldValidate: true,
@@ -115,12 +113,11 @@ export function AddProveedorDialog() {
     }
   }, [open, session, opcionesDeSucursal, form]);
 
-  // CREAR PROVEEDOR (sin lookup por CUIT)
   const mutation = useMutation({
     mutationFn: async (payload: ProveedorFormInputs) => {
       const body: ProveedorApiPayload = {
         ...payload,
-        cuit: onlyDigits(payload.cuit), // normaliza
+        cuit: onlyDigits(payload.cuit),
         fechaVtoCAI: payload.fechaVtoCAI
           ? new Date(payload.fechaVtoCAI)
           : undefined,
@@ -183,7 +180,11 @@ export function AddProveedorDialog() {
             {/* SUCURSAL */}
             <div className="space-y-2">
               <Label>Sucursal *</Label>
-              <div className={bloquearSucursal ? "pointer-events-none opacity-60" : ""}>
+              <div
+                className={
+                  bloquearSucursal ? "pointer-events-none opacity-60" : ""
+                }
+              >
                 <Controller
                   name="sucursalId"
                   control={form.control}
