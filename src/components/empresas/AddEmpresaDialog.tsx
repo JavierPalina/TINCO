@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { useForm, SubmitHandler } from "react-hook-form";
+import { useEffect, useMemo, useState } from "react";
+import { useForm, SubmitHandler, Controller } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import axios from "axios";
 import { toast } from "sonner";
 
@@ -18,6 +19,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Combobox } from "@/components/ui/combobox";
+
+import { useSucursales } from "@/features/sucursales/sucursales.queries";
 
 type EmpresaFormInputs = {
   razonSocial: string;
@@ -37,12 +41,25 @@ type EmpresaFormInputs = {
   categoriaIVA?: string;
   inscriptoGanancias?: boolean;
 
-  // notas?: string; // eliminado
+  // NUEVO
+  sucursalId: string;
 };
 
 export function AddEmpresaDialog() {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
+  const { data: session } = useSession();
+
+  // SUCURSALES
+  const {
+    data: sucursales = [],
+    isLoading: sucursalesLoading,
+    isError: sucursalesError,
+  } = useSucursales();
+
+  const opcionesDeSucursal = useMemo(() => {
+    return sucursales.map((s) => ({ value: s._id, label: s.nombre }));
+  }, [sucursales]);
 
   const form = useForm<EmpresaFormInputs>({
     defaultValues: {
@@ -59,8 +76,34 @@ export function AddEmpresaDialog() {
       cuit: "",
       categoriaIVA: "",
       inscriptoGanancias: false,
+      sucursalId: "",
     },
   });
+
+  // Default sucursal del usuario al abrir
+  useEffect(() => {
+    if (!open) return;
+
+    const current = (form.getValues("sucursalId") ?? "").trim();
+    if (current) return;
+
+    // AJUSTÁ si tu session lo guarda con otro nombre
+    const sucursalUsuarioId = (session?.user as any)?.sucursal as
+      | string
+      | undefined;
+
+    if (sucursalUsuarioId?.trim()) {
+      form.setValue("sucursalId", sucursalUsuarioId, { shouldValidate: true });
+      return;
+    }
+
+    // fallback: primera sucursal
+    if (opcionesDeSucursal.length) {
+      form.setValue("sucursalId", opcionesDeSucursal[0].value, {
+        shouldValidate: true,
+      });
+    }
+  }, [open, session, opcionesDeSucursal, form]);
 
   const mutation = useMutation({
     mutationFn: async (payload: EmpresaFormInputs) => axios.post("/api/empresas", payload),
@@ -78,7 +121,17 @@ export function AddEmpresaDialog() {
     },
   });
 
-  const onSubmit: SubmitHandler<EmpresaFormInputs> = (data) => mutation.mutate(data);
+  const onSubmit: SubmitHandler<EmpresaFormInputs> = (data) => {
+    if (!data.sucursalId?.trim()) {
+      toast.error("Sucursal requerida", {
+        description: "Seleccioná una sucursal antes de guardar.",
+      });
+      return;
+    }
+    mutation.mutate(data);
+  };
+
+  const bloquearSucursal = sucursalesLoading || sucursalesError;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -99,6 +152,32 @@ export function AddEmpresaDialog() {
             <h3 className="md:col-span-2 font-semibold text-lg border-b pb-2">
               Identificación
             </h3>
+
+            {/* SUCURSAL */}
+            <div className="space-y-2">
+              <Label>Sucursal *</Label>
+              <div className={bloquearSucursal ? "pointer-events-none opacity-60" : ""}>
+                <Controller
+                  name="sucursalId"
+                  control={form.control}
+                  rules={{ required: true }}
+                  render={({ field }) => (
+                    <Combobox
+                      options={opcionesDeSucursal}
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder={
+                        sucursalesLoading
+                          ? "Cargando sucursales..."
+                          : sucursalesError
+                          ? "Error cargando sucursales"
+                          : "Selecciona una sucursal..."
+                      }
+                    />
+                  )}
+                />
+              </div>
+            </div>
 
             <div className="space-y-2 md:col-span-2">
               <Label>Razón Social *</Label>

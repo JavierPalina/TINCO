@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { useForm, SubmitHandler } from "react-hook-form";
+import { useEffect, useMemo, useState } from "react";
+import { useForm, SubmitHandler, Controller } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import axios from "axios";
 import { toast } from "sonner";
 
@@ -18,10 +19,15 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Combobox } from "@/components/ui/combobox";
+
+import { useSucursales } from "@/features/sucursales/sucursales.queries";
 
 type ProveedorFormInputs = {
   proveedorId?: string;
+
   cuit: string;
+
   razonSocial: string;
   nombreFantasia?: string;
 
@@ -38,20 +44,36 @@ type ProveedorFormInputs = {
   fechaVtoCAI?: string; // input type="date"
   inscriptoGanancias?: boolean;
 
-  // notas?: string; // eliminado
+  sucursalId: string; // ObjectId
 };
 
-// Payload hacia la API: fechaVtoCAI se manda como Date (o undefined)
 type ProveedorApiPayload = Omit<ProveedorFormInputs, "fechaVtoCAI"> & {
   fechaVtoCAI?: Date;
 };
 
+function onlyDigits(value: string) {
+  return (value ?? "").replace(/\D/g, "");
+}
+
 export function AddProveedorDialog() {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
+  const { data: session } = useSession();
+
+  // SUCURSALES
+  const {
+    data: sucursales = [],
+    isLoading: sucursalesLoading,
+    isError: sucursalesError,
+  } = useSucursales();
+
+  const opcionesDeSucursal = useMemo(() => {
+    return sucursales.map((s) => ({ value: s._id, label: s.nombre }));
+  }, [sucursales]);
 
   const form = useForm<ProveedorFormInputs>({
     defaultValues: {
+      proveedorId: "",
       cuit: "",
       razonSocial: "",
       nombreFantasia: "",
@@ -65,14 +87,43 @@ export function AddProveedorDialog() {
       categoriaIVA: "",
       fechaVtoCAI: "",
       inscriptoGanancias: false,
+      sucursalId: "",
     },
   });
 
+  // Al abrir: setear sucursalId desde usuario (ID)
+  useEffect(() => {
+    if (!open) return;
+
+    const current = (form.getValues("sucursalId") ?? "").trim();
+    if (current) return;
+
+    const sucursalUsuarioId = (session?.user as any)?.sucursal as
+      | string
+      | undefined;
+
+    if (sucursalUsuarioId?.trim()) {
+      form.setValue("sucursalId", sucursalUsuarioId, { shouldValidate: true });
+      return;
+    }
+
+    // fallback si no hay en session
+    if (opcionesDeSucursal.length) {
+      form.setValue("sucursalId", opcionesDeSucursal[0].value, {
+        shouldValidate: true,
+      });
+    }
+  }, [open, session, opcionesDeSucursal, form]);
+
+  // CREAR PROVEEDOR (sin lookup por CUIT)
   const mutation = useMutation({
     mutationFn: async (payload: ProveedorFormInputs) => {
       const body: ProveedorApiPayload = {
         ...payload,
-        fechaVtoCAI: payload.fechaVtoCAI ? new Date(payload.fechaVtoCAI) : undefined,
+        cuit: onlyDigits(payload.cuit), // normaliza
+        fechaVtoCAI: payload.fechaVtoCAI
+          ? new Date(payload.fechaVtoCAI)
+          : undefined,
       };
       return axios.post("/api/proveedores", body);
     },
@@ -84,12 +135,29 @@ export function AddProveedorDialog() {
     },
     onError: () => {
       toast.error("Error al crear el proveedor", {
-        description: "No se pudo guardar el proveedor. Por favor, intenta de nuevo.",
+        description:
+          "No se pudo guardar el proveedor. Por favor, intenta de nuevo.",
       });
     },
   });
 
-  const onSubmit: SubmitHandler<ProveedorFormInputs> = (data) => mutation.mutate(data);
+  const onSubmit: SubmitHandler<ProveedorFormInputs> = (data) => {
+    if (!data.sucursalId?.trim()) {
+      toast.error("Sucursal requerida", {
+        description: "Seleccioná una sucursal antes de guardar.",
+      });
+      return;
+    }
+    if (onlyDigits(data.cuit).length !== 11) {
+      toast.error("CUIT inválido", {
+        description: "El CUIT debe tener 11 dígitos.",
+      });
+      return;
+    }
+    mutation.mutate(data);
+  };
+
+  const bloquearSucursal = sucursalesLoading || sucursalesError;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -101,7 +169,8 @@ export function AddProveedorDialog() {
         <DialogHeader>
           <DialogTitle>Crear Proveedor</DialogTitle>
           <DialogDescription>
-            Completa los datos fiscales y de contacto para registrar un nuevo proveedor.
+            Completa los datos fiscales y de contacto para registrar un nuevo
+            proveedor.
           </DialogDescription>
         </DialogHeader>
 
@@ -111,17 +180,43 @@ export function AddProveedorDialog() {
               Datos Identificatorios
             </h3>
 
+            {/* SUCURSAL */}
+            <div className="space-y-2">
+              <Label>Sucursal *</Label>
+              <div className={bloquearSucursal ? "pointer-events-none opacity-60" : ""}>
+                <Controller
+                  name="sucursalId"
+                  control={form.control}
+                  rules={{ required: true }}
+                  render={({ field }) => (
+                    <Combobox
+                      options={opcionesDeSucursal}
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder={
+                        sucursalesLoading
+                          ? "Cargando sucursales..."
+                          : sucursalesError
+                          ? "Error cargando sucursales"
+                          : "Selecciona una sucursal..."
+                      }
+                    />
+                  )}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>ID de proveedor (opcional)</Label>
+              <Input {...form.register("proveedorId")} placeholder="ID interno" />
+            </div>
+
             <div className="space-y-2">
               <Label>CUIT *</Label>
               <Input
                 {...form.register("cuit", { required: true })}
                 placeholder="20-XXXXXXXX-X"
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label>ID de proveedor (opcional)</Label>
-              <Input {...form.register("proveedorId")} placeholder="ID interno" />
             </div>
 
             <div className="space-y-2 md:col-span-2">
@@ -182,7 +277,10 @@ export function AddProveedorDialog() {
 
             <div className="space-y-2">
               <Label>Categoría IVA</Label>
-              <Input {...form.register("categoriaIVA")} placeholder="Ej: Responsable Inscripto" />
+              <Input
+                {...form.register("categoriaIVA")}
+                placeholder="Ej: Responsable Inscripto"
+              />
             </div>
 
             <div className="space-y-2">
