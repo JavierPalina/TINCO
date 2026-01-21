@@ -21,12 +21,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 
+import { AddPrioridadDialog } from "@/components/prioridades/AddPrioridadDialog";
+import { usePrioridades } from "@/features/prioridades/prioridades.queries";
+
 type FormInputs = {
   nombreCompleto: string;
   email?: string;
   telefono: string;
 
-  prioridad: "Alta" | "Media" | "Baja";
+  // PRIORIDAD COMO STRING (vacío al iniciar)
+  prioridad: string;
+
   origenContacto?: string;
   direccion?: string;
   ciudad?: string;
@@ -34,49 +39,69 @@ type FormInputs = {
   dni?: string;
 };
 
-const defaultPrioridades = ["Alta", "Media", "Baja"];
-
-export function AddClientDialog({
-  prioridadesOptions,
-}: {
-  prioridadesOptions: string[];
-}) {
+export function AddClientDialog() {
   const [open, setOpen] = useState(false);
   const { data: session } = useSession();
   const queryClient = useQueryClient();
 
-  const { register, handleSubmit, reset, control } = useForm<FormInputs>({
-    defaultValues: {
-      prioridad: "Media",
-    },
-  });
+  const {
+    data: prioridades = [],
+    isLoading: prioridadesLoading,
+    isError: prioridadesError,
+  } = usePrioridades();
 
   const opcionesDePrioridad = useMemo(() => {
-    const combined = [...new Set([...defaultPrioridades, ...prioridadesOptions])];
-    return combined.map((p) => ({ value: p, label: p }));
-  }, [prioridadesOptions]);
+    // Si querés siempre incluir Alta/Media/Baja aunque no estén en DB:
+    const defaults = ["Alta", "Media", "Baja"];
+    const nombresDb = prioridades.map((p) => p.nombre).filter(Boolean);
+
+    const combined = Array.from(new Set([...defaults, ...nombresDb]));
+    return combined.map((n) => ({ value: n, label: n }));
+  }, [prioridades]);
+
+  const { register, handleSubmit, reset, control, setValue } =
+    useForm<FormInputs>({
+      defaultValues: {
+        prioridad: "", // <- ARRANCA VACÍO
+      },
+    });
 
   const mutation = useMutation({
     mutationFn: (newClient: FormInputs & { vendedorAsignado: string }) => {
       return axios.post("/api/clientes", newClient);
     },
     onSuccess: (res) => {
-      toast.success(`Cliente "${res.data.data.nombreCompleto}" creado con éxito.`);
+      toast.success(
+        `Cliente "${res.data.data.nombreCompleto}" creado con éxito.`
+      );
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
-      reset({ prioridad: "Media" });
+
+      // Reset dejando prioridad VACÍA
+      reset({ prioridad: "" });
       setOpen(false);
     },
     onError: () => {
       toast.error("Error al crear el cliente", {
-        description: "No se pudo guardar el cliente. Por favor, intenta de nuevo.",
+        description:
+          "No se pudo guardar el cliente. Por favor, intenta de nuevo.",
       });
     },
   });
 
   const onSubmit: SubmitHandler<FormInputs> = (data) => {
     if (!session?.user?.id) return alert("You must be logged in.");
+
+    if (!data.prioridad?.trim()) {
+      toast.error("Prioridad requerida", {
+        description: "Seleccioná una prioridad antes de guardar.",
+      });
+      return;
+    }
+
     mutation.mutate({ ...data, vendedorAsignado: session.user.id });
   };
+
+  const bloquearPrioridad = prioridadesLoading || prioridadesError;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -133,21 +158,42 @@ export function AddClientDialog({
               <Input {...register("pais")} />
             </div>
 
-            <div className="space-y-2">
+            {/* Prioridad ocupa 2 columnas para que no se corte */}
+            <div className="space-y-2 md:col-span-2">
               <Label>Prioridad *</Label>
-              <Controller
-                name="prioridad"
-                control={control}
-                rules={{ required: "La prioridad es obligatoria" }}
-                render={({ field }) => (
-                  <Combobox
-                    options={opcionesDePrioridad}
-                    value={field.value}
-                    onChange={field.onChange}
-                    placeholder="Selecciona o crea una prioridad..."
+
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <div className={bloquearPrioridad ? "pointer-events-none opacity-60 flex-1 min-w-0" : "flex-1 min-w-0"}>
+                  <Controller
+                    name="prioridad"
+                    control={control}
+                    rules={{ required: "La prioridad es obligatoria" }}
+                    render={({ field }) => (
+                      <Combobox
+                        options={opcionesDePrioridad}
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder={
+                          prioridadesLoading
+                            ? "Cargando prioridades..."
+                            : prioridadesError
+                            ? "Error cargando prioridades"
+                            : "Selecciona una prioridad..."
+                        }
+                      />
+                    )}
                   />
-                )}
-              />
+                </div>
+
+                <div className={bloquearPrioridad ? "pointer-events-none opacity-60" : ""}>
+                  <AddPrioridadDialog
+                    onCreated={(p) => {
+                      // Al crear, selecciona esa prioridad (string)
+                      setValue("prioridad", p.nombre, { shouldValidate: true });
+                    }}
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="space-y-2 md:col-span-2">

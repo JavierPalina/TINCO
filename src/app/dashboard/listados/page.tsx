@@ -768,7 +768,7 @@ export default function ListadosPage() {
           {listType === "clientes" && (
             <>
               <ImportClientsDialog />
-              <AddClientDialog prioridadesOptions={prioridadesNormalizadas} />
+              <AddClientDialog />
             </>
           )}
 
@@ -779,7 +779,7 @@ export default function ListadosPage() {
         {/* Mobile actions */}
         <div className="flex md:hidden items-center gap-2 flex-wrap pb-4">
           {listType === "clientes" && (
-            <AddClientDialog prioridadesOptions={prioridadesNormalizadas} />
+            <AddClientDialog />
           )}
         </div>
       </div>
