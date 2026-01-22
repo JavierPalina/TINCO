@@ -105,6 +105,7 @@ export async function GET(request: NextRequest) {
       name: '$vendedorInfo.name',
     },
     createdAt: 1,
+    updatedAt: 1,
   }
 }
     ];

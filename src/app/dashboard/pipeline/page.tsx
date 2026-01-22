@@ -81,6 +81,8 @@ import { IFormField } from "@/types/IFormField";
 import { CreateStageDialog } from "@/components/cotizaciones/CreateStageDialog";
 import Link from "next/link";
 import axios, { AxiosError } from "axios";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { QuoteDetailsSheet } from "@/components/cotizaciones/QuoteDetailsSheet";
 
 interface Etapa {
   _id: string;
@@ -112,8 +114,11 @@ interface Cotizacion {
     _id: string;
     nombreCompleto: string;
     prioridad: "Alta" | "Media" | "Baja";
+    telefono?: string;
   };
   vendedor: { name: string };
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 type Columns = Record<string, Cotizacion[]>;
@@ -136,6 +141,9 @@ interface PipelineViewProps {
   activeQuote: Cotizacion | null;
   stageColors: StageColorMap;
   isFetching: boolean;
+  collapsedStages: Record<string, boolean>;
+  onToggleCollapse: (stageId: string) => void;
+  onOpenDetails: (quoteId: string) => void;
 }
 
 /** Overlay bloqueante para movimientos */
@@ -178,11 +186,13 @@ function QuoteCard({
   onDelete,
   onUndo,
   stageColors,
+  onOpenDetails,
 }: {
   quote: Cotizacion;
   onDelete: (quoteId: string) => void;
   onUndo: (quoteId: string) => void;
   stageColors: StageColorMap;
+  onOpenDetails: (quoteId: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({
@@ -205,18 +215,54 @@ function QuoteCard({
   };
 
   const handleEmail = () => {
-    if (quote.cliente?.nombreCompleto) {
-      window.location.href = `mailto:?subject=Cotización ${quote.codigo}&body=Hola ${quote.cliente.nombreCompleto}, ...`;
-    }
-  };
+  const subject = encodeURIComponent(`Cotización ${quote.codigo}`);
+  const body = encodeURIComponent(
+    `Hola ${quote.cliente?.nombreCompleto || ""},\n\nTe escribo por la cotización ${quote.codigo}.\n\nSaludos.`
+  );
 
-  const handleWhatsApp = () => {
-    const phone = "5491111111111";
-    const message = encodeURIComponent(
-      `Hola ${quote.cliente?.nombreCompleto}, te escribo por la cotización ${quote.codigo}`
-    );
-    window.open(`https://wa.me/${phone}?text=${message}`, "_blank");
-  };
+  // Si algún día agregás email real del cliente, lo ponés antes del ?
+  const mailto = `mailto:?subject=${subject}&body=${body}`;
+  window.location.assign(mailto);
+};
+
+function normalizePhoneForWA(raw?: string) {
+  if (!raw) return "";
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+
+  // Heurística Argentina:
+  // Si ya empieza con 54 -> ok
+  // Si empieza con 0... o 11..., anteponemos 54
+  if (digits.startsWith("54")) return digits;
+
+  // Si viene "011..." o "0..."
+  const cleaned = digits.replace(/^0+/, "");
+  if (cleaned.startsWith("54")) return cleaned;
+
+  return `54${cleaned}`;
+}
+
+const handleWhatsApp = () => {
+  const waPhone =
+    normalizePhoneForWA(quote.cliente?.telefono) || "5491111111111";
+
+  const text = encodeURIComponent(
+    `Hola ${quote.cliente?.nombreCompleto || ""}, te escribo por la cotización ${quote.codigo}`
+  );
+
+  const url = `https://wa.me/${waPhone}?text=${text}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+};
+
+  const createdAt = quote.createdAt ? new Date(quote.createdAt) : null;
+  const lastMove = quote.historialEtapas?.length
+    ? new Date(quote.historialEtapas[quote.historialEtapas.length - 1].fecha)
+    : quote.updatedAt
+      ? new Date(quote.updatedAt)
+      : null;
+
+  const fmt = (d: Date | null) =>
+    d ? d.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "—";
 
   return (
     <>
@@ -228,9 +274,9 @@ function QuoteCard({
       />
 
       <div ref={setNodeRef} style={style}>
-        <Card className="mb-2 shadow-sm hover:shadow-md transition-shadow duration-200">
+        <Card className="mb-2 shadow-sm hover:shadow-md transition-shadow duration-200 p-0" onDoubleClick={() => onOpenDetails(quote._id)}>
           <CardContent className="p-3">
-            {quote?.historialEtapas && quote.historialEtapas.length > 0 && (
+            {/* {quote?.historialEtapas && quote.historialEtapas.length > 0 && (
               <div className="flex gap-1 mb-2">
                 {quote.historialEtapas.map((h, i) => (
                   <div
@@ -245,22 +291,22 @@ function QuoteCard({
                   />
                 ))}
               </div>
-            )}
+            )} */}
 
             <div className="flex justify-between items-start gap-2">
               <div className="min-w-0">
-                <p className="text-sm font-bold truncate">
-                  {quote.codigo}
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      "mt-1 text-xs ml-1 align-middle",
-                      prioridadStyles[quote.cliente.prioridad] || ""
-                    )}
-                  >
-                    {quote.cliente.prioridad}
-                  </Badge>
-                </p>
+                <div className="flex justify-between items-start gap-2">
+                  {/* IZQUIERDA */}
+                  <div className="min-w-0 flex-1">
+                    <Link href={`/dashboard/listados/${quote.cliente._id}`}>
+                      <div className="text-sm font-semibold hover:underline hover:text-primary transition-colors truncate">
+                        {quote.cliente.nombreCompleto} - {quote.codigo}
+                      </div>
+                    </Link>
+                  </div>
+
+                  {/* DERECHA */}
+                </div>
               </div>
 
               <div className="flex items-center gap-1 flex-shrink-0">
@@ -303,15 +349,25 @@ function QuoteCard({
               </div>
             </div>
 
-            <div className="mt-2">
-              <Link href={`/dashboard/listados/${quote.cliente._id}`}>
-                <p className="text-sm font-semibold hover:underline hover:text-primary transition-colors truncate">
-                  {quote.cliente.nombreCompleto}
-                </p>
-              </Link>
+            <div className="mt-2 space-y-2">
               <p className="text-xs text-muted-foreground italic line-clamp-2">
                 &quot;{quote.detalle || "Sin detalle"}&quot;
               </p>
+
+              <div className="grid grid-cols-1 gap-1 text-[11px] text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <span>Creada:</span>
+                  <span className="font-medium">{fmt(createdAt)}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span>Vendedor:</span>
+                  <span className="font-medium">{quote.vendedor?.name || "—"}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span>Último movimiento:</span>
+                  <span className="font-medium">{fmt(lastMove)}</span>
+                </div>
+              </div>
             </div>
 
             <div className="flex items-center justify-between border-t pt-2 mt-3 gap-2">
@@ -395,6 +451,10 @@ function QuoteColumn({
   onUndo,
   onDeleteStage,
   highlight = false,
+
+  collapsed = false,
+  onToggleCollapse,
+  onOpenDetails,
 }: {
   id: string;
   etapa: Etapa;
@@ -405,6 +465,10 @@ function QuoteColumn({
   isFetching: boolean;
   onDeleteStage: (etapa: Etapa) => void;
   highlight?: boolean;
+
+  collapsed?: boolean;
+  onToggleCollapse: () => void;
+  onOpenDetails: (quoteId: string) => void;
 }) {
   const quoteIds = useMemo(() => quotes.map((q) => q._id), [quotes]);
   const totalAmount = useMemo(
@@ -418,104 +482,171 @@ function QuoteColumn({
     <div
       ref={setNodeRef}
       className={cn(
-        "w-80 h-full flex flex-col flex-shrink-0 rounded-lg bg-card shadow-sm transition-colors duration-300 border",
+        // IMPORTANTE: width dinámica
+        collapsed ? "w-12" : "w-80",
+        "h-full flex flex-col flex-shrink-0 rounded-lg bg-card shadow-sm transition-all duration-200 border",
         isOver && "bg-primary/10",
         highlight &&
           "border-emerald-500 ring-2 ring-emerald-500/25 bg-emerald-500/10",
         isOver && highlight && "bg-emerald-500/15"
       )}
     >
-      <div className="p-3 pb-1 sticky top-0 bg-card/80 backdrop-blur-sm z-10 rounded-t-lg">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2 min-w-0">
+      {/* HEADER */}
+      <div
+        className={cn(
+          "p-3 pb-1 sticky top-0 bg-card/80 backdrop-blur-sm z-10 rounded-t-lg",
+          collapsed && "p-2"
+        )}
+      >
+        {/* Layout colapsado */}
+        {collapsed ? (
+          <div className="flex flex-col items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={onToggleCollapse}
+              title="Expandir"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+
             <div
-              className="w-2.5 h-2.5 rounded-full"
-              style={{ backgroundColor: stageColors[etapa._id] || etapa.color }}
-            />
-            <h2 className="font-semibold text-base truncate">{etapa.nombre}</h2>
-          </div>
+              className={cn(
+                "flex items-center gap-2 select-none",
+                // texto vertical estilo HubSpot
+                "[writing-mode:vertical-rl] [text-orientation:mixed] rotate-180"
+              )}
+              title={etapa.nombre}
+            >
+              <div
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ backgroundColor: stageColors[etapa._id] || etapa.color }}
+              />
+              <span className="font-semibold text-sm leading-none">
+                {etapa.nombre}
+              </span>
+            </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-muted-foreground bg-secondary rounded-full px-2 py-0.5">
-              {quotes.length} Leads
+            <span className="text-[11px] font-semibold text-muted-foreground bg-secondary rounded-full px-2 py-0.5">
+              {quotes.length}
             </span>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  className="text-red-600 focus:text-red-600"
-                  onSelect={() => {
-                    if (quotes.length > 0) {
-                      toast.error(
-                        "No podés eliminar esta etapa porque tiene leads. Movelos a otra etapa antes de eliminar."
-                      );
-                      return;
-                    }
-                    onDeleteStage(etapa);
-                  }}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" /> Eliminar etapa
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1 text-base font-bold">
-          <DollarSign className="h-4 w-4" />
-          <span>{totalAmount.toLocaleString("es-AR")}</span>
-        </div>
-      </div>
-
-      <div className="flex-grow overflow-y-auto p-2">
-        {isFetching ? (
-          <div className="space-y-2">
-            <QuoteCardSkeleton />
-            <QuoteCardSkeleton />
-            <QuoteCardSkeleton />
           </div>
         ) : (
+          /* Layout expandido (tu header actual + botón colapsar) */
           <>
-            <SortableContext items={quoteIds}>
-              {quotes.map((quote) => (
-                <QuoteCard
-                  key={quote._id}
-                  quote={quote}
-                  onDelete={onDelete}
-                  onUndo={onUndo}
-                  stageColors={stageColors}
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2 min-w-0">
+                <div
+                  className="w-2.5 h-2.5 rounded-full"
+                  style={{ backgroundColor: stageColors[etapa._id] || etapa.color }}
                 />
-              ))}
-            </SortableContext>
-
-            {quotes.length === 0 && (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-center text-sm text-muted-foreground p-4 italic">
-                  Arrastrá una cotización aquí
-                </p>
+                <h2 className="font-semibold text-base truncate">{etapa.nombre}</h2>
               </div>
-            )}
+
+              <div className="flex items-center gap-2">
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={onToggleCollapse}
+                  title="Minimizar"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      className="text-red-600 focus:text-red-600"
+                      onSelect={() => {
+                        if (quotes.length > 0) {
+                          toast.error(
+                            "No podés eliminar esta etapa porque tiene leads. Movelos a otra etapa antes de eliminar."
+                          );
+                          return;
+                        }
+                        onDeleteStage(etapa);
+                      }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" /> Eliminar etapa
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 text-base font-bold">
+              <DollarSign className="h-4 w-4" />
+              <span>{totalAmount.toLocaleString("es-AR")}</span>
+
+              <span className="text-xs font-semibold text-muted-foreground bg-secondary rounded-full px-2 py-0.5">
+                {quotes.length} Leads
+              </span>
+            </div>
+      
           </>
         )}
       </div>
 
-      <div className="border-t px-3 py-2 bg-muted/40 text-[11px] flex flex-col gap-1 rounded-b-lg">
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Leads</span>
-          <span className="font-semibold">{quotes.length}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Total</span>
-          <span className="font-semibold">
-            ${totalAmount.toLocaleString("es-AR")}
-          </span>
-        </div>
-      </div>
+      {/* BODY + FOOTER: solo si NO está colapsada */}
+      {!collapsed && (
+        <>
+          <div className="flex-grow overflow-y-auto p-2">
+            {isFetching ? (
+              <div className="space-y-2">
+                <QuoteCardSkeleton />
+                <QuoteCardSkeleton />
+                <QuoteCardSkeleton />
+              </div>
+            ) : (
+              <>
+                <SortableContext items={quoteIds}>
+                  {quotes.map((quote) => (
+                    <QuoteCard
+                      key={quote._id}
+                      quote={quote}
+                      onDelete={onDelete}
+                      onUndo={onUndo}
+                      stageColors={stageColors}
+                      onOpenDetails={onOpenDetails}
+                    />
+                  ))}
+                </SortableContext>
+
+                {quotes.length === 0 && (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-center text-sm text-muted-foreground p-4 italic">
+                      Arrastrá una cotización aquí
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          <div className="border-t px-3 py-2 bg-muted/40 text-[11px] flex flex-col gap-1 rounded-b-lg">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Leads</span>
+              <span className="font-semibold">{quotes.length}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Total</span>
+              <span className="font-semibold">
+                ${totalAmount.toLocaleString("es-AR")}
+              </span>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -608,7 +739,11 @@ function PipelineView({
   activeQuote,
   stageColors,
   isFetching,
+  collapsedStages,
+  onToggleCollapse,
+  onOpenDetails,
 }: PipelineViewProps) {
+
   return (
     <>
       <div className="hidden md:flex" style={{ height: "calc(100vh - 206px)" }}>
@@ -636,6 +771,9 @@ function PipelineView({
                     etapa.nombre === "Proyectos no realizados" ||
                     etapa.nombre === "Proyecto Finalizado"
                   }
+                  collapsed={!!collapsedStages[etapa._id]}
+                  onToggleCollapse={() => onToggleCollapse(etapa._id)}
+                  onOpenDetails={onOpenDetails}
                 />
               ))}
             </SortableContext>
@@ -647,10 +785,12 @@ function PipelineView({
                 {activeQuote ? (
                   <div className="w-80 scale-105 opacity-95 shadow-2xl">
                     <QuoteCard
+                      key={activeQuote._id}
                       quote={activeQuote}
-                      onDelete={() => {}}
-                      stageColors={stageColors}
+                      onDelete={onDelete}
                       onUndo={onUndo}
+                      stageColors={stageColors}
+                      onOpenDetails={onOpenDetails}
                     />
                   </div>
                 ) : null}
@@ -672,20 +812,24 @@ function PipelineView({
               {etapas?.map((etapa: Etapa) => (
                 <div key={etapa._id} className="snap-start w-[92vw] max-w-[420px] flex-shrink-0">
                   <QuoteColumn
-                    id={etapa._id}
-                    etapa={etapa}
-                    quotes={columns[etapa._id] || []}
-                    onDelete={onDelete}
-                    onUndo={onUndo}
-                    onDeleteStage={onDeleteStage}
-                    stageColors={stageColors}
-                    isFetching={isFetching}
-                    highlight={
-                      etapa.nombre === "Proyecto por Iniciar" ||
-                      etapa.nombre === "Proyectos no realizados" ||
-                      etapa.nombre === "Proyecto Finalizado"
-                    }
-                  />
+  key={etapa._id}
+  id={etapa._id}
+  etapa={etapa}
+  quotes={columns[etapa._id] || []}
+  onDelete={onDelete}
+  onUndo={onUndo}
+  onDeleteStage={onDeleteStage}
+  stageColors={stageColors}
+  isFetching={isFetching}
+  highlight={
+    etapa.nombre === "Proyecto por Iniciar" ||
+    etapa.nombre === "Proyectos no realizados" ||
+    etapa.nombre === "Proyecto Finalizado"
+  }
+  collapsed={!!collapsedStages[etapa._id]}
+  onToggleCollapse={() => onToggleCollapse(etapa._id)}
+  onOpenDetails={onOpenDetails}
+/>
                 </div>
               ))}
             </SortableContext>
@@ -697,10 +841,12 @@ function PipelineView({
                 {activeQuote ? (
                   <div className="w-[92vw] max-w-[420px] scale-105 opacity-95 shadow-2xl">
                     <QuoteCard
+                      key={activeQuote._id}
                       quote={activeQuote}
-                      onDelete={() => {}}
-                      stageColors={stageColors}
+                      onDelete={onDelete}
                       onUndo={onUndo}
+                      stageColors={stageColors}
+                      onOpenDetails={onOpenDetails}
                     />
                   </div>
                 ) : null}
@@ -728,6 +874,8 @@ export default function PipelinePage() {
   const [formFieldsForStage, setFormFieldsForStage] = useState<IFormField[]>([]);
   const [quoteToMove, setQuoteToMove] = useState<Cotizacion | null>(null);
   const [newStageId, setNewStageId] = useState<string | null>(null);
+  const [isQuoteSidebarOpen, setIsQuoteSidebarOpen] = useState(false);
+  const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
 
   // NUEVO: datos iniciales para precargar (precio anterior, etc.)
   const [initialFormData, setInitialFormData] = useState<IFormularioData>({});
@@ -743,6 +891,30 @@ export default function PipelinePage() {
 
   const [isMoveBlocking, setIsMoveBlocking] = useState(false);
   const [moveBlockingLabel, setMoveBlockingLabel] = useState<string>("");
+
+  const [collapsedStages, setCollapsedStages] = useState<Record<string, boolean>>(
+    {}
+  );
+
+  const toggleStageCollapse = (stageId: string) => {
+    setCollapsedStages((prev) => ({ ...prev, [stageId]: !prev[stageId] }));
+  };
+
+  const collapseAll = () => {
+    if (!etapas) return;
+    const next: Record<string, boolean> = {};
+    etapas.forEach((e) => (next[e._id] = true));
+    setCollapsedStages(next);
+  };
+
+  const expandAll = () => {
+    setCollapsedStages({});
+  };
+
+  const openQuoteSidebar = (quoteId: string) => {
+    setSelectedQuoteId(quoteId);
+    setIsQuoteSidebarOpen(true);
+  };
 
   const [filters, setFilters] = useState<Filters>(() => {
     if (typeof window === "undefined")
@@ -1093,6 +1265,11 @@ export default function PipelinePage() {
 
   return (
     <div className="flex flex-col bg-muted/20">
+      <QuoteDetailsSheet
+        open={isQuoteSidebarOpen}
+        onOpenChange={setIsQuoteSidebarOpen}
+        quoteId={selectedQuoteId}
+      />
       <BlockingMoveOverlay show={isMoveBlocking} label={moveBlockingLabel} />
 
       <div className="p-4 border-b flex flex-col gap-4">
@@ -1202,6 +1379,15 @@ export default function PipelinePage() {
           <QuotesPipelineFilters filters={filters} setFilters={setFilters} />
         </div>
 
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" onClick={collapseAll}>
+            Colapsar todo
+          </Button>
+          <Button type="button" variant="outline" onClick={expandAll}>
+            Expandir todo
+          </Button>
+        </div>
+
         <ToggleGroup
           type="single"
           value={viewMode}
@@ -1282,6 +1468,10 @@ export default function PipelinePage() {
             activeQuote={activeQuote}
             stageColors={stageColors}
             isFetching={isFetching || isLoadingQuotes}
+
+            collapsedStages={collapsedStages}
+            onToggleCollapse={toggleStageCollapse}
+            onOpenDetails={openQuoteSidebar}
           />
         ) : (
           <QuotesTableView

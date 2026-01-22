@@ -15,8 +15,10 @@ export async function GET(
   await dbConnect();
   try {
     const cotizacion = await Cotizacion.findById(id)
-      .populate('cliente', 'nombreCompleto email telefono')
-      .populate('vendedor', 'name email');
+      .populate('cliente')
+      .populate('vendedor', 'name email')
+      .populate("etapa", "nombre color")
+      .populate("historialEtapas.etapa", "nombre color");
 
     if (!cotizacion) {
       return NextResponse.json({ success: false, error: 'Cotización no encontrada' }, { status: 404 });
