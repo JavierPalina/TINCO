@@ -400,14 +400,16 @@ export function QuoteDetailsSheet({
                     {history
                       .slice()
                       .reverse()
-                      .map((h: any, idx: number) => {
-                        const df = h?.datosFormulario || {};
-                        const entries = Object.entries(df).filter(
-                          ([k]) => k !== "__precioAnterior" && k !== "__precioNuevo"
-                        );
+                      .map((h: unknown, idx: number) => {
+  const item = h as {
+    fecha?: string;
+    etapa?: { nombre?: string };
+    datosFormulario?: Record<string, unknown>;
+  };
 
-                        const title = h?.etapa?.nombre || "Etapa";
-                        const when = fmtDate(h?.fecha);
+                        const title = item?.etapa?.nombre || "Etapa";
+                        const when = fmtDate(item?.fecha);
+                        const entries = Object.entries(item?.datosFormulario ?? {});
 
                         return (
                           <AccordionItem key={`${title}-${idx}`} value={`${idx}`}>
