@@ -83,6 +83,23 @@ import Link from "next/link";
 import axios, { AxiosError } from "axios";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { QuoteDetailsSheet } from "@/components/cotizaciones/QuoteDetailsSheet";
+import { QuoteDetailsDialog } from "@/components/cotizaciones/QuoteDetailsDialog";
+
+const GREEN_STAGE_NAMES = new Set([
+  "Proyecto por Iniciar",
+  "Proyectos no realizados",
+  "Proyecto Finalizado",
+]);
+
+function sortStagesGreenLast(etapas: Etapa[]) {
+  const normal: Etapa[] = [];
+  const green: Etapa[] = [];
+  for (const e of etapas) {
+    if (GREEN_STAGE_NAMES.has(e.nombre)) green.push(e);
+    else normal.push(e);
+  }
+  return [...normal, ...green];
+}
 
 interface Etapa {
   _id: string;
@@ -476,6 +493,8 @@ function QuoteColumn({
     [quotes]
   );
 
+  const isGreenLocked = GREEN_STAGE_NAMES.has(etapa.nombre);
+
   const { setNodeRef, isOver } = useSortable({ id, data: { type: "Column" } });
 
   return (
@@ -567,11 +586,14 @@ function QuoteColumn({
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
                       className="text-red-600 focus:text-red-600"
+                      disabled={isGreenLocked}
                       onSelect={() => {
+                        if (isGreenLocked) {
+                          toast.error("Esta etapa no se puede eliminar.");
+                          return;
+                        }
                         if (quotes.length > 0) {
-                          toast.error(
-                            "No podés eliminar esta etapa porque tiene leads. Movelos a otra etapa antes de eliminar."
-                          );
+                          toast.error("No podés eliminar esta etapa porque tiene leads. Movelos a otra etapa antes de eliminar.");
                           return;
                         }
                         onDeleteStage(etapa);
@@ -585,9 +607,6 @@ function QuoteColumn({
             </div>
 
             <div className="flex items-center gap-1 text-base font-bold">
-              <DollarSign className="h-4 w-4" />
-              <span>{totalAmount.toLocaleString("es-AR")}</span>
-
               <span className="text-xs font-semibold text-muted-foreground bg-secondary rounded-full px-2 py-0.5">
                 {quotes.length} Leads
               </span>
@@ -655,30 +674,38 @@ function QuotesTableView({
   quotes,
   onDelete,
   stageColors,
+  onOpenDetails,
 }: {
   quotes: Cotizacion[];
   onDelete: (quoteId: string) => void;
   stageColors: StageColorMap;
+  onOpenDetails: (quoteId: string) => void;
 }) {
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Código</TableHead>
             <TableHead>Cliente</TableHead>
+            <TableHead>Código</TableHead>
             <TableHead>Etapa</TableHead>
-            <TableHead className="text-right">Monto</TableHead>
             <TableHead>Vendedor</TableHead>
+            <TableHead className="text-right">Monto</TableHead>
             <TableHead className="text-center">Acciones</TableHead>
           </TableRow>
         </TableHeader>
+
         <TableBody>
           {quotes.length > 0 ? (
             quotes.map((quote) => (
-              <TableRow key={quote._id}>
-                <TableCell className="font-medium">{quote.codigo}</TableCell>
-                <TableCell>{quote.cliente.nombreCompleto}</TableCell>
+              <TableRow
+                key={quote._id}
+                className="cursor-pointer"
+                onClick={() => onOpenDetails(quote._id)}
+              >
+                <TableCell className="font-medium">{quote.cliente.nombreCompleto}</TableCell>
+                <TableCell className="text-muted-foreground">{quote.codigo}</TableCell>
+
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <div
@@ -688,20 +715,29 @@ function QuotesTableView({
                           stageColors[quote.etapa._id] || quote.etapa.color,
                       }}
                     />
-                    {quote.etapa.nombre}
+                    <span>{quote.etapa.nombre}</span>
                   </div>
                 </TableCell>
+
+                <TableCell className="text-muted-foreground">
+                  {quote.vendedor?.name || "—"}
+                </TableCell>
+
                 <TableCell className="text-right font-semibold">
                   ${quote.montoTotal.toLocaleString("es-AR")}
                 </TableCell>
-                <TableCell>{quote.vendedor.name}</TableCell>
-                <TableCell className="text-center">
+
+                <TableCell
+                  className="text-center"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-8 w-8">
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
+
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
                         className="text-red-600 focus:text-red-600"
@@ -717,7 +753,7 @@ function QuotesTableView({
           ) : (
             <TableRow>
               <TableCell colSpan={6} className="h-24 text-center">
-                No se encontraron cotizaciones con los filtros actuales.
+                No se encontraron negocios con los filtros actuales.
               </TableCell>
             </TableRow>
           )}
@@ -744,6 +780,8 @@ function PipelineView({
   onOpenDetails,
 }: PipelineViewProps) {
 
+  const orderedEtapas = useMemo(() => (etapas ? sortStagesGreenLast(etapas) : []), [etapas]);
+
   return (
     <>
       <div className="hidden md:flex" style={{ height: "calc(100vh - 206px)" }}>
@@ -754,8 +792,8 @@ function PipelineView({
           onDragEnd={onDragEnd}
         >
           <div className="flex gap-4 h-full items-start overflow-x-auto w-full pb-2">
-            <SortableContext items={etapas?.map((e: Etapa) => e._id) || []}>
-              {etapas?.map((etapa: Etapa) => (
+            <SortableContext items={orderedEtapas.map((e) => e._id)}>
+              {orderedEtapas.map((etapa) => (
                 <QuoteColumn
                   key={etapa._id}
                   id={etapa._id}
@@ -880,6 +918,14 @@ export default function PipelinePage() {
   // NUEVO: datos iniciales para precargar (precio anterior, etc.)
   const [initialFormData, setInitialFormData] = useState<IFormularioData>({});
 
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsId, setDetailsId] = useState<string | null>(null);
+
+  const openDetailsDialog = (id: string) => {
+    setDetailsId(id);
+    setDetailsOpen(true);
+  };
+
   const { data: session } = useSession();
   const queryClient = useQueryClient();
 
@@ -926,7 +972,7 @@ export default function PipelinePage() {
       if (parsed.dateRange?.to) parsed.dateRange.to = new Date(parsed.dateRange.to);
       return parsed;
     }
-    return { searchTerm: "", vendedorId: "", dateRange: undefined };
+    return { searchTerm: "", vendedorId: "", sucursalId: "", etapaId: "", dateRange: undefined };
   });
 
   const [debouncedSearchTerm] = useDebounce(filters.searchTerm, 500);
@@ -994,6 +1040,8 @@ export default function PipelinePage() {
       const params = {
         searchTerm: debouncedSearchTerm,
         vendedorId: filters.vendedorId,
+        sucursalId: filters.sucursalId || undefined,
+        etapaId: filters.etapaId || undefined,
         fechaDesde: filters.dateRange?.from?.toISOString(),
         fechaHasta: filters.dateRange?.to?.toISOString(),
       };
@@ -1271,10 +1319,15 @@ export default function PipelinePage() {
         quoteId={selectedQuoteId}
       />
       <BlockingMoveOverlay show={isMoveBlocking} label={moveBlockingLabel} />
+      <QuoteDetailsDialog
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+        quoteId={detailsId}
+      />
 
-      <div className="p-4 border-b flex flex-col gap-4">
+      <div className="p-4 border-b flex flex-col gap-4 bg-background">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h1 className="text-2xl sm:text-3xl font-bold">Pipeline de Cotizaciones</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Negocios</h1>
 
           <div className="flex gap-2 w-full sm:w-auto">
             <CreateStageDialog />
@@ -1374,9 +1427,9 @@ export default function PipelinePage() {
         />
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-center px-4 py-3 gap-3">
+      <div className="flex flex-col md:flex-row md:items-center px-4 py-3 gap-3 bg-muted/30">
         <div className="flex-grow">
-          <QuotesPipelineFilters filters={filters} setFilters={setFilters} />
+          <QuotesPipelineFilters filters={filters} setFilters={setFilters} etapas={etapas || []} />
         </div>
 
         <div className="flex gap-2">
@@ -1478,6 +1531,7 @@ export default function PipelinePage() {
             quotes={cotizaciones || []}
             onDelete={setQuoteToDelete}
             stageColors={stageColors}
+            onOpenDetails={openDetailsDialog}
           />
         )}
       </div>
