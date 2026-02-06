@@ -63,8 +63,8 @@ export default function ChatbotWppIaPage() {
               </Button>
 
               <Button asChild size="lg" variant="outline" className="gap-2">
-                <Link href="/dashboard/pipeline">
-                  Ver Pipeline
+                <Link href="/dashboard/negocios">
+                  Ver Negocios
                 </Link>
               </Button>
             </div>
@@ -261,8 +261,8 @@ export default function ChatbotWppIaPage() {
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button asChild size="lg" className="gap-2">
-                  <Link href="/dashboard/pipeline">
-                    Ver Pipeline <ArrowRight className="h-4 w-4" />
+                  <Link href="/dashboard/negocios">
+                    Ver Negocios <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
 

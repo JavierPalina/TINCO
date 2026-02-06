@@ -3,7 +3,7 @@ import mongoose, { Schema, type Document } from "mongoose";
 import type { UserRole } from "@/lib/roles";
 
 export type SectionKey =
-  | "pipeline"
+  | "negocios"
   | "proyectos"
   | "clientes"
   | "servicios"
@@ -28,7 +28,7 @@ const RoleAccessSchema = new Schema<IRoleAccess>(
     role: { type: String, required: true, unique: true },
 
     sections: {
-      pipeline: { type: Boolean, default: false },
+      negocios: { type: Boolean, default: false },
       proyectos: { type: Boolean, default: false },
       clientes: { type: Boolean, default: false },
       servicios: { type: Boolean, default: false },

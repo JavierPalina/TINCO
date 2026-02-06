@@ -9,7 +9,7 @@ export default async function LoginPage() {
   const session = await getServerSession(authOptions);
 
   if (session) {
-    redirect("/dashboard/pipeline");
+    redirect("/dashboard/negocios");
   }
 
   return <AuthComponent />;

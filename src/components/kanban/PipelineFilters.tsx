@@ -22,7 +22,7 @@ export function PipelineFilters({ filters, onFilterChange, prioridadesUnicas }: 
     <div className="flex items-center gap-4 mb-4 px-4">
       <div className="flex-grow">
         <Input 
-            placeholder="Buscar cliente en el pipeline..."
+            placeholder="Buscar cliente en negocios..."
             value={filters.searchTerm}
             onChange={(e) => onFilterChange('searchTerm', e.target.value)}
         />

@@ -51,7 +51,7 @@ import type { UserRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 type SectionKey =
-  | "pipeline"
+  | "negocios"
   | "proyectos"
   | "clientes"
   | "servicios"
@@ -110,7 +110,7 @@ function emptyRoleAccess(role: UserRole): RoleAccessDoc {
   return {
     role,
     sections: {
-      pipeline: false,
+      negocios: false,
       proyectos: false,
       clientes: false,
       servicios: false,
@@ -160,7 +160,7 @@ export function Header() {
     return Boolean(roleConfig.proyectoStages?.[stage]);
   };
 
-  const showPipeline = canSection("pipeline");
+  const showNegocios = canSection("negocios");
   const showProyectos = canSection("proyectos");
   const showClientes = canSection("clientes");
   const showServicios = canSection("servicios");
@@ -238,8 +238,8 @@ export function Header() {
     ];
   }, []);
 
-  const homeHref = showPipeline
-    ? "/dashboard/pipeline"
+  const homeHref = showNegocios
+    ? "/dashboard/negocios"
     : showProyectos
       ? "/dashboard/proyectos"
       : showClientes
@@ -268,7 +268,7 @@ export function Header() {
           </Link>
 
           <div className="hidden md:flex items-center gap-6">
-            {showPipeline && <NavLink href="/dashboard/pipeline">Pipeline</NavLink>}
+            {showNegocios && <NavLink href="/dashboard/negocios">Negocios</NavLink>}
 
             {showProyectos && (
               <DropdownMenu>
@@ -492,9 +492,9 @@ export function Header() {
               <DropdownMenuContent align="end" className="min-w-[280px]">
                 <DropdownMenuLabel>Menú</DropdownMenuLabel>
 
-                {showPipeline && (
+                {showNegocios && (
                   <DropdownMenuItem asChild>
-                    <Link href="/dashboard/pipeline">Pipeline</Link>
+                    <Link href="/dashboard/negocios">Negocios</Link>
                   </DropdownMenuItem>
                 )}
 

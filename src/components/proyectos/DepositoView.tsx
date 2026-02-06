@@ -159,7 +159,6 @@ export function DepositoView({ proyecto, onDeleted }: DepositoViewProps) {
   );
   const [isMovingEstado, setIsMovingEstado] = useState(false);
 
-  // Etapas de cotización para mover en el pipeline
   const { data: etapasCotizacion, isLoading: isLoadingEtapas } = useQuery<
     EtapaCotizacion[]
   >({

@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { ROLES, type UserRole } from "@/lib/roles";
 
 type SectionKey =
-  | "pipeline"
+  | "negocios"
   | "proyectos"
   | "clientes"
   | "servicios"
@@ -35,7 +35,7 @@ type RoleAccessDoc = {
 type RoleAccessResponse = { ok: boolean; data: RoleAccessDoc[] };
 
 const SECTION_LABELS: Record<SectionKey, string> = {
-  pipeline: "Pipeline",
+  negocios: "Negocios",
   proyectos: "Proyectos",
   clientes: "Listados / Clientes",
   servicios: "Servicios",
@@ -61,7 +61,7 @@ function buildEmptyConfig(role: UserRole): Omit<RoleAccessDoc, "_id"> {
   return {
     role,
     sections: {
-      pipeline: false,
+      negocios: false,
       proyectos: false,
       clientes: false,
       servicios: false,

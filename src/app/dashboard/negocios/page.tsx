@@ -430,7 +430,7 @@ const handleWhatsApp = () => {
                   <span>{quote.montoTotal.toLocaleString("es-AR")}</span>
                 </div>
 
-                {(() => {
+                {/* {(() => {
                   const last = quote.historialEtapas?.[quote.historialEtapas.length - 1];
                   const df = last?.datosFormulario;
                 
@@ -440,7 +440,6 @@ const handleWhatsApp = () => {
                   const next =
                     typeof df?.__precioNuevo === "number" ? df.__precioNuevo : null;
                 
-                  // Solo mostrar si realmente hubo cambio
                   if (prev === null || next === null || prev === next) return null;
                 
                   return (
@@ -448,7 +447,7 @@ const handleWhatsApp = () => {
                       Anterior: ${prev.toLocaleString("es-AR")} → Nuevo: ${next.toLocaleString("es-AR")}
                     </div>
                   );
-                })()}
+                })()} */}
               </div>
             </div>
           </CardContent>

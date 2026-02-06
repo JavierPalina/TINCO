@@ -68,7 +68,7 @@ export async function PUT(req: Request, context: RouteContext) {
     const nextProyectoStages: Record<string, boolean> = {};
 
     const allowedSections: SectionKey[] = [
-      "pipeline",
+      "negocios",
       "proyectos",
       "clientes",
       "servicios",
