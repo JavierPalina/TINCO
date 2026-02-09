@@ -40,7 +40,7 @@ export default function AuthComponent() {
     setIsLoginLoading(false);
 
     if (result?.ok) {
-      router.replace("/dashboard/pipeline"); // replace recomendado
+      router.replace("/dashboard/negocios"); // replace recomendado
       router.refresh();
     } else {
       setError(result?.error || "Credenciales inválidas");
