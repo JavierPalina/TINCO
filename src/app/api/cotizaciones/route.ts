@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const matchFilter: Record<string, unknown> = {};
     const sucursalId = searchParams.get("sucursalId");
     const etapaId = searchParams.get("etapaId");
-      
+
     if (sucursalId) {
       matchFilter.sucursalId = new mongoose.Types.ObjectId(sucursalId);
     }
@@ -150,6 +150,15 @@ export async function GET(request: NextRequest) {
 }
 
 // -------------------- POST --------------------
+type CreateCotizacionBody = {
+  cliente: string;
+  montoTotal?: number | string;
+  etapa?: string;
+  sucursalId: string;
+  tipoAbertura?: string;
+  comoNosConocio?: string;
+};
+
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return new NextResponse("No autorizado", { status: 401 });
@@ -157,17 +166,13 @@ export async function POST(request: NextRequest) {
   await dbConnect();
 
   try {
-    const body = await request.json();
+    const body = (await request.json()) as CreateCotizacionBody;
 
     const {
       cliente: clienteId,
-
-      // NUEVOS:
       montoTotal,
       etapa: etapaDesdeFront,
       sucursalId,
-
-      // existentes:
       tipoAbertura,
       comoNosConocio,
     } = body;
@@ -175,27 +180,29 @@ export async function POST(request: NextRequest) {
     if (!clienteId) throw new Error("cliente es obligatorio");
     if (!sucursalId) throw new Error("sucursalId es obligatorio");
 
-    // Resolver etapa inicial
-    let etapaInicial: any = null;
+    // Resolver etapa inicial (solo necesitamos el ID)
+    let etapaId: mongoose.Types.ObjectId;
 
     if (etapaDesdeFront) {
-      etapaInicial = await EtapaCotizacion.findById(etapaDesdeFront);
-      if (!etapaInicial) throw new Error("La etapa inicial enviada no existe");
+      const etapaDoc = await EtapaCotizacion.findById(etapaDesdeFront).select("_id");
+      if (!etapaDoc) throw new Error("La etapa inicial enviada no existe");
+      etapaId = etapaDoc._id;
     } else {
-      etapaInicial = await EtapaCotizacion.findOne({
-        nombre: new RegExp("^contacto inicial$", "i"),
-      });
-      if (!etapaInicial) etapaInicial = await EtapaCotizacion.findOne().sort({ createdAt: 1 });
-      if (!etapaInicial) throw new Error("No se encontró una etapa inicial. Creá al menos una etapa.");
-    }
+      const etapaDoc =
+        (await EtapaCotizacion.findOne({
+          nombre: new RegExp("^contacto inicial$", "i"),
+        }).select("_id")) ??
+        (await EtapaCotizacion.findOne().sort({ createdAt: 1 }).select("_id"));
 
-    const etapaId = etapaInicial._id;
+      if (!etapaDoc) throw new Error("No se encontró una etapa inicial. Creá al menos una etapa.");
+      etapaId = etapaDoc._id;
+    }
 
     // Código secuencial
     const ultimaCotizacion = await Cotizacion.findOne().sort({ createdAt: -1 });
     let nuevoCodigo = "COT-001";
     if (ultimaCotizacion?.codigo) {
-      const ultimoNumero = parseInt(ultimaCotizacion.codigo.split("-")[1]);
+      const ultimoNumero = parseInt(ultimaCotizacion.codigo.split("-")[1], 10);
       nuevoCodigo = `COT-${(ultimoNumero + 1).toString().padStart(3, "0")}`;
     }
 
@@ -203,7 +210,9 @@ export async function POST(request: NextRequest) {
     const parsedMonto = typeof montoTotal === "number" ? montoTotal : Number(montoTotal ?? 0);
     const safeMonto = Number.isFinite(parsedMonto) ? parsedMonto : 0;
 
-    const detalle = `Tipo de Abertura: ${tipoAbertura || "No especificado"}\n | Cómo nos conoció: ${comoNosConocio || "No especificado"}`;
+    const detalle = `Tipo de Abertura: ${tipoAbertura || "No especificado"}\n | Cómo nos conoció: ${
+      comoNosConocio || "No especificado"
+    }`;
 
     const nuevaCotizacion = await Cotizacion.create({
       cliente: clienteId,
@@ -221,7 +230,6 @@ export async function POST(request: NextRequest) {
       vendedor: session.user.id,
       codigo: nuevoCodigo,
 
-      // Si querés dejar registro inicial con metas de precio:
       historialEtapas: [
         {
           etapa: etapaId,
