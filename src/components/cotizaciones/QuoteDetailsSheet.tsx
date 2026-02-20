@@ -4,6 +4,7 @@ import React, { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import axios from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -15,18 +16,8 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 import {
   Mail,
@@ -35,7 +26,6 @@ import {
   ExternalLink,
   Phone,
   User2,
-  Pencil,
   Check,
   X,
   Receipt,
@@ -44,7 +34,6 @@ import {
   Boxes,
   LifeBuoy,
   Activity,
-  Download,
   Trash2,
   Upload,
   Plus,
@@ -56,6 +45,31 @@ import { FaWhatsapp } from "react-icons/fa";
 
 import { TableCellActions } from "@/components/clientes/TableCellActions";
 import { Client } from "@/types/client";
+
+function cleanUrl(u: string) {
+  return u.split("?")[0] || u;
+}
+
+function extFromUrl(u: string) {
+  const base = cleanUrl(u);
+  const last = base.split("/").pop() || "";
+  const parts = last.split(".");
+  return parts.length > 1 ? parts.pop()!.toLowerCase() : "";
+}
+
+function isPdfAttachment(a: QuoteArchivo) {
+  const name = (a.name || "").toLowerCase();
+  if (name.endsWith(".pdf")) return true;
+  const ext = extFromUrl(a.url);
+  return ext === "pdf";
+}
+
+function isImageAttachment(a: QuoteArchivo) {
+  const name = (a.name || "").toLowerCase();
+  if (/\.(png|jpe?g|webp|gif|bmp|svg)$/.test(name)) return true;
+  const ext = extFromUrl(a.url);
+  return ["png", "jpg", "jpeg", "webp", "gif", "bmp", "svg"].includes(ext);
+}
 
 // -------------------- Types --------------------
 type Stage = { _id?: string; nombre?: string; color?: string };
@@ -165,7 +179,7 @@ function prettifyKey(key: string) {
   return key
     .replace(/^__/, "")
     .replace(/_/g, " ")
-    .replace(/([a-z])([A-Z])/g, "$1 $2") // PrecioNuevo -> Precio Nuevo
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
@@ -188,9 +202,7 @@ function renderValueWithKey(k: string, v: unknown) {
 }
 
 function fmtDate(d?: string) {
-  return d
-    ? new Date(d).toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" })
-    : "—";
+  return d ? new Date(d).toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" }) : "—";
 }
 
 function money(n: unknown) {
@@ -229,6 +241,13 @@ function normalizeArchivos(raw?: Array<QuoteArchivo | string>): QuoteArchivo[] {
     .filter(Boolean);
 }
 
+function truncate(s: string, max = 20) {
+  const t = (s ?? "").trim();
+  if (!t) return "archivo";
+  if (t.length <= max) return t;
+  return `${t.slice(0, max - 1)}…`;
+}
+
 function IconCta({
   label,
   onClick,
@@ -263,6 +282,131 @@ function IconCta({
   );
 }
 
+function Dropzone({
+  title,
+  subtitle,
+  acceptHint,
+  disabled,
+  onPick,
+  onFiles,
+}: {
+  title: string;
+  subtitle?: string;
+  acceptHint?: string;
+  disabled?: boolean;
+  onPick: () => void;
+  onFiles: (files: File[]) => void;
+}) {
+  const [isOver, setIsOver] = useState(false);
+
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (disabled) return;
+    setIsOver(true);
+  };
+
+  const onDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsOver(false);
+  };
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsOver(false);
+    if (disabled) return;
+    const list = e.dataTransfer.files;
+    if (!list?.length) return;
+    onFiles(Array.from(list));
+  };
+
+  return (
+    <div
+      className={[
+        "rounded-2xl border bg-background/60 p-4 shadow-sm",
+        isOver ? "ring-2 ring-primary/30 border-primary/40" : "",
+        disabled ? "opacity-60 pointer-events-none" : "",
+      ].join(" ")}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold">{title}</div>
+          {subtitle ? <div className="mt-1 text-xs text-muted-foreground">{subtitle}</div> : null}
+          {acceptHint ? <div className="mt-1 text-[11px] text-muted-foreground">{acceptHint}</div> : null}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-xl gap-2 shrink-0"
+          onClick={onPick}
+          disabled={disabled}
+        >
+          <Upload className="h-4 w-4" />
+          Subir
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function applyOptimistic(old: QuoteDetails | null, payload: PutOps): QuoteDetails | null {
+  if (!old) return old;
+
+  switch (payload.op) {
+    case "setCodigo":
+      return { ...old, codigo: payload.codigo };
+    case "setNombre":
+      return { ...old, nombre: payload.nombre };
+
+    case "appendArchivos":
+      return { ...old, archivos: [...normalizeArchivos(old.archivos), ...payload.archivos] };
+
+    case "removeArchivo":
+      return {
+        ...old,
+        archivos: normalizeArchivos(old.archivos).filter((a) => a.uid !== payload.uid),
+      };
+
+    case "addFactura":
+      return { ...old, facturas: [...(old.facturas ?? []), payload.factura] };
+
+    case "removeFactura":
+      return { ...old, facturas: (old.facturas ?? []).filter((f) => f.uid !== payload.uid) };
+
+    case "addPago":
+      return { ...old, pagos: [...(old.pagos ?? []), payload.pago] };
+
+    case "removePago":
+      return { ...old, pagos: (old.pagos ?? []).filter((p) => p.uid !== payload.uid) };
+
+    case "addImagen":
+      return { ...old, imagenes: [...(old.imagenes ?? []), payload.imagen] };
+
+    case "removeImagen":
+      return { ...old, imagenes: (old.imagenes ?? []).filter((i) => i.uid !== payload.uid) };
+
+    case "addMaterial":
+      return { ...old, materialPedido: [...(old.materialPedido ?? []), payload.material] };
+
+    case "removeMaterial":
+      return { ...old, materialPedido: (old.materialPedido ?? []).filter((m) => m.uid !== payload.uid) };
+
+    case "addTicket":
+      return { ...old, tickets: [...(old.tickets ?? []), payload.ticket] };
+
+    case "removeTicket":
+      return { ...old, tickets: (old.tickets ?? []).filter((t) => t.uid !== payload.uid) };
+
+    default:
+      return old;
+  }
+}
+
 export function QuoteDetailsSheet({
   open,
   onOpenChange,
@@ -284,24 +428,6 @@ export function QuoteDetailsSheet({
 
   const [isEditingCode, setIsEditingCode] = useState(false);
   const [codeDraft, setCodeDraft] = useState("");
-
-  const [facturaDraft, setFacturaDraft] = useState<{
-    numero: string;
-    fecha: string;
-    monto: string;
-    estado: QuoteFactura["estado"];
-    url: string;
-  }>({ numero: "", fecha: "", monto: "", estado: "pendiente", url: "" });
-
-  const [pagoDraft, setPagoDraft] = useState<{
-    fecha: string;
-    monto: string;
-    metodo: string;
-    referencia: string;
-    comprobanteUrl: string;
-  }>({ fecha: "", monto: "", metodo: "", referencia: "", comprobanteUrl: "" });
-
-  const [imagenDraft, setImagenDraft] = useState<{ caption: string }>({ caption: "" });
 
   const [materialDraft, setMaterialDraft] = useState<{
     descripcion: string;
@@ -332,10 +458,7 @@ export function QuoteDetailsSheet({
   const clienteEmail = (quote?.cliente as unknown as { email?: string } | undefined)?.email || "";
   const clienteTelefono = quote?.cliente?.telefono || "";
 
-  const waPhone = useMemo(
-    () => normalizePhoneForWA(clienteTelefono) || "5491111111111",
-    [clienteTelefono]
-  );
+  const waPhone = useMemo(() => normalizePhoneForWA(clienteTelefono) || "5491111111111", [clienteTelefono]);
 
   const waMessage = useMemo(() => {
     const msg = `Hola ${clienteNombre}, te escribo por la cotización ${quote?.codigo || ""}.`;
@@ -345,9 +468,7 @@ export function QuoteDetailsSheet({
   const handleEmail = () => {
     const to = clienteEmail ? `${encodeURIComponent(clienteEmail)}` : "";
     const subject = encodeURIComponent(`Cotización ${quote?.codigo || ""}`);
-    const body = encodeURIComponent(
-      `Hola ${clienteNombre},\n\nTe escribo por la cotización ${quote?.codigo || ""}.\n\nSaludos.`
-    );
+    const body = encodeURIComponent(`Hola ${clienteNombre},\n\nTe escribo por la cotización ${quote?.codigo || ""}.\n\nSaludos.`);
     window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
   };
 
@@ -356,22 +477,98 @@ export function QuoteDetailsSheet({
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const copy = async (text: string) => {
+  const copyText = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
+      toast.success("Copiado", { description: "Se copió al portapapeles." });
     } catch {
-      // no-op
+      toast.error("No se pudo copiar", { description: "Tu navegador bloqueó el portapapeles." });
     }
   };
 
+  // ✅ PUT con propagación inmediata a "cotizacionesPipeline" (sin F5) + toasts (sonner)
   const putMutation = useMutation({
     mutationFn: async (payload: PutOps) => {
       if (!quoteId) throw new Error("quoteId requerido");
       const res = await axios.put(`/api/cotizaciones/${quoteId}`, payload);
       return res.data.data as QuoteDetails;
     },
-    onSuccess: (updated) => {
+
+    onMutate: async (payload) => {
+      if (!quoteId) return;
+
+      await queryClient.cancelQueries({ queryKey: ["cotizacionDetalle", quoteId] });
+      await queryClient.cancelQueries({ queryKey: ["cotizacionesPipeline"] });
+
+      const prevDetail = queryClient.getQueryData<QuoteDetails | null>(["cotizacionDetalle", quoteId]);
+      const prevLists = queryClient.getQueriesData({ queryKey: ["cotizacionesPipeline"], exact: false });
+
+      // optimistic detalle
+      queryClient.setQueryData(["cotizacionDetalle", quoteId], (old: QuoteDetails | null) =>
+        applyOptimistic(old, payload)
+      );
+
+      // optimistic listas (solo codigo/nombre, para no romper shapes)
+      if (payload.op === "setCodigo" || payload.op === "setNombre") {
+        queryClient.setQueriesData({ queryKey: ["cotizacionesPipeline"], exact: false }, (old: any) => {
+          if (!Array.isArray(old)) return old;
+          return old.map((q: any) => {
+            if (q?._id !== quoteId) return q;
+            return {
+              ...q,
+              ...(payload.op === "setCodigo" ? { codigo: payload.codigo } : {}),
+              ...(payload.op === "setNombre" ? { nombre: payload.nombre } : {}),
+            };
+          });
+        });
+      }
+
+      return { prevDetail, prevLists, payload };
+    },
+
+    onError: (_err, _payload, ctx) => {
+      if (quoteId && ctx?.prevDetail) queryClient.setQueryData(["cotizacionDetalle", quoteId], ctx.prevDetail);
+      if (ctx?.prevLists) ctx.prevLists.forEach(([key, data]: any) => queryClient.setQueryData(key, data));
+      toast.error("Error", { description: "No se pudo guardar el cambio." });
+    },
+
+    onSuccess: (updated, payload) => {
       queryClient.setQueryData(["cotizacionDetalle", quoteId], updated);
+
+      // server truth: listas
+      if (payload.op === "setCodigo" || payload.op === "setNombre") {
+        queryClient.setQueriesData({ queryKey: ["cotizacionesPipeline"], exact: false }, (old: any) => {
+          if (!Array.isArray(old)) return old;
+          return old.map((q: any) => {
+            if (q?._id !== updated._id) return q;
+            return {
+              ...q,
+              codigo: updated.codigo ?? q.codigo,
+              nombre: updated.nombre ?? q.nombre,
+              updatedAt: updated.updatedAt ?? q.updatedAt,
+            };
+          });
+        });
+      }
+
+      const msgByOp: Record<string, string> = {
+        setCodigo: "Código actualizado.",
+        setNombre: "Nombre actualizado.",
+        appendArchivos: "Adjunto(s) agregados.",
+        removeArchivo: "Adjunto eliminado.",
+        addFactura: "Factura agregada.",
+        removeFactura: "Factura eliminada.",
+        addPago: "Pago agregado.",
+        removePago: "Pago eliminado.",
+        addImagen: "Imagen agregada.",
+        removeImagen: "Imagen eliminada.",
+        addMaterial: "Material agregado.",
+        removeMaterial: "Material eliminado.",
+        addTicket: "Ticket agregado.",
+        removeTicket: "Ticket eliminado.",
+      };
+
+      toast.success("Listo", { description: msgByOp[(payload as any)?.op] ?? "Cambio guardado." });
     },
   });
 
@@ -403,6 +600,9 @@ export function QuoteDetailsSheet({
       }
 
       return uploads;
+    },
+    onError: () => {
+      toast.error("Error", { description: "No se pudieron subir los archivos." });
     },
   });
 
@@ -441,13 +641,12 @@ export function QuoteDetailsSheet({
     setCodeDraft("");
   };
   const saveCode = async () => {
-    // formato sugerido: COT-001, pero no lo fuerzo (solo trim y mayúsculas)
     const next = codeDraft.trim().toUpperCase();
     await putMutation.mutateAsync({ op: "setCodigo", codigo: next });
     setIsEditingCode(false);
   };
 
-  // -------------------- Upload helpers (restricciones por sección) --------------------
+  // -------------------- Upload helpers --------------------
   const folderBase = `cotizaciones/${quoteId ?? "general"}`;
 
   const pickAttachments = () => attachmentsInputRef.current?.click();
@@ -458,50 +657,99 @@ export function QuoteDetailsSheet({
   const onAttachmentsSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const list = e.target.files;
     if (!list?.length) return;
-
     const files = Array.from(list);
     e.target.value = "";
 
     const uploaded = await uploadMutation.mutateAsync({ files, folder: `${folderBase}/adjuntos` });
-    await putMutation.mutateAsync({ op: "appendArchivos", archivos: uploaded }); // cantidad ilimitada
+    await putMutation.mutateAsync({ op: "appendArchivos", archivos: uploaded });
   };
 
+  const handleAttachmentsFiles = async (files: File[]) => {
+    if (!files.length) return;
+    const uploaded = await uploadMutation.mutateAsync({ files, folder: `${folderBase}/adjuntos` });
+    await putMutation.mutateAsync({ op: "appendArchivos", archivos: uploaded });
+  };
+
+  // Facturas: solo adjunto (imagen/pdf). Otros campos “-” / 0 para no romper.
   const onFacturaSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const list = e.target.files;
     if (!list?.length) return;
     const files = Array.from(list);
     e.target.value = "";
-
-    // pdf + imágenes (por accept)
-    const uploaded = await uploadMutation.mutateAsync({ files, folder: `${folderBase}/facturas` });
-
-    // si subieron varios, dejamos el primero en el draft (el resto podrías guardarlo como adjuntos si querés)
-    const first = uploaded[0];
-    if (first?.url) setFacturaDraft((s) => ({ ...s, url: first.url }));
+    await handleFacturaFiles(files);
   };
 
+  const handleFacturaFiles = async (files: File[]) => {
+    if (!files.length) return;
+
+    const uploaded = await uploadMutation.mutateAsync({ files, folder: `${folderBase}/facturas` });
+
+    for (const u of uploaded) {
+      const f: QuoteFactura = {
+        uid: uid(),
+        numero: "-",
+        fecha: undefined,
+        monto: 0,
+        estado: "pendiente",
+        url: u.url,
+      };
+      await putMutation.mutateAsync({ op: "addFactura", factura: f });
+    }
+  };
+
+  // Pagos: solo imagen. Otros campos “-” / 0.
   const onPagoSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const list = e.target.files;
     if (!list?.length) return;
     const files = Array.from(list);
     e.target.value = "";
-
-    // solo imágenes (por accept)
-    const uploaded = await uploadMutation.mutateAsync({ files, folder: `${folderBase}/pagos` });
-    const first = uploaded[0];
-    if (first?.url) setPagoDraft((s) => ({ ...s, comprobanteUrl: first.url }));
+    await handlePagoFiles(files);
   };
 
+  const handlePagoFiles = async (files: File[]) => {
+    if (!files.length) return;
+
+    const onlyImages = files.filter((f) => f.type.startsWith("image/"));
+    if (onlyImages.length !== files.length) {
+      toast.warning("Solo imágenes", { description: "Los pagos aceptan únicamente imágenes." });
+    }
+    if (!onlyImages.length) return;
+
+    const uploaded = await uploadMutation.mutateAsync({ files: onlyImages, folder: `${folderBase}/pagos` });
+
+    for (const u of uploaded) {
+      const p: QuotePago = {
+        uid: uid(),
+        fecha: undefined,
+        monto: 0,
+        metodo: "-",
+        referencia: "-",
+        comprobanteUrl: u.url,
+      };
+      await putMutation.mutateAsync({ op: "addPago", pago: p });
+    }
+  };
+
+  // Imágenes: drag/drop (solo imágenes)
   const onImagenesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const list = e.target.files;
     if (!list?.length) return;
     const files = Array.from(list);
     e.target.value = "";
+    await handleImagenesFiles(files);
+  };
 
-    // subimos imágenes a cloudinary y creamos items en imagenes
-    const uploaded = await uploadMutation.mutateAsync({ files, folder: `${folderBase}/imagenes` });
+  const handleImagenesFiles = async (files: File[]) => {
+    if (!files.length) return;
 
-    // agregamos una por una al array "imagenes"
+    const onlyImages = files.filter((f) => f.type.startsWith("image/"));
+    if (onlyImages.length !== files.length) {
+      toast.warning("Solo imágenes", { description: "Esta sección acepta únicamente imágenes." });
+    }
+    if (!onlyImages.length) return;
+
+    const uploaded = await uploadMutation.mutateAsync({ files: onlyImages, folder: `${folderBase}/imagenes` });
+
     for (const u of uploaded) {
       await putMutation.mutateAsync({
         op: "addImagen",
@@ -514,35 +762,7 @@ export function QuoteDetailsSheet({
     await putMutation.mutateAsync({ op: "removeArchivo", uid: uidToRemove });
   };
 
-  // -------------------- Create entities --------------------
-  const addFactura = async () => {
-    const montoNum = Number(facturaDraft.monto || 0);
-    const f: QuoteFactura = {
-      uid: uid(),
-      numero: facturaDraft.numero.trim() || undefined,
-      fecha: facturaDraft.fecha || undefined,
-      monto: Number.isFinite(montoNum) ? montoNum : 0,
-      estado: facturaDraft.estado,
-      url: facturaDraft.url.trim() || undefined,
-    };
-    await putMutation.mutateAsync({ op: "addFactura", factura: f });
-    setFacturaDraft({ numero: "", fecha: "", monto: "", estado: "pendiente", url: "" });
-  };
-
-  const addPago = async () => {
-    const montoNum = Number(pagoDraft.monto || 0);
-    const p: QuotePago = {
-      uid: uid(),
-      fecha: pagoDraft.fecha || undefined,
-      monto: Number.isFinite(montoNum) ? montoNum : 0,
-      metodo: pagoDraft.metodo.trim() || undefined,
-      referencia: pagoDraft.referencia.trim() || undefined,
-      comprobanteUrl: pagoDraft.comprobanteUrl.trim() || undefined,
-    };
-    await putMutation.mutateAsync({ op: "addPago", pago: p });
-    setPagoDraft({ fecha: "", monto: "", metodo: "", referencia: "", comprobanteUrl: "" });
-  };
-
+  // -------------------- Create entities (material / tickets) --------------------
   const addMaterial = async () => {
     const desc = materialDraft.descripcion.trim();
     if (!desc) return;
@@ -579,49 +799,39 @@ export function QuoteDetailsSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-xl p-0">
-        {/* hidden inputs (restricciones por sección) */}
+      <SheetContent side="right" className="w-full sm:max-w-xl p-0 overflow-hidden">
+        {/* hidden inputs */}
         <input ref={attachmentsInputRef} type="file" multiple className="hidden" onChange={onAttachmentsSelected} />
+
+        {/* Facturas: permitimos imagen/pdf (drag/drop también). */}
         <input
           ref={facturaInputRef}
           type="file"
-          multiple={false}
+          multiple
           className="hidden"
           accept="application/pdf,image/*"
           onChange={onFacturaSelected}
         />
-        <input
-          ref={pagoInputRef}
-          type="file"
-          multiple={false}
-          className="hidden"
-          accept="image/*"
-          onChange={onPagoSelected}
-        />
-        <input
-          ref={imagenesInputRef}
-          type="file"
-          multiple
-          className="hidden"
-          accept="image/*"
-          onChange={onImagenesSelected}
-        />
 
-        {/* Header premium */}
+        {/* Pagos: solo imágenes */}
+        <input ref={pagoInputRef} type="file" multiple className="hidden" accept="image/*" onChange={onPagoSelected} />
+
+        {/* Imágenes: solo imágenes */}
+        <input ref={imagenesInputRef} type="file" multiple className="hidden" accept="image/*" onChange={onImagenesSelected} />
+
+        {/* Header */}
         <div className="sticky top-0 z-10 border-b bg-gradient-to-b from-background/90 to-background/60 backdrop-blur">
           <SheetHeader className="px-5 py-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <SheetTitle className="text-base sm:text-lg truncate">
-                    {isLoading ? "Cargando…" : `Detalle de negocio`}
-                  </SheetTitle>
+                  <SheetTitle className="text-base sm:text-lg truncate">{isLoading ? "Cargando…" : `Detalle de negocio`}</SheetTitle>
                   <Badge className="rounded-full border border-primary/20 bg-primary text-primary-foreground shadow-sm">
                     {quote?.etapa?.nombre || "Sin etapa"}
                   </Badge>
                 </div>
 
-                {/* Código editable (punto 1) */}
+                {/* Código editable */}
                 <div className="mt-3 rounded-2xl border bg-background/60 shadow-sm p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -647,51 +857,18 @@ export function QuoteDetailsSheet({
                           <IconCta label="Editar código" onClick={startEditCode} disabled={!quote || busy}>
                             <Hash className="h-4 w-4" />
                           </IconCta>
-                          <IconCta label="Copiar código" onClick={() => copy(String(quote?.codigo || ""))} disabled={!quote}>
+                          <IconCta label="Copiar código" onClick={() => copyText(String(quote?.codigo || ""))} disabled={!quote}>
                             <Copy className="h-4 w-4" />
                           </IconCta>
                         </div>
                       )}
                     </div>
-
-                    {/* Nombre editable */}
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[11px] text-muted-foreground">Nombre</div>
-                      {isEditingName ? (
-                        <div className="mt-1 flex items-center gap-2">
-                          <Input
-                            value={nameDraft}
-                            onChange={(e) => setNameDraft(e.target.value)}
-                            className="h-9"
-                            placeholder="Ej: Aberturas premium - Casa Pérez"
-                          />
-                          <IconCta label="Guardar nombre" onClick={saveName} disabled={busy}>
-                            <Check className="h-4 w-4" />
-                          </IconCta>
-                          <IconCta label="Cancelar" onClick={cancelEditName} disabled={busy}>
-                            <X className="h-4 w-4" />
-                          </IconCta>
-                        </div>
-                      ) : (
-                        <div className="mt-1 flex items-center gap-2">
-                          <div className="text-sm font-semibold truncate">
-                            {quote?.nombre?.trim() ? quote.nombre : "—"}
-                          </div>
-                          <IconCta label="Editar nombre" onClick={startEditName} disabled={!quote || busy}>
-                            <Pencil className="h-4 w-4" />
-                          </IconCta>
-                        </div>
-                      )}
-                    </div>
                   </div>
 
-                  <div className="mt-2 text-xs text-muted-foreground truncate">
-                    {clienteNombre}
-                  </div>
+                  <div className="mt-2 text-xs text-muted-foreground truncate">{clienteNombre}</div>
                 </div>
               </div>
 
-              {/* ✅ Todos los botones juntos (punto 9) */}
               <div className="flex flex-col items-end gap-2">
                 <div className="flex items-center gap-2">
                   <IconCta label="Email" onClick={handleEmail} disabled={!quote}>
@@ -704,7 +881,6 @@ export function QuoteDetailsSheet({
                     <Upload className="h-4 w-4" />
                   </IconCta>
 
-                  {/* Notas / Interacciones en el mismo bloque */}
                   {quote?.cliente ? (
                     <>
                       <TableCellActions client={quote.cliente as Client} actionType="notas" />
@@ -718,7 +894,7 @@ export function QuoteDetailsSheet({
         </div>
 
         {/* Body */}
-        <ScrollArea className="h-[calc(100vh-220px)]">
+        <ScrollArea className="h-[calc(100vh-220px)] overflow-x-hidden">
           <div className="px-5 py-5 space-y-4">
             {isLoading ? (
               <div className="space-y-4">
@@ -730,7 +906,7 @@ export function QuoteDetailsSheet({
               <div className="text-sm text-muted-foreground">No se encontró la cotización.</div>
             ) : (
               <>
-                {/* Resumen premium */}
+                {/* Resumen */}
                 <Card className="relative overflow-hidden rounded-3xl border shadow-sm">
                   <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/10 to-primary/5" />
                   <div className="relative p-5">
@@ -739,12 +915,10 @@ export function QuoteDetailsSheet({
                         <div className="text-xs text-muted-foreground">Monto total</div>
                         <div className="text-3xl font-semibold tracking-tight">{money(quote.montoTotal)}</div>
                         <div className="mt-2 text-xs text-muted-foreground">
-                          Vendedor:{" "}
-                          <span className="font-medium text-foreground">{quote.vendedor?.name || "—"}</span>
+                          Vendedor: <span className="font-medium text-foreground">{quote.vendedor?.name || "—"}</span>
                         </div>
                         <div className="mt-1 text-xs text-muted-foreground">
-                          Actualizada:{" "}
-                          <span className="font-medium text-foreground">{fmtDate(quote.updatedAt)}</span>
+                          Actualizada: <span className="font-medium text-foreground">{fmtDate(quote.updatedAt)}</span>
                         </div>
                       </div>
 
@@ -752,7 +926,7 @@ export function QuoteDetailsSheet({
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => copy(String(quote.codigo || ""))}
+                        onClick={() => copyText(String(quote.codigo || ""))}
                         className="rounded-xl gap-2 bg-background/70"
                       >
                         <Copy className="h-4 w-4" /> Copiar código
@@ -771,7 +945,7 @@ export function QuoteDetailsSheet({
                   </div>
                 </Card>
 
-                {/* (7) Card destacada "Resumen IA" NO utilizable */}
+                {/* Premium */}
                 <Card className="rounded-3xl border shadow-sm overflow-hidden p-0">
                   <div className="p-5 bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10">
                     <div className="flex items-start justify-between gap-4">
@@ -784,17 +958,10 @@ export function QuoteDetailsSheet({
                           Un asistente IA que resume todo el negocio y responde preguntas como:
                           <span className="font-medium text-foreground"> “¿en qué estado está este negocio?”</span>
                         </div>
-                        <div className="mt-2 text-xs text-muted-foreground">
-                          *Requiere contratación. No está habilitado en este plan.
-                        </div>
+                        <div className="mt-2 text-xs text-muted-foreground">*Requiere contratación. No está habilitado en este plan.</div>
                       </div>
 
-                      <Button
-                        variant="outline"
-                        className="rounded-xl gap-2"
-                        disabled
-                        title="Servicio premium - requiere contratación"
-                      >
+                      <Button variant="outline" className="rounded-xl gap-2" disabled title="Servicio premium - requiere contratación">
                         <Lock className="h-4 w-4" />
                         Contratar
                       </Button>
@@ -802,10 +969,10 @@ export function QuoteDetailsSheet({
                   </div>
                 </Card>
 
-                {/* Secciones (acordeones) */}
+                {/* Secciones */}
                 <Card className="rounded-3xl border shadow-sm p-2">
                   <Accordion type="multiple" className="w-full">
-                    {/* (2) Última actividad mejorada */}
+                    {/* Última actividad */}
                     <AccordionItem value="last-activity">
                       <AccordionTrigger className="px-3 hover:no-underline">
                         <div className="flex items-center gap-2">
@@ -820,9 +987,7 @@ export function QuoteDetailsSheet({
                           <div className="rounded-2xl border bg-gradient-to-br from-primary/5 to-primary/10 p-4">
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
-                                <div className="text-sm font-semibold truncate">
-                                  {lastMove.etapa?.nombre || "Movimiento"}
-                                </div>
+                                <div className="text-sm font-semibold truncate">{lastMove.etapa?.nombre || "Movimiento"}</div>
                                 <div className="text-xs text-muted-foreground">{fmtDate(lastMove.fecha)}</div>
                               </div>
                               <Badge variant="outline" className="rounded-full">
@@ -835,16 +1000,9 @@ export function QuoteDetailsSheet({
                                 <Separator className="my-3" />
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                   {Object.entries(lastMove.datosFormulario ?? {}).map(([k, v]) => (
-                                    <div
-                                      key={k}
-                                      className="rounded-2xl border bg-background/60 p-3"
-                                    >
-                                      <div className="text-[11px] text-muted-foreground">
-                                        {prettifyKey(k)}
-                                      </div>
-                                      <div className="mt-1 text-sm font-semibold">
-                                        {renderValueWithKey(k, v)}
-                                      </div>
+                                    <div key={k} className="rounded-2xl border bg-background/60 p-3">
+                                      <div className="text-[11px] text-muted-foreground">{prettifyKey(k)}</div>
+                                      <div className="mt-1 text-sm font-semibold">{renderValueWithKey(k, v)}</div>
                                     </div>
                                   ))}
                                 </div>
@@ -855,33 +1013,23 @@ export function QuoteDetailsSheet({
                       </AccordionContent>
                     </AccordionItem>
 
-                    {/* (3) Archivos adjuntos: ilimitado */}
+                    {/* Adjuntos */}
                     <AccordionItem value="attachments">
                       <AccordionTrigger className="px-3 hover:no-underline">
                         <div className="flex items-center gap-2">
                           <Paperclip className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm font-semibold">Archivos adjuntos</span>
-                          <Badge className="ml-2 rounded-full bg-primary/15 text-primary">
-                            {attachments.length}
-                          </Badge>
+                          <Badge className="ml-2 rounded-full bg-primary/15 text-primary">{attachments.length}</Badge>
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="px-3 pb-4">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="text-xs text-muted-foreground">
-                            Subís la cantidad que necesites (Cloudinary).
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="rounded-xl gap-2"
-                            onClick={pickAttachments}
-                            disabled={busy}
-                          >
-                            <Upload className="h-4 w-4" />
-                            Subir
-                          </Button>
-                        </div>
+                        <Dropzone
+                          title="Arrastrá y soltá archivos aquí"
+                          subtitle="O subilos desde tu computadora (Cloudinary)."
+                          disabled={busy}
+                          onPick={pickAttachments}
+                          onFiles={handleAttachmentsFiles}
+                        />
 
                         <Separator className="my-3" />
 
@@ -889,148 +1037,111 @@ export function QuoteDetailsSheet({
                           <div className="text-sm text-muted-foreground">No hay archivos adjuntos.</div>
                         ) : (
                           <div className="space-y-2">
-                            {attachments.map((a) => (
-                              <div
-                                key={a.uid}
-                                className="flex items-center justify-between gap-3 rounded-2xl border bg-background/60 px-3 py-2 shadow-sm"
-                              >
-                                <div className="min-w-0">
-                                  <div className="text-sm font-semibold truncate">
-                                    {a.name || fileNameFromUrl(a.url)}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground truncate">{a.url}</div>
-                                </div>
+                            {attachments.map((a) => {
+                              const isPdf = isPdfAttachment(a);
+                              const isImg = isImageAttachment(a);
+                              const shownName = truncate(a.name || fileNameFromUrl(a.url), 20);
 
-                                <div className="flex items-center gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 rounded-xl"
-                                    onClick={() => copy(a.url)}
-                                    title="Copiar link"
-                                  >
-                                    <Copy className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 rounded-xl"
-                                    onClick={() => window.open(a.url, "_blank", "noopener,noreferrer")}
-                                    title="Abrir"
-                                  >
-                                    <ExternalLink className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 rounded-xl"
-                                    onClick={() => window.open(a.url, "_blank", "noopener,noreferrer")}
-                                    title="Descargar"
-                                  >
-                                    <Download className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 rounded-xl"
-                                    onClick={() => removeArchivo(a.uid)}
-                                    disabled={busy}
-                                    title="Eliminar de la cotización"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                              return (
+                                <div
+                                  key={a.uid}
+                                  className="flex items-center justify-between gap-3 rounded-2xl border bg-background/60 px-3 py-2 shadow-sm w-full"
+                                >
+                                  <div className="flex-1 min-w-0 flex items-center gap-3 overflow-hidden">
+                                    {isImg ? (
+                                      <button
+                                        type="button"
+                                        className="shrink-0 h-12 w-12 rounded-xl overflow-hidden border bg-background"
+                                        onClick={() => window.open(a.url, "_blank", "noopener,noreferrer")}
+                                        title="Abrir imagen"
+                                      >
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={a.url} alt={a.name || "Imagen"} className="h-full w-full object-cover" loading="lazy" />
+                                      </button>
+                                    ) : null}
+
+                                    <div className="flex-1 min-w-0 overflow-hidden">
+                                      <div className="text-sm font-semibold truncate" title={a.name || fileNameFromUrl(a.url)}>
+                                        {shownName}
+                                      </div>
+                                      {/* ✅ NO mostramos URL */}
+                                      <div className="text-xs text-muted-foreground">
+                                        {isPdf ? "PDF" : isImg ? "Imagen" : "Archivo"}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 rounded-xl"
+                                      onClick={() => copyText(a.url)}
+                                      title="Copiar link"
+                                    >
+                                      <Copy className="h-4 w-4" />
+                                    </Button>
+
+                                    {isPdf ? (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="rounded-xl gap-2"
+                                        onClick={() => window.open(a.url, "_blank", "noopener,noreferrer")}
+                                        title="Abrir PDF"
+                                      >
+                                        <ExternalLink className="h-4 w-4" />
+                                        Abrir
+                                      </Button>
+                                    ) : (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 rounded-xl"
+                                        onClick={() => window.open(a.url, "_blank", "noopener,noreferrer")}
+                                        title="Abrir"
+                                      >
+                                        <ExternalLink className="h-4 w-4" />
+                                      </Button>
+                                    )}
+
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 rounded-xl"
+                                      onClick={() => removeArchivo(a.uid)}
+                                      disabled={busy}
+                                      title="Eliminar de la cotización"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </AccordionContent>
                     </AccordionItem>
 
-                    {/* (4) Facturas: subir pdf o imágenes */}
+                    {/* Facturas */}
                     <AccordionItem value="invoices">
                       <AccordionTrigger className="px-3 hover:no-underline">
                         <div className="flex items-center gap-2">
                           <Receipt className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm font-semibold">Facturas</span>
-                          <Badge className="ml-2 rounded-full bg-primary/15 text-primary">
-                            {facturas.length}
-                          </Badge>
+                          <Badge className="ml-2 rounded-full bg-primary/15 text-primary">{facturas.length}</Badge>
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="px-3 pb-4">
-                        <div className="rounded-2xl border bg-background/60 p-4 shadow-sm">
-                          <div className="flex items-center justify-between">
-                            <div className="text-sm font-semibold">Nueva factura</div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="rounded-xl gap-2"
-                              onClick={pickFacturaFile}
-                              disabled={busy}
-                              title="Subir PDF o imagen a Cloudinary"
-                            >
-                              <Upload className="h-4 w-4" />
-                              Adjuntar
-                            </Button>
-                          </div>
-
-                          <div className="mt-3 grid grid-cols-1 gap-2">
-                            <div className="grid grid-cols-2 gap-2">
-                              <Input
-                                value={facturaDraft.numero}
-                                onChange={(e) => setFacturaDraft((s) => ({ ...s, numero: e.target.value }))}
-                                placeholder="Número"
-                                className="h-9 rounded-xl"
-                              />
-                              <Input
-                                value={facturaDraft.fecha}
-                                onChange={(e) => setFacturaDraft((s) => ({ ...s, fecha: e.target.value }))}
-                                placeholder="Fecha (YYYY-MM-DD)"
-                                className="h-9 rounded-xl"
-                              />
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <Input
-                                value={facturaDraft.monto}
-                                onChange={(e) => setFacturaDraft((s) => ({ ...s, monto: e.target.value }))}
-                                placeholder="Monto"
-                                className="h-9 rounded-xl"
-                              />
-                              <Input
-                                value={facturaDraft.estado}
-                                onChange={(e) =>
-                                  setFacturaDraft((s) => ({
-                                    ...s,
-                                    estado: e.target.value as QuoteFactura["estado"],
-                                  }))
-                                }
-                                placeholder="Estado: pendiente|pagada|vencida|anulada"
-                                className="h-9 rounded-xl"
-                              />
-                            </div>
-
-                            <Input
-                              value={facturaDraft.url}
-                              onChange={(e) => setFacturaDraft((s) => ({ ...s, url: e.target.value }))}
-                              placeholder="URL (se completa al adjuntar)"
-                              className="h-9 rounded-xl"
-                            />
-
-                            <div className="flex justify-end">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="rounded-xl gap-2"
-                                onClick={addFactura}
-                                disabled={busy}
-                              >
-                                <Plus className="h-4 w-4" />
-                                Agregar factura
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
+                        <Dropzone
+                          title="Arrastrá y soltá facturas aquí"
+                          subtitle="Se agrega automáticamente al negocio."
+                          acceptHint="Acepta: imágenes y PDF"
+                          disabled={busy}
+                          onPick={pickFacturaFile}
+                          onFiles={handleFacturaFiles}
+                        />
 
                         <Separator className="my-3" />
 
@@ -1042,14 +1153,23 @@ export function QuoteDetailsSheet({
                               <div key={f.uid} className="rounded-2xl border bg-background/60 p-4 shadow-sm">
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="min-w-0">
-                                    <div className="text-sm font-semibold truncate">{f.numero || "Factura"}</div>
-                                    <div className="text-xs text-muted-foreground">{fmtDate(f.fecha)}</div>
+                                    <div className="text-sm font-semibold truncate">Factura</div>
+                                    <div className="text-xs text-muted-foreground">{f.url ? truncate(fileNameFromUrl(f.url), 28) : "—"}</div>
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <Badge variant="outline" className="rounded-full">
                                       {f.estado || "pendiente"}
                                     </Badge>
-                                    <div className="text-sm font-semibold">{money(f.monto)}</div>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="rounded-xl gap-2"
+                                      onClick={() => f.url && window.open(f.url, "_blank", "noopener,noreferrer")}
+                                      disabled={!f.url}
+                                    >
+                                      <ExternalLink className="h-4 w-4" />
+                                      Ver
+                                    </Button>
                                     <Button
                                       variant="ghost"
                                       size="icon"
@@ -1062,28 +1182,6 @@ export function QuoteDetailsSheet({
                                     </Button>
                                   </div>
                                 </div>
-                                {f.url ? (
-                                  <div className="mt-3 flex items-center gap-2">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="rounded-xl gap-2"
-                                      onClick={() => window.open(f.url!, "_blank", "noopener,noreferrer")}
-                                    >
-                                      <ExternalLink className="h-4 w-4" />
-                                      Ver adjunto
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="rounded-xl gap-2"
-                                      onClick={() => copy(f.url!)}
-                                    >
-                                      <Copy className="h-4 w-4" />
-                                      Copiar link
-                                    </Button>
-                                  </div>
-                                ) : null}
                               </div>
                             ))}
                           </div>
@@ -1091,85 +1189,24 @@ export function QuoteDetailsSheet({
                       </AccordionContent>
                     </AccordionItem>
 
-                    {/* (5) Pagos: solo imágenes */}
+                    {/* Pagos */}
                     <AccordionItem value="payments">
                       <AccordionTrigger className="px-3 hover:no-underline">
                         <div className="flex items-center gap-2">
                           <CreditCard className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm font-semibold">Pagos</span>
-                          <Badge className="ml-2 rounded-full bg-primary/15 text-primary">
-                            {pagos.length}
-                          </Badge>
+                          <Badge className="ml-2 rounded-full bg-primary/15 text-primary">{pagos.length}</Badge>
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="px-3 pb-4">
-                        <div className="rounded-2xl border bg-background/60 p-4 shadow-sm">
-                          <div className="flex items-center justify-between">
-                            <div className="text-sm font-semibold">Nuevo pago</div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="rounded-xl gap-2"
-                              onClick={pickPagoImage}
-                              disabled={busy}
-                              title="Subir comprobante (solo imagen)"
-                            >
-                              <Upload className="h-4 w-4" />
-                              Subir comprobante
-                            </Button>
-                          </div>
-
-                          <div className="mt-3 grid grid-cols-1 gap-2">
-                            <div className="grid grid-cols-2 gap-2">
-                              <Input
-                                value={pagoDraft.fecha}
-                                onChange={(e) => setPagoDraft((s) => ({ ...s, fecha: e.target.value }))}
-                                placeholder="Fecha (YYYY-MM-DD)"
-                                className="h-9 rounded-xl"
-                              />
-                              <Input
-                                value={pagoDraft.monto}
-                                onChange={(e) => setPagoDraft((s) => ({ ...s, monto: e.target.value }))}
-                                placeholder="Monto"
-                                className="h-9 rounded-xl"
-                              />
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <Input
-                                value={pagoDraft.metodo}
-                                onChange={(e) => setPagoDraft((s) => ({ ...s, metodo: e.target.value }))}
-                                placeholder="Método"
-                                className="h-9 rounded-xl"
-                              />
-                              <Input
-                                value={pagoDraft.referencia}
-                                onChange={(e) => setPagoDraft((s) => ({ ...s, referencia: e.target.value }))}
-                                placeholder="Referencia"
-                                className="h-9 rounded-xl"
-                              />
-                            </div>
-
-                            <Input
-                              value={pagoDraft.comprobanteUrl}
-                              onChange={(e) => setPagoDraft((s) => ({ ...s, comprobanteUrl: e.target.value }))}
-                              placeholder="URL comprobante (se completa al subir)"
-                              className="h-9 rounded-xl"
-                            />
-
-                            <div className="flex justify-end">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="rounded-xl gap-2"
-                                onClick={addPago}
-                                disabled={busy}
-                              >
-                                <Plus className="h-4 w-4" />
-                                Agregar pago
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
+                        <Dropzone
+                          title="Arrastrá y soltá comprobantes aquí"
+                          subtitle="Se agrega automáticamente al negocio."
+                          acceptHint="Acepta: solo imágenes"
+                          disabled={busy}
+                          onPick={pickPagoImage}
+                          onFiles={handlePagoFiles}
+                        />
 
                         <Separator className="my-3" />
 
@@ -1181,14 +1218,22 @@ export function QuoteDetailsSheet({
                               <div key={p.uid} className="rounded-2xl border bg-background/60 p-4 shadow-sm">
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="min-w-0">
-                                    <div className="text-sm font-semibold">{p.metodo || "Pago"}</div>
-                                    <div className="text-xs text-muted-foreground">{fmtDate(p.fecha)}</div>
-                                    {p.referencia ? (
-                                      <div className="text-xs text-muted-foreground truncate">Ref: {p.referencia}</div>
-                                    ) : null}
+                                    <div className="text-sm font-semibold">Pago</div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {p.comprobanteUrl ? truncate(fileNameFromUrl(p.comprobanteUrl), 28) : "—"}
+                                    </div>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <div className="text-sm font-semibold">{money(p.monto)}</div>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="rounded-xl gap-2"
+                                      onClick={() => p.comprobanteUrl && window.open(p.comprobanteUrl, "_blank", "noopener,noreferrer")}
+                                      disabled={!p.comprobanteUrl}
+                                    >
+                                      <ExternalLink className="h-4 w-4" />
+                                      Ver
+                                    </Button>
                                     <Button
                                       variant="ghost"
                                       size="icon"
@@ -1201,29 +1246,6 @@ export function QuoteDetailsSheet({
                                     </Button>
                                   </div>
                                 </div>
-
-                                {p.comprobanteUrl ? (
-                                  <div className="mt-3 flex items-center gap-2">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="rounded-xl gap-2"
-                                      onClick={() => window.open(p.comprobanteUrl!, "_blank", "noopener,noreferrer")}
-                                    >
-                                      <ExternalLink className="h-4 w-4" />
-                                      Ver comprobante
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="rounded-xl gap-2"
-                                      onClick={() => copy(p.comprobanteUrl!)}
-                                    >
-                                      <Copy className="h-4 w-4" />
-                                      Copiar link
-                                    </Button>
-                                  </div>
-                                ) : null}
                               </div>
                             ))}
                           </div>
@@ -1231,33 +1253,24 @@ export function QuoteDetailsSheet({
                       </AccordionContent>
                     </AccordionItem>
 
-                    {/* (6) Imágenes subidas a Cloudinary */}
+                    {/* Imágenes */}
                     <AccordionItem value="images">
                       <AccordionTrigger className="px-3 hover:no-underline">
                         <div className="flex items-center gap-2">
                           <ImageIcon className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm font-semibold">Imágenes</span>
-                          <Badge className="ml-2 rounded-full bg-primary/15 text-primary">
-                            {imagenes.length}
-                          </Badge>
+                          <Badge className="ml-2 rounded-full bg-primary/15 text-primary">{imagenes.length}</Badge>
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="px-3 pb-4">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="text-xs text-muted-foreground">
-                            Subí imágenes (Cloudinary). Se agregan automáticamente a la sección.
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="rounded-xl gap-2"
-                            onClick={pickImagenes}
-                            disabled={busy}
-                          >
-                            <Upload className="h-4 w-4" />
-                            Subir imágenes
-                          </Button>
-                        </div>
+                        <Dropzone
+                          title="Arrastrá y soltá imágenes aquí"
+                          subtitle="Se agregan automáticamente a la sección."
+                          acceptHint="Acepta: solo imágenes"
+                          disabled={busy}
+                          onPick={pickImagenes}
+                          onFiles={handleImagenesFiles}
+                        />
 
                         <Separator className="my-3" />
 
@@ -1269,10 +1282,9 @@ export function QuoteDetailsSheet({
                               <div key={img.uid} className="rounded-2xl border bg-background/60 p-4 shadow-sm">
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="min-w-0">
-                                    <div className="text-sm font-semibold truncate">
-                                      {img.caption || fileNameFromUrl(img.url)}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground truncate">{img.url}</div>
+                                    <div className="text-sm font-semibold truncate">{img.caption || truncate(fileNameFromUrl(img.url), 24)}</div>
+                                    {/* no mostramos url */}
+                                    <div className="text-xs text-muted-foreground">{truncate(fileNameFromUrl(img.url), 28)}</div>
                                   </div>
                                   <div className="flex items-center gap-1">
                                     <Button
@@ -1303,15 +1315,13 @@ export function QuoteDetailsSheet({
                       </AccordionContent>
                     </AccordionItem>
 
-                    {/* Material pedido */}
+                    {/* Material (igual que antes) */}
                     <AccordionItem value="materials">
                       <AccordionTrigger className="px-3 hover:no-underline">
                         <div className="flex items-center gap-2">
                           <Boxes className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm font-semibold">Material pedido</span>
-                          <Badge className="ml-2 rounded-full bg-primary/15 text-primary">
-                            {materialPedido.length}
-                          </Badge>
+                          <Badge className="ml-2 rounded-full bg-primary/15 text-primary">{materialPedido.length}</Badge>
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="px-3 pb-4">
@@ -1352,13 +1362,7 @@ export function QuoteDetailsSheet({
                             />
 
                             <div className="flex justify-end">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="rounded-xl gap-2"
-                                onClick={addMaterial}
-                                disabled={busy}
-                              >
+                              <Button variant="outline" size="sm" className="rounded-xl gap-2" onClick={addMaterial} disabled={busy}>
                                 <Plus className="h-4 w-4" />
                                 Agregar
                               </Button>
@@ -1404,15 +1408,13 @@ export function QuoteDetailsSheet({
                       </AccordionContent>
                     </AccordionItem>
 
-                    {/* Tickets */}
+                    {/* Tickets (igual que antes) */}
                     <AccordionItem value="tickets">
                       <AccordionTrigger className="px-3 hover:no-underline">
                         <div className="flex items-center gap-2">
                           <LifeBuoy className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm font-semibold">Tickets (soporte)</span>
-                          <Badge className="ml-2 rounded-full bg-primary/15 text-primary">
-                            {tickets.length}
-                          </Badge>
+                          <Badge className="ml-2 rounded-full bg-primary/15 text-primary">{tickets.length}</Badge>
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="px-3 pb-4">
@@ -1451,13 +1453,7 @@ export function QuoteDetailsSheet({
                               placeholder="Descripción (opcional)"
                             />
                             <div className="flex justify-end">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="rounded-xl gap-2"
-                                onClick={addTicket}
-                                disabled={busy}
-                              >
+                              <Button variant="outline" size="sm" className="rounded-xl gap-2" onClick={addTicket} disabled={busy}>
                                 <Plus className="h-4 w-4" />
                                 Agregar ticket
                               </Button>
@@ -1478,9 +1474,7 @@ export function QuoteDetailsSheet({
                                     <div className="text-sm font-semibold">{t.titulo}</div>
                                     <div className="text-xs text-muted-foreground">{t.createdAt ? fmtDate(t.createdAt) : "—"}</div>
                                     {t.descripcion ? (
-                                      <div className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">
-                                        {t.descripcion}
-                                      </div>
+                                      <div className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">{t.descripcion}</div>
                                     ) : null}
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -1519,7 +1513,7 @@ export function QuoteDetailsSheet({
                   </Accordion>
                 </Card>
 
-                {/* Cliente (quick) */}
+                {/* Cliente */}
                 <Card className="rounded-3xl border shadow-sm p-5">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
@@ -1527,10 +1521,7 @@ export function QuoteDetailsSheet({
                       <div className="text-sm font-semibold">Cliente</div>
                     </div>
                     {quote.cliente?._id ? (
-                      <Link
-                        className="text-xs text-primary hover:underline inline-flex items-center gap-1"
-                        href={`/dashboard/listados/${quote.cliente._id}`}
-                      >
+                      <Link className="text-xs text-primary hover:underline inline-flex items-center gap-1" href={`/dashboard/listados/${quote.cliente._id}`}>
                         Ver ficha <ExternalLink className="h-3.5 w-3.5" />
                       </Link>
                     ) : null}
@@ -1550,7 +1541,7 @@ export function QuoteDetailsSheet({
                         <div className="text-sm font-semibold">{clienteTelefono || "—"}</div>
                         {clienteTelefono ? (
                           <>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl" onClick={() => copy(clienteTelefono)} title="Copiar">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl" onClick={() => copyText(clienteTelefono)} title="Copiar">
                               <Copy className="h-4 w-4" />
                             </Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl" onClick={() => window.open(`tel:${clienteTelefono}`, "_self")} title="Llamar">
@@ -1566,7 +1557,7 @@ export function QuoteDetailsSheet({
                       <div className="flex items-center gap-2">
                         <div className="text-sm font-semibold break-all">{clienteEmail || "—"}</div>
                         {clienteEmail ? (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl" onClick={() => copy(clienteEmail)} title="Copiar">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl" onClick={() => copyText(clienteEmail)} title="Copiar">
                             <Copy className="h-4 w-4" />
                           </Button>
                         ) : null}

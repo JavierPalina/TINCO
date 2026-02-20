@@ -47,7 +47,7 @@ type FormInputs = {
   };
 
   // cotización
-  montoTotal: number; // Precio
+  montoTotal: number; // Precio (entero, sin centavos)
   etapa: string; // Columna/Etapa inicial
 
   // sucursal (ID)
@@ -56,6 +56,22 @@ type FormInputs = {
   // opcionales
   tipoAbertura?: string;
   comoNosConocio?: string;
+};
+
+// --- Helpers: formateo AR (miles con ".") y parseo sin centavos
+const formatARSInteger = (n: number) =>
+  new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(
+    Number.isFinite(n) ? n : 0
+  );
+
+const parseDigitsToNumber = (raw: string) => {
+  // deja solo dígitos
+  const digits = raw.replace(/[^\d]/g, "");
+  if (!digits) return 0;
+
+  // evita números absurdos si pegan un string enorme
+  const trimmed = digits.slice(0, 15);
+  return Number(trimmed);
 };
 
 export function CreateQuoteDialog() {
@@ -150,7 +166,8 @@ export function CreateQuoteDialog() {
       }
 
       if (!clienteId) throw new Error("Debe seleccionar o crear un cliente.");
-      if (!formData.etapa) throw new Error("Debe seleccionar la columna inicial.");
+      if (!formData.etapa)
+        throw new Error("Debe seleccionar la columna inicial.");
 
       if (!formData.sucursalId?.trim()) {
         throw new Error("Debe seleccionar una sucursal.");
@@ -301,16 +318,38 @@ export function CreateQuoteDialog() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="montoTotal">Precio*</Label>
-                <Input
-                  id="montoTotal"
-                  type="number"
-                  step="1"
-                  placeholder="0"
-                  {...register("montoTotal", {
+
+                {/* INPUT FORMATEADO (sin centavos) */}
+                <Controller
+                  name="montoTotal"
+                  control={control}
+                  rules={{
                     required: true,
-                    valueAsNumber: true,
                     min: 0,
-                  })}
+                    validate: (v) =>
+                      Number.isFinite(v) ? true : "Precio inválido",
+                  }}
+                  render={({ field }) => {
+                    const displayValue =
+                      typeof field.value === "number"
+                        ? formatARSInteger(field.value)
+                        : "";
+
+                    return (
+                      <Input
+                        id="montoTotal"
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="0"
+                        value={displayValue}
+                        onChange={(e) => {
+                          const num = parseDigitsToNumber(e.target.value);
+                          field.onChange(num);
+                        }}
+                        onBlur={field.onBlur}
+                      />
+                    );
+                  }}
                 />
               </div>
 
@@ -339,7 +378,9 @@ export function CreateQuoteDialog() {
             <div className="space-y-2">
               <Label>Sucursal *</Label>
 
-              <div className={bloquearSucursal ? "pointer-events-none opacity-60" : ""}>
+              <div
+                className={bloquearSucursal ? "pointer-events-none opacity-60" : ""}
+              >
                 <Controller
                   name="sucursalId"
                   control={control}

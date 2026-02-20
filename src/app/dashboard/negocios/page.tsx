@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   useQuery,
   useMutation,
@@ -34,6 +34,8 @@ import {
   StepBackIcon,
   GripVertical,
   Clock,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { CreateQuoteDialog } from "@/components/cotizaciones/CreateQuoteDialog";
@@ -78,11 +80,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Client } from "@/types/client";
 import { StageFormModal } from "@/components/cotizaciones/StageFormModal";
 import { IFormField } from "@/types/IFormField";
-
 import { CreateStageDialog } from "@/components/cotizaciones/CreateStageDialog";
 import Link from "next/link";
 import axios, { AxiosError } from "axios";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { QuoteDetailsSheet } from "@/components/cotizaciones/QuoteDetailsSheet";
 import { QuoteDetailsDialog } from "@/components/cotizaciones/QuoteDetailsDialog";
 
@@ -116,7 +116,13 @@ interface Etapa {
   color: string;
 }
 
-type HistorialFormValue = string | number | boolean | string[] | undefined | null;
+type HistorialFormValue =
+  | string
+  | number
+  | boolean
+  | string[]
+  | undefined
+  | null;
 
 type HistorialDatosFormulario = Record<string, HistorialFormValue> & {
   __precioAnterior?: number;
@@ -142,7 +148,7 @@ interface Cotizacion {
     prioridad: "Alta" | "Media" | "Baja";
     telefono?: string;
   };
-  vendedor: { name: string };
+  vendedor: { _id?: string; name: string };
   createdAt?: string;
   updatedAt?: string;
 }
@@ -172,7 +178,7 @@ interface PipelineViewProps {
   onOpenDetails: (quoteId: string) => void;
 }
 
-/** ✅ Botón icon-only con tooltip (tal cual lo pediste) */
+/** ✅ Botón icon-only con tooltip */
 function IconCta({
   label,
   onClick,
@@ -226,7 +232,7 @@ function timeAgoEs(date: Date | null) {
   return `hace ${weeks} semana${weeks === 1 ? "" : "s"}`;
 }
 
-/** Overlay bloqueante para movimientos */
+/** Overlay bloqueante */
 function BlockingMoveOverlay({ show, label }: { show: boolean; label?: string }) {
   if (!show) return null;
   return (
@@ -234,7 +240,7 @@ function BlockingMoveOverlay({ show, label }: { show: boolean; label?: string })
       <div className="flex flex-col items-center gap-3 rounded-xl border bg-background/90 px-6 py-5 shadow-lg">
         <Loader2 className="h-7 w-7 animate-spin" />
         <p className="text-sm font-medium text-muted-foreground">
-          {label || "Moviendo cotización..."}
+          {label || "Procesando..."}
         </p>
       </div>
     </div>
@@ -299,9 +305,7 @@ function QuoteCard({
     const body = encodeURIComponent(
       `Hola ${quote.cliente?.nombreCompleto || ""},\n\nTe escribo por la cotización ${quote.codigo}.\n\nSaludos.`
     );
-
-    const mailto = `mailto:?subject=${subject}&body=${body}`;
-    window.location.assign(mailto);
+    window.location.assign(`mailto:?subject=${subject}&body=${body}`);
   };
 
   function normalizePhoneForWA(raw?: string) {
@@ -322,21 +326,27 @@ function QuoteCard({
       `Hola ${quote.cliente?.nombreCompleto || ""}, te escribo por la cotización ${quote.codigo}`
     );
 
-    const url = `https://wa.me/${waPhone}?text=${text}`;
-    window.open(url, "_blank", "noopener,noreferrer");
+    window.open(
+      `https://wa.me/${waPhone}?text=${text}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
   };
 
   const createdAt = quote.createdAt ? new Date(quote.createdAt) : null;
   const lastMove = quote.historialEtapas?.length
     ? new Date(quote.historialEtapas[quote.historialEtapas.length - 1].fecha)
     : quote.updatedAt
-      ? new Date(quote.updatedAt)
-      : null;
+    ? new Date(quote.updatedAt)
+    : null;
 
   const fmt = (d: Date | null) =>
-    d ? d.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "—";
+    d
+      ? d.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })
+      : "—";
 
   const lastMoveAgo = timeAgoEs(lastMove);
+  const stageColor = stageColors[quote.etapa._id] || quote.etapa.color;
 
   return (
     <>
@@ -348,7 +358,6 @@ function QuoteCard({
       />
 
       <div ref={setNodeRef} style={style}>
-        {/* ✅ Más color / estilo */}
         <Card
           className={cn(
             "mb-2 p-0 overflow-hidden",
@@ -357,12 +366,14 @@ function QuoteCard({
             "border border-primary/10"
           )}
           onDoubleClick={() => onOpenDetails(quote._id)}
+          style={{
+            backgroundImage: `linear-gradient(135deg, ${stageColor}18, transparent 60%)`,
+          }}
         >
           <CardContent className="p-3">
             <div className="flex justify-between items-start gap-2">
               <div className="min-w-0">
                 <div className="flex items-start gap-2">
-                  {/* IZQUIERDA */}
                   <div className="min-w-0 flex-1">
                     <Link href={`/dashboard/listados/${quote.cliente._id}`}>
                       <div className="text-sm font-semibold hover:underline hover:text-primary transition-colors truncate">
@@ -370,7 +381,6 @@ function QuoteCard({
                       </div>
                     </Link>
 
-                    {/* ✅ 1) Dentro del lead: último movimiento relativo con emoji/anotación */}
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <Badge
                         variant="outline"
@@ -394,8 +404,6 @@ function QuoteCard({
                       )}
                     </div>
                   </div>
-
-                  {/* DERECHA */}
                 </div>
               </div>
 
@@ -430,7 +438,8 @@ function QuoteCard({
                       className="text-red-600 focus:text-red-600"
                       onSelect={() => onUndo(quote._id)}
                     >
-                      <StepBackIcon className="mr-2 h-4 w-4" /> Deshacer última acción
+                      <StepBackIcon className="mr-2 h-4 w-4" /> Deshacer última
+                      acción
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-red-600 focus:text-red-600"
@@ -455,7 +464,9 @@ function QuoteCard({
                 </div>
                 <div className="flex items-center gap-1">
                   <span>Vendedor:</span>
-                  <span className="font-medium">{quote.vendedor?.name || "—"}</span>
+                  <span className="font-medium">
+                    {quote.vendedor?.name || "—"}
+                  </span>
                 </div>
                 <div className="flex items-center gap-1">
                   <span>Último movimiento:</span>
@@ -464,7 +475,6 @@ function QuoteCard({
               </div>
             </div>
 
-            {/* ✅ 2) Acciones como IconCta + más prolijo */}
             <div className="flex items-center justify-between border-t pt-3 mt-3 gap-2">
               <div className="flex items-center gap-2">
                 <IconCta label="Ver archivos" onClick={() => setFilesOpen(true)}>
@@ -476,8 +486,10 @@ function QuoteCard({
                   </div>
                 </IconCta>
 
-                {/* Estos vienen de tu componente existente */}
-                <TableCellActions client={quote?.cliente as Client} actionType="notas" />
+                <TableCellActions
+                  client={quote?.cliente as Client}
+                  actionType="notas"
+                />
                 <div style={{ marginLeft: -6 }}>
                   <TableCellActions
                     client={quote?.cliente as Client}
@@ -485,11 +497,11 @@ function QuoteCard({
                   />
                 </div>
 
-                <IconCta label="Enviar email" onClick={handleEmail} disabled={!quote}>
+                <IconCta label="Enviar email" onClick={handleEmail}>
                   <Mail className="h-4 w-4" />
                 </IconCta>
 
-                <IconCta label="Enviar WhatsApp" onClick={handleWhatsApp} disabled={!quote}>
+                <IconCta label="Enviar WhatsApp" onClick={handleWhatsApp}>
                   <FaWhatsapp className="h-4 w-4" />
                 </IconCta>
               </div>
@@ -518,7 +530,6 @@ function QuoteColumn({
   onUndo,
   onDeleteStage,
   highlight = false,
-
   collapsed = false,
   onToggleCollapse,
   onOpenDetails,
@@ -532,7 +543,6 @@ function QuoteColumn({
   isFetching: boolean;
   onDeleteStage: (etapa: Etapa) => void;
   highlight?: boolean;
-
   collapsed?: boolean;
   onToggleCollapse: () => void;
   onOpenDetails: (quoteId: string) => void;
@@ -544,7 +554,6 @@ function QuoteColumn({
   );
 
   const isGreenLocked = GREEN_STAGE_NAMES.has(etapa.nombre);
-
   const { setNodeRef, isOver } = useSortable({ id, data: { type: "Column" } });
 
   const stageColor = stageColors[etapa._id] || etapa.color;
@@ -555,7 +564,6 @@ function QuoteColumn({
       className={cn(
         collapsed ? "w-12" : "w-80",
         "h-full flex flex-col flex-shrink-0 rounded-xl transition-all duration-200 border",
-        // ✅ más color
         "bg-gradient-to-b from-background/80 to-muted/30 backdrop-blur supports-[backdrop-filter]:bg-background/55 shadow-sm",
         isOver && "ring-2 ring-primary/20",
         highlight &&
@@ -563,7 +571,6 @@ function QuoteColumn({
         isOver && highlight && "bg-emerald-500/15"
       )}
     >
-      {/* HEADER */}
       <div
         className={cn(
           "p-3 pb-2 sticky top-0 z-10 rounded-t-xl border-b",
@@ -767,7 +774,11 @@ function QuotesTableView({
     const text = encodeURIComponent(
       `Hola ${q.cliente?.nombreCompleto || ""}, te escribo por la cotización ${q.codigo}`
     );
-    window.open(`https://wa.me/${waPhone}?text=${text}`, "_blank", "noopener,noreferrer");
+    window.open(
+      `https://wa.me/${waPhone}?text=${text}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
   };
 
   return (
@@ -800,10 +811,12 @@ function QuotesTableView({
             {quotes.length > 0 ? (
               quotes.map((quote) => {
                 const lastMove = quote.historialEtapas?.length
-                  ? new Date(quote.historialEtapas[quote.historialEtapas.length - 1].fecha)
+                  ? new Date(
+                      quote.historialEtapas[quote.historialEtapas.length - 1].fecha
+                    )
                   : quote.updatedAt
-                    ? new Date(quote.updatedAt)
-                    : null;
+                  ? new Date(quote.updatedAt)
+                  : null;
 
                 return (
                   <TableRow
@@ -813,14 +826,18 @@ function QuotesTableView({
                   >
                     <TableCell className="font-medium">
                       <div className="flex flex-col">
-                        <span className="truncate">{quote.cliente.nombreCompleto}</span>
+                        <span className="truncate">
+                          {quote.cliente.nombreCompleto}
+                        </span>
                         <span className="text-[11px] text-muted-foreground">
                           Nota {timeAgoEs(lastMove)}
                         </span>
                       </div>
                     </TableCell>
 
-                    <TableCell className="text-muted-foreground">{quote.codigo}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {quote.codigo}
+                    </TableCell>
 
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -841,7 +858,9 @@ function QuotesTableView({
 
                     <TableCell className="text-muted-foreground">
                       {lastMove
-                        ? lastMove.toLocaleDateString("es-AR", { dateStyle: "short" })
+                        ? lastMove.toLocaleDateString("es-AR", {
+                            dateStyle: "short",
+                          })
                         : "—"}
                     </TableCell>
 
@@ -849,7 +868,6 @@ function QuotesTableView({
                       ${quote.montoTotal.toLocaleString("es-AR")}
                     </TableCell>
 
-                    {/* ✅ 4) Tabla: info básica + TODAS las acciones */}
                     <TableCell
                       className="text-center"
                       onClick={(e) => e.stopPropagation()}
@@ -864,7 +882,10 @@ function QuotesTableView({
                           </div>
                         </IconCta>
 
-                        <TableCellActions client={quote?.cliente as Client} actionType="notas" />
+                        <TableCellActions
+                          client={quote?.cliente as Client}
+                          actionType="notas"
+                        />
                         <div style={{ marginLeft: -6 }}>
                           <TableCellActions
                             client={quote?.cliente as Client}
@@ -872,11 +893,17 @@ function QuotesTableView({
                           />
                         </div>
 
-                        <IconCta label="Enviar email" onClick={() => handleEmail(quote)}>
+                        <IconCta
+                          label="Enviar email"
+                          onClick={() => handleEmail(quote)}
+                        >
                           <Mail className="h-4 w-4" />
                         </IconCta>
 
-                        <IconCta label="Enviar WhatsApp" onClick={() => handleWhatsApp(quote)}>
+                        <IconCta
+                          label="Enviar WhatsApp"
+                          onClick={() => handleWhatsApp(quote)}
+                        >
                           <FaWhatsapp className="h-4 w-4" />
                         </IconCta>
 
@@ -1062,7 +1089,22 @@ function PipelineView({
   );
 }
 
-/** Normalización: mismo helper que en el modal para que coincidan los keys */
+/** ✅ Detecta si el formulario de una etapa ya fue completado (mínimo) */
+function hasStageFormFilled(quote: Cotizacion, stageId: string) {
+  const entries = quote.historialEtapas || [];
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const h = entries[i];
+    if (h?.etapa?._id === stageId) {
+      const df = h.datosFormulario;
+      if (!df) return false;
+      const keys = Object.keys(df).filter((k) => !k.startsWith("__"));
+      return keys.length > 0;
+    }
+  }
+  return false;
+}
+
+/** Normalización: mismo helper que en el modal */
 const toFieldName = (title: string): string => {
   return title
     .normalize("NFD")
@@ -1084,11 +1126,6 @@ export default function PipelinePage() {
 
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsId, setDetailsId] = useState<string | null>(null);
-
-  const openDetailsDialog = (id: string) => {
-    setDetailsId(id);
-    setDetailsOpen(true);
-  };
 
   const { data: session } = useSession();
   const queryClient = useQueryClient();
@@ -1117,18 +1154,30 @@ export default function PipelinePage() {
     setCollapsedStages(next);
   };
 
-  const expandAll = () => {
-    setCollapsedStages({});
-  };
+  const expandAll = () => setCollapsedStages({});
 
   const openQuoteSidebar = (quoteId: string) => {
     setSelectedQuoteId(quoteId);
     setIsQuoteSidebarOpen(true);
   };
 
+  const openDetailsDialog = (id: string) => {
+    setDetailsId(id);
+    setDetailsOpen(true);
+  };
+
+  // ✅ filtros: admin por defecto ve TODO (vendedorId = "")
   const [filters, setFilters] = useState<Filters>(() => {
-    if (typeof window === "undefined")
-      return { searchTerm: "", vendedorId: "", dateRange: undefined };
+    if (typeof window === "undefined") {
+      return {
+        searchTerm: "",
+        vendedorId: "",
+        sucursalId: "",
+        etapaId: "",
+        dateRange: undefined,
+      } as Filters;
+    }
+
     const savedFilters = localStorage.getItem("quotePipelineFilters");
     if (savedFilters) {
       const parsed = JSON.parse(savedFilters);
@@ -1136,6 +1185,7 @@ export default function PipelinePage() {
       if (parsed.dateRange?.to) parsed.dateRange.to = new Date(parsed.dateRange.to);
       return parsed;
     }
+
     return {
       searchTerm: "",
       vendedorId: "",
@@ -1147,8 +1197,12 @@ export default function PipelinePage() {
 
   const [debouncedSearchTerm] = useDebounce(filters.searchTerm, 500);
 
+  // ✅ set default vendedor solo si NO sos admin
   useEffect(() => {
-    if (session?.user?.id && !filters.vendedorId) {
+    const role = (session?.user as any)?.role as string | undefined;
+    if (!session?.user?.id) return;
+
+    if (role !== "admin" && !filters.vendedorId) {
       setFilters((prev) => ({ ...prev, vendedorId: session.user.id as string }));
     }
   }, [session, filters.vendedorId]);
@@ -1181,10 +1235,12 @@ export default function PipelinePage() {
 
       const maxOpacity = 1.0;
       const minOpacity = 0.2;
+
       if (total <= 1) {
         colorMap[etapa._id] = `hsla(${themePrimaryColor.h}, ${themePrimaryColor.s}%, ${themePrimaryColor.l}%, ${maxOpacity})`;
         return;
       }
+
       const opacityStep = (maxOpacity - minOpacity) / (total - 1);
       const opacity = maxOpacity - index * opacityStep;
       colorMap[etapa._id] = `hsla(${themePrimaryColor.h}, ${themePrimaryColor.s}%, ${themePrimaryColor.l}%, ${opacity})`;
@@ -1193,11 +1249,15 @@ export default function PipelinePage() {
     return colorMap;
   }, [etapas]);
 
+  // ✅ queryKey COMPLETO: incluye sucursalId y etapaId (si no, no refetch)
   const queryKey = [
     "cotizacionesPipeline",
     debouncedSearchTerm,
     filters.vendedorId,
-    filters.dateRange,
+    filters.sucursalId,
+    filters.etapaId,
+    filters.dateRange?.from?.toISOString() ?? "",
+    filters.dateRange?.to?.toISOString() ?? "",
   ];
 
   const {
@@ -1208,17 +1268,17 @@ export default function PipelinePage() {
     queryKey,
     queryFn: async () => {
       const params = {
-        searchTerm: debouncedSearchTerm,
-        vendedorId: filters.vendedorId,
+        searchTerm: debouncedSearchTerm || undefined,
+        vendedorId: filters.vendedorId || undefined, // "" => no filtra
         sucursalId: filters.sucursalId || undefined,
         etapaId: filters.etapaId || undefined,
-        fechaDesde: filters.dateRange?.from?.toISOString(),
-        fechaHasta: filters.dateRange?.to?.toISOString(),
+        fechaDesde: filters.dateRange?.from ? filters.dateRange.from.toISOString() : undefined,
+        fechaHasta: filters.dateRange?.to ? filters.dateRange.to.toISOString() : undefined,
       };
       const { data } = await axios.get("/api/cotizaciones", { params });
       return data.data;
     },
-    enabled: !!etapas && !!filters.vendedorId,
+    enabled: !!etapas, // ✅ admin puede tener vendedorId vacío
     placeholderData: keepPreviousData,
   });
 
@@ -1244,15 +1304,7 @@ export default function PipelinePage() {
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } })
   );
 
-  const updateQuoteStage = useMutation({
-    mutationFn: (data: { quoteId: string; newStageId: string }) =>
-      axios.put(`/api/cotizaciones/${data.quoteId}`, { etapa: data.newStageId }),
-    onError: () => {
-      toast.error("Error al cambiar la etapa.");
-      queryClient.invalidateQueries({ queryKey });
-    },
-  });
-
+  // ✅ SIEMPRE usamos /move (con o sin form)
   const updateQuoteWithFormData = useMutation({
     mutationFn: (data: {
       quoteId: string;
@@ -1266,11 +1318,10 @@ export default function PipelinePage() {
         montoTotal: data.montoTotal,
       }),
     onSuccess: () => {
-      toast.success("Cotización movida y actualizada con éxito.");
       queryClient.invalidateQueries({ queryKey: ["cotizacionesPipeline"] });
     },
     onError: () => {
-      toast.error("Error al mover la cotización.");
+      toast.error("Error al mover/guardar la cotización.");
     },
   });
 
@@ -1301,7 +1352,8 @@ export default function PipelinePage() {
   };
 
   const deleteStageMutation = useMutation({
-    mutationFn: (stageId: string) => axios.delete(`/api/etapas-cotizacion/${stageId}`),
+    mutationFn: (stageId: string) =>
+      axios.delete(`/api/etapas-cotizacion/${stageId}`),
     onSuccess: async () => {
       toast.success("Etapa eliminada con éxito.");
       await queryClient.invalidateQueries({ queryKey: ["etapasCotizacion"] });
@@ -1344,7 +1396,6 @@ export default function PipelinePage() {
     setActiveQuote(null);
 
     const { active, over } = event;
-
     if (!over || active.id === over.id) return;
 
     const activeId = active.id.toString();
@@ -1362,9 +1413,12 @@ export default function PipelinePage() {
       setIsMoveBlocking(true);
 
       try {
-        const { data } = await axios.get(`/api/formularios-etapa/${overContainer}`);
+        const { data } = await axios.get(
+          `/api/formularios-etapa/${overContainer}`
+        );
         const camposFormulario: IFormField[] = data.data?.campos || [];
 
+        // Si hay formulario -> abrir modal
         if (camposFormulario.length > 0) {
           const preload: IFormularioData = {};
           camposFormulario.forEach((f) => {
@@ -1381,6 +1435,7 @@ export default function PipelinePage() {
           return;
         }
 
+        // ✅ Si NO hay formulario -> mover directo usando /move con historial {}
         setMoveBlockingLabel("Moviendo cotización...");
 
         const newSourceItems = [...columns[activeContainer]];
@@ -1405,9 +1460,11 @@ export default function PipelinePage() {
         }));
 
         try {
-          await updateQuoteStage.mutateAsync({
+          await updateQuoteWithFormData.mutateAsync({
             quoteId: activeId,
             newStageId: overContainer,
+            formData: {}, // <- clave para /move
+            montoTotal: movedItem.montoTotal,
           });
 
           if (nuevaEtapa?.nombre === "Proyecto por Iniciar") {
@@ -1420,12 +1477,18 @@ export default function PipelinePage() {
               });
 
               toast.success(
-                `Proyecto creado para ${movedItem.cliente?.nombreCompleto || "el cliente"}`
+                `Proyecto creado para ${
+                  movedItem.cliente?.nombreCompleto || "el cliente"
+                }`
               );
             } catch (error) {
               console.error("Error creando proyecto desde cotización", error);
-              toast.error("Se movió la cotización pero no se pudo crear el proyecto.");
+              toast.error(
+                "Se movió la cotización pero no se pudo crear el proyecto."
+              );
             }
+          } else {
+            toast.success("Cotización movida con éxito.");
           }
         } catch (err) {
           console.error("Error moviendo cotización:", err);
@@ -1437,17 +1500,28 @@ export default function PipelinePage() {
         }
       } catch (err) {
         console.error("Error al cargar formulario o mover:", err);
-        toast.error("Error al cargar el formulario de la etapa o al mover la cotización.");
+        toast.error(
+          "Error al cargar el formulario de la etapa o al mover la cotización."
+        );
         queryClient.invalidateQueries({ queryKey: ["cotizacionesPipeline"] });
         setIsMoveBlocking(false);
         setMoveBlockingLabel("");
       }
     } else {
-      const activeIndex = columns[activeContainer].findIndex((q) => q._id === activeId);
-      const overIndex = columns[overContainer].findIndex((q) => q._id === overId);
+      // reorder dentro de la misma columna
+      const activeIndex = columns[activeContainer].findIndex(
+        (q) => q._id === activeId
+      );
+      const overIndex = columns[overContainer].findIndex(
+        (q) => q._id === overId
+      );
 
       if (activeIndex !== overIndex) {
-        const newOrderedQuotes = arrayMove(columns[overContainer], activeIndex, overIndex);
+        const newOrderedQuotes = arrayMove(
+          columns[overContainer],
+          activeIndex,
+          overIndex
+        );
         setColumns((prev) => ({ ...prev, [overContainer]: newOrderedQuotes }));
 
         reorderQuotesMutation.mutate({
@@ -1469,6 +1543,79 @@ export default function PipelinePage() {
 
   const handleUndo = (quoteId: string) => undoQuoteStage.mutate(quoteId);
 
+  // ====== Auto modal para lead nuevo (evita F5 y evita reabrir si ya está lleno) ======
+  const prevIdsRef = useRef<Set<string>>(new Set());
+  const handledNewLeadsRef = useRef<Set<string>>(new Set());
+  const didInitRef = useRef(false);
+
+  useEffect(() => {
+    if (!cotizaciones?.length) return;
+    if (!etapas?.length) return;
+
+    if (!didInitRef.current) {
+      prevIdsRef.current = new Set(cotizaciones.map((q) => q._id));
+      didInitRef.current = true;
+      return;
+    }
+
+    if (isStageFormModalOpen) {
+      prevIdsRef.current = new Set(cotizaciones.map((q) => q._id));
+      return;
+    }
+
+    const currentIds = new Set(cotizaciones.map((q) => q._id));
+    const prevIds = prevIdsRef.current;
+
+    const newQuotes = cotizaciones.filter(
+      (q) => !prevIds.has(q._id) && !handledNewLeadsRef.current.has(q._id)
+    );
+
+    prevIdsRef.current = currentIds;
+
+    if (!newQuotes.length) return;
+
+    const newest = [...newQuotes].sort((a, b) => {
+      const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return db - da;
+    })[0];
+
+    handledNewLeadsRef.current.add(newest._id);
+
+    const stageId = newest.etapa?._id;
+    if (!stageId) return;
+
+    if (hasStageFormFilled(newest, stageId)) return;
+
+    (async () => {
+      try {
+        setMoveBlockingLabel("Verificando formulario de la etapa...");
+        setIsMoveBlocking(true);
+
+        const { data } = await axios.get(`/api/formularios-etapa/${stageId}`);
+        const camposFormulario: IFormField[] = data.data?.campos || [];
+        if (!camposFormulario.length) return;
+
+        const preload: IFormularioData = {};
+        camposFormulario.forEach((f) => {
+          const key = toFieldName(f.titulo);
+          if (f.tipo === "precio") preload[key] = newest.montoTotal;
+        });
+
+        setInitialFormData(preload);
+        setFormFieldsForStage(camposFormulario);
+        setQuoteToMove(newest);
+        setNewStageId(stageId);
+        setIsStageFormModalOpen(true);
+      } catch (e) {
+        console.error("Error verificando formulario de etapa para nuevo lead:", e);
+      } finally {
+        setIsMoveBlocking(false);
+        setMoveBlockingLabel("");
+      }
+    })();
+  }, [cotizaciones, etapas, isStageFormModalOpen]);
+
   if (isLoadingEtapas) {
     return (
       <div className="p-10 text-center flex justify-center items-center h-screen">
@@ -1477,8 +1624,10 @@ export default function PipelinePage() {
     );
   }
 
+  const isInitialFormSameStage =
+    !!quoteToMove && !!newStageId && quoteToMove.etapa._id === newStageId;
+
   return (
-    // ✅ 3) Más color general (fondo con gradiente suave)
     <div className="flex flex-col bg-gradient-to-b from-background via-muted/30 to-muted/50">
       <QuoteDetailsSheet
         open={isQuoteSidebarOpen}
@@ -1510,10 +1659,15 @@ export default function PipelinePage() {
               setInitialFormData({});
               setQuoteToMove(null);
               setNewStageId(null);
+              setFormFieldsForStage([]);
             }
           }}
           title="Completa los datos para esta etapa"
-          description="Agrega la información requerida antes de mover la cotización."
+          description={
+            isInitialFormSameStage
+              ? "Agrega la información requerida para esta etapa."
+              : "Agrega la información requerida antes de mover la cotización."
+          }
           formFields={formFieldsForStage}
           quoteId={quoteToMove?._id || ""}
           initialData={initialFormData}
@@ -1543,16 +1697,30 @@ export default function PipelinePage() {
 
             setColumns((prev) => {
               const newPrev = { ...prev };
-              const newSourceItems = newPrev[activeContainer].filter((q) => q._id !== quoteId);
-              const newDestItems = [movedQuote, ...newPrev[overContainer]];
+              const source = newPrev[activeContainer] || [];
+              const dest = newPrev[overContainer] || [];
+              const sourceWithout = source.filter((q) => q._id !== quoteId);
+
+              const nextDest =
+                activeContainer === overContainer
+                  ? [movedQuote, ...sourceWithout]
+                  : [movedQuote, ...dest];
+
               return {
                 ...newPrev,
-                [activeContainer]: newSourceItems,
-                [overContainer]: newDestItems,
+                [activeContainer]:
+                  activeContainer === overContainer ? nextDest : sourceWithout,
+                ...(activeContainer !== overContainer
+                  ? { [overContainer]: nextDest }
+                  : {}),
               };
             });
 
-            setMoveBlockingLabel("Moviendo cotización...");
+            setMoveBlockingLabel(
+              activeContainer === overContainer
+                ? "Guardando formulario..."
+                : "Moviendo cotización..."
+            );
             setIsMoveBlocking(true);
 
             try {
@@ -1563,7 +1731,16 @@ export default function PipelinePage() {
                 montoTotal: newMontoTotal,
               });
 
-              if (newEtapa?.nombre === "Proyecto por Iniciar") {
+              toast.success(
+                activeContainer === overContainer
+                  ? "Datos guardados con éxito."
+                  : "Cotización movida y actualizada con éxito."
+              );
+
+              if (
+                activeContainer !== overContainer &&
+                newEtapa?.nombre === "Proyecto por Iniciar"
+              ) {
                 setMoveBlockingLabel("Creando proyecto...");
                 try {
                   await axios.post("/api/proyectos", {
@@ -1572,11 +1749,15 @@ export default function PipelinePage() {
                     estadoActual: null,
                   });
                   toast.success(
-                    `Proyecto creado para ${quoteToMove.cliente?.nombreCompleto || "el cliente"}`
+                    `Proyecto creado para ${
+                      quoteToMove.cliente?.nombreCompleto || "el cliente"
+                    }`
                   );
                 } catch (error) {
                   console.error("Error creando proyecto desde cotización", error);
-                  toast.error("Se movió la cotización pero no se pudo crear el proyecto.");
+                  toast.error(
+                    "Se movió la cotización pero no se pudo crear el proyecto."
+                  );
                 }
               }
             } finally {
@@ -1585,6 +1766,7 @@ export default function PipelinePage() {
               setQuoteToMove(null);
               setNewStageId(null);
               setInitialFormData({});
+              setFormFieldsForStage([]);
             }
           }}
         />

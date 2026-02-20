@@ -1,3 +1,5 @@
+// src/app/api/cotizaciones/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
@@ -23,25 +25,23 @@ export async function GET(request: NextRequest) {
     const fechaHasta = searchParams.get("fechaHasta");
     const searchTerm = searchParams.get("searchTerm");
     const clienteId = searchParams.get("clienteId");
-
-    const matchFilter: Record<string, unknown> = {};
     const sucursalId = searchParams.get("sucursalId");
     const etapaId = searchParams.get("etapaId");
 
-    if (sucursalId) {
-      matchFilter.sucursalId = new mongoose.Types.ObjectId(sucursalId);
-    }
-    if (etapaId) {
-      matchFilter.etapa = new mongoose.Types.ObjectId(etapaId);
-    }
+    const matchFilter: Record<string, unknown> = {};
+
+    // filtros por IDs (si vienen)
+    if (sucursalId) matchFilter.sucursalId = new mongoose.Types.ObjectId(sucursalId);
+    if (etapaId) matchFilter.etapa = new mongoose.Types.ObjectId(etapaId);
     if (vendedorId) matchFilter.vendedor = new mongoose.Types.ObjectId(vendedorId);
     if (clienteId) matchFilter.cliente = new mongoose.Types.ObjectId(clienteId);
 
-    if (fechaDesde && fechaHasta) {
-      matchFilter.createdAt = {
-        $gte: startOfDay(parseISO(fechaDesde)),
-        $lte: endOfDay(parseISO(fechaHasta)),
-      };
+    // ✅ rango de fechas robusto: soporta solo desde, solo hasta, o ambos
+    if (fechaDesde || fechaHasta) {
+      const createdAt: Record<string, Date> = {};
+      if (fechaDesde) createdAt.$gte = startOfDay(parseISO(fechaDesde));
+      if (fechaHasta) createdAt.$lte = endOfDay(parseISO(fechaHasta));
+      matchFilter.createdAt = createdAt;
     }
 
     const pipeline: mongoose.PipelineStage[] = [
@@ -85,7 +85,17 @@ export async function GET(request: NextRequest) {
       { $lookup: { from: "users", localField: "vendedor", foreignField: "_id", as: "vendedorInfo" } },
       { $unwind: { path: "$vendedorInfo", preserveNullAndEmptyArrays: true } },
 
-      { $match: searchTerm ? { "clienteInfo.nombreCompleto": { $regex: searchTerm, $options: "i" } } : {} },
+      // ✅ searchTerm ahora matchea cliente o código
+      {
+        $match: searchTerm
+          ? {
+              $or: [
+                { "clienteInfo.nombreCompleto": { $regex: searchTerm, $options: "i" } },
+                { codigo: { $regex: searchTerm, $options: "i" } },
+              ],
+            }
+          : {},
+      },
 
       {
         $project: {
@@ -93,14 +103,10 @@ export async function GET(request: NextRequest) {
           montoTotal: 1,
           detalle: 1,
           archivos: 1,
-
-          // NUEVO: sucursalId (por si lo usás luego en UI/filtros)
           sucursalId: 1,
-
           tipoAbertura: 1,
           comoNosConocio: 1,
 
-          // HISTORIAL: incluir datosFormulario ✅
           historialEtapas: {
             $map: {
               input: "$historialEtapas",
@@ -145,7 +151,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, data: cotizaciones });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Error desconocido";
-    return NextResponse.json({ success: false, error: errorMessage, status: 500 });
+    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   }
 }
 
@@ -180,7 +186,6 @@ export async function POST(request: NextRequest) {
     if (!clienteId) throw new Error("cliente es obligatorio");
     if (!sucursalId) throw new Error("sucursalId es obligatorio");
 
-    // Resolver etapa inicial (solo necesitamos el ID)
     let etapaId: mongoose.Types.ObjectId;
 
     if (etapaDesdeFront) {
@@ -198,7 +203,6 @@ export async function POST(request: NextRequest) {
       etapaId = etapaDoc._id;
     }
 
-    // Código secuencial
     const ultimaCotizacion = await Cotizacion.findOne().sort({ createdAt: -1 });
     let nuevoCodigo = "COT-001";
     if (ultimaCotizacion?.codigo) {
@@ -206,7 +210,6 @@ export async function POST(request: NextRequest) {
       nuevoCodigo = `COT-${(ultimoNumero + 1).toString().padStart(3, "0")}`;
     }
 
-    // Precio
     const parsedMonto = typeof montoTotal === "number" ? montoTotal : Number(montoTotal ?? 0);
     const safeMonto = Number.isFinite(parsedMonto) ? parsedMonto : 0;
 
@@ -220,8 +223,8 @@ export async function POST(request: NextRequest) {
       montoTotal: safeMonto,
       detalle,
 
-      // ✅ guardar sucursal por ID
-      sucursalId,
+      // ✅ ObjectId garantizado (aunque Mongoose castee, acá queda explícito)
+      sucursalId: new mongoose.Types.ObjectId(sucursalId),
 
       tipoAbertura: tipoAbertura || undefined,
       comoNosConocio: comoNosConocio || undefined,
@@ -242,7 +245,6 @@ export async function POST(request: NextRequest) {
       ],
     });
 
-    // Crear tarea (igual que antes)
     const cliente = await Cliente.findById(clienteId);
     if (cliente) {
       await Tarea.create({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { DateRange } from "react-day-picker";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -35,9 +35,9 @@ type SucursalLite = { _id: string; nombre: string };
 
 export interface Filters {
   searchTerm: string;
-  vendedorId: string;
-  sucursalId: string;
-  etapaId: string;
+  vendedorId: string;   // "" => todas
+  sucursalId: string;   // "" => todas
+  etapaId: string;      // "" => todas
   dateRange: DateRange | undefined;
 }
 
@@ -60,7 +60,6 @@ function parseDateParam(v: string | null): Date | undefined {
 }
 
 function isoDateOnly(d: Date) {
-  // YYYY-MM-DD para URL
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
@@ -72,18 +71,18 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
   const router = useRouter();
   const sp = useSearchParams();
 
-  // --- VENDEDORES (solo rol vendedor)
-  // Ajustá el endpoint según tu backend:
-  // 1) /api/users?role=vendedor
-  // o 2) /api/users?vendedorOnly=true
+  const sessionUserId = (session?.user?.id as string | undefined) || "";
+  const sessionRole = (session?.user as any)?.role as string | undefined;
+
+  // Vendedores (si tu endpoint devuelve solo vendedores, ok)
   const { data: vendedores } = useQuery<User[]>({
     queryKey: ["users", "vendedores"],
     queryFn: async () =>
       (await axios.get("/api/users", { params: { role: "vendedor" } })).data.data,
   });
 
-  // --- SUCURSALES
-  const { data: sucursales = [], isLoading: sucursalesLoading } = useSucursales();
+  // Sucursales
+  const { data: sucursales = [] } = useSucursales();
 
   const sucursalNameById = useMemo(() => {
     const m = new Map<string, string>();
@@ -97,14 +96,12 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
     return m;
   }, [etapas]);
 
-  // --- URL -> State (leer al montar/cambiar)
+  // URL -> State
   useEffect(() => {
-    // Solo si hay algo en la URL; si no, respetamos tu default actual
     const urlSearch = sp.get("search");
     const urlVendedorId = sp.get("vendedorId");
     const urlSucursalId = sp.get("sucursalId");
     const urlEtapaId = sp.get("etapaId");
-
     const from = parseDateParam(sp.get("from"));
     const to = parseDateParam(sp.get("to"));
 
@@ -135,7 +132,7 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sp]);
 
-  // --- State -> URL (sync)
+  // State -> URL
   useEffect(() => {
     const params = new URLSearchParams(sp.toString());
 
@@ -144,30 +141,36 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
     setOrDelete(params, "sucursalId", filters.sucursalId);
     setOrDelete(params, "etapaId", filters.etapaId);
 
-    if (filters.dateRange?.from) {
-      params.set("from", isoDateOnly(filters.dateRange.from));
-    } else {
-      params.delete("from");
-    }
+    if (filters.dateRange?.from) params.set("from", isoDateOnly(filters.dateRange.from));
+    else params.delete("from");
 
-    if (filters.dateRange?.to) {
-      params.set("to", isoDateOnly(filters.dateRange.to));
-    } else {
-      params.delete("to");
-    }
+    if (filters.dateRange?.to) params.set("to", isoDateOnly(filters.dateRange.to));
+    else params.delete("to");
 
     router.replace(`?${params.toString()}`, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.searchTerm, filters.vendedorId, filters.sucursalId, filters.etapaId, filters.dateRange?.from, filters.dateRange?.to]);
+  }, [
+    filters.searchTerm,
+    filters.vendedorId,
+    filters.sucursalId,
+    filters.etapaId,
+    filters.dateRange?.from,
+    filters.dateRange?.to,
+  ]);
 
   const handleFilterChange = <K extends keyof Filters>(name: K, value: Filters[K]) => {
     setFilters((prev) => ({ ...prev, [name]: value }));
   };
 
   const clearFilters = () => {
+    // Para admin, limpiar = ver todo (vendedorId vacío).
+    // Para vendedor, limpiar = mis cotizaciones.
+    const defaultVendedor =
+      sessionRole === "admin" ? "" : sessionUserId;
+
     setFilters({
       searchTerm: "",
-      vendedorId: session?.user?.id || "",
+      vendedorId: defaultVendedor,
       sucursalId: "",
       etapaId: "",
       dateRange: undefined,
@@ -175,8 +178,10 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
   };
 
   const activeFilterCount = useMemo(() => {
-    const defaultVendedorId = session?.user?.id || "";
-    const isVendedorActive = filters.vendedorId !== defaultVendedorId;
+    const defaultVendedor =
+      sessionRole === "admin" ? "" : sessionUserId;
+
+    const isVendedorActive = filters.vendedorId !== defaultVendedor;
     const isDateActive = !!filters.dateRange?.from;
     const isSucursalActive = !!filters.sucursalId;
     const isEtapaActive = !!filters.etapaId;
@@ -187,10 +192,10 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
       (isSucursalActive ? 1 : 0) +
       (isEtapaActive ? 1 : 0)
     );
-  }, [filters, session?.user?.id]);
+  }, [filters, sessionRole, sessionUserId]);
 
   const vendedorName = useMemo(() => {
-    if (filters.vendedorId === "") return "Todos";
+    if (!filters.vendedorId) return "Todas";
     return vendedores?.find((v) => v._id === filters.vendedorId)?.name || "Otro";
   }, [filters.vendedorId, vendedores]);
 
@@ -217,11 +222,12 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
 
       {/* Badges */}
       <div className="flex items-center gap-2 flex-shrink-0">
-        {filters.vendedorId !== (session?.user?.id || "") && (session?.user?.id || "") && (
+        {/* vendedor badge sólo si no es el default */}
+        {activeFilterCount > 0 && filters.vendedorId && (
           <Badge className="pl-2 pr-1 h-6 bg-primary">
             <span className="mr-1">Vendedor: {vendedorName}</span>
             <button
-              onClick={() => handleFilterChange("vendedorId", session?.user?.id || "")}
+              onClick={() => handleFilterChange("vendedorId", "")}
               className="rounded-full hover:bg-background/80 p-2"
               aria-label="Quitar filtro de vendedor"
             >
@@ -260,8 +266,7 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
           <Badge className="pl-2 pr-1 h-6 bg-primary">
             <span className="mr-1">
               {format(filters.dateRange.from, "d/MM", { locale: es })}
-              {filters.dateRange.to &&
-                ` - ${format(filters.dateRange.to, "d/MM", { locale: es })}`}
+              {filters.dateRange.to && ` - ${format(filters.dateRange.to, "d/MM", { locale: es })}`}
             </span>
             <button
               onClick={() => handleFilterChange("dateRange", undefined)}
@@ -292,9 +297,7 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
           <div className="grid gap-4">
             <div className="space-y-2">
               <h4 className="font-medium leading-none">Filtros Adicionales</h4>
-              <p className="text-sm text-muted-foreground">
-                Refina tu búsqueda de negocios.
-              </p>
+              <p className="text-sm text-muted-foreground">Refina tu búsqueda de negocios.</p>
             </div>
 
             <div className="grid gap-4">
@@ -302,22 +305,24 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
               <div className="space-y-2">
                 <Label>Vendedor</Label>
                 <Select
-                  value={filters.vendedorId}
+                  value={filters.vendedorId || "all"}
                   onValueChange={(value) =>
                     handleFilterChange("vendedorId", value === "all" ? "" : value)
                   }
-                  defaultValue={session?.user?.id}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Filtrar por vendedor..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={session?.user?.id || ""}>
-                      Mis Cotizaciones
-                    </SelectItem>
                     <SelectItem value="all">Todas</SelectItem>
+
+                    {/* Si querés “Mis Cotizaciones” para todos */}
+                    {sessionUserId && (
+                      <SelectItem value={sessionUserId}>Mis Cotizaciones</SelectItem>
+                    )}
+
                     {vendedores
-                      ?.filter((v) => v._id !== session?.user?.id)
+                      ?.filter((v) => v._id !== sessionUserId)
                       .map((v) => (
                         <SelectItem key={v._id} value={v._id}>
                           {v.name}
@@ -378,10 +383,7 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
                 <Label>Rango de Fechas</Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className="w-full justify-start text-left font-normal"
-                    >
+                    <Button variant={"outline"} className="w-full justify-start text-left font-normal">
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {filters.dateRange?.from ? (
                         filters.dateRange.to ? (
