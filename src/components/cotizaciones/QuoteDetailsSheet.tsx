@@ -3,7 +3,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import axios from "axios";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -169,6 +169,13 @@ type PutOps =
   | { op: "removeMaterial"; uid: string }
   | { op: "addTicket"; ticket: QuoteTicket }
   | { op: "removeTicket"; uid: string };
+
+type PipelineQuoteLite = {
+  _id: string;
+  codigo?: string;
+  nombre?: string;
+  updatedAt?: string;
+} & Record<string, unknown>;
 
 function uid() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
@@ -339,13 +346,7 @@ function Dropzone({
           {subtitle ? <div className="mt-1 text-xs text-muted-foreground">{subtitle}</div> : null}
           {acceptHint ? <div className="mt-1 text-[11px] text-muted-foreground">{acceptHint}</div> : null}
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-xl gap-2 shrink-0"
-          onClick={onPick}
-          disabled={disabled}
-        >
+        <Button variant="outline" size="sm" className="rounded-xl gap-2 shrink-0" onClick={onPick} disabled={disabled}>
           <Upload className="h-4 w-4" />
           Subir
         </Button>
@@ -423,9 +424,6 @@ export function QuoteDetailsSheet({
   const pagoInputRef = useRef<HTMLInputElement | null>(null);
   const imagenesInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [nameDraft, setNameDraft] = useState("");
-
   const [isEditingCode, setIsEditingCode] = useState(false);
   const [codeDraft, setCodeDraft] = useState("");
 
@@ -486,7 +484,6 @@ export function QuoteDetailsSheet({
     }
   };
 
-  // ✅ PUT con propagación inmediata a "cotizacionesPipeline" (sin F5) + toasts (sonner)
   const putMutation = useMutation({
     mutationFn: async (payload: PutOps) => {
       if (!quoteId) throw new Error("quoteId requerido");
@@ -494,64 +491,73 @@ export function QuoteDetailsSheet({
       return res.data.data as QuoteDetails;
     },
 
-    onMutate: async (payload) => {
+    onMutate: async (payload: PutOps) => {
       if (!quoteId) return;
 
       await queryClient.cancelQueries({ queryKey: ["cotizacionDetalle", quoteId] });
       await queryClient.cancelQueries({ queryKey: ["cotizacionesPipeline"] });
 
       const prevDetail = queryClient.getQueryData<QuoteDetails | null>(["cotizacionDetalle", quoteId]);
-      const prevLists = queryClient.getQueriesData({ queryKey: ["cotizacionesPipeline"], exact: false });
+      const prevLists = queryClient.getQueriesData<unknown>({ queryKey: ["cotizacionesPipeline"], exact: false });
 
       // optimistic detalle
-      queryClient.setQueryData(["cotizacionDetalle", quoteId], (old: QuoteDetails | null) =>
-        applyOptimistic(old, payload)
-      );
+      queryClient.setQueryData(["cotizacionDetalle", quoteId], (old: QuoteDetails | null) => applyOptimistic(old, payload));
 
-      // optimistic listas (solo codigo/nombre, para no romper shapes)
+      // optimistic listas (solo codigo/nombre)
       if (payload.op === "setCodigo" || payload.op === "setNombre") {
-        queryClient.setQueriesData({ queryKey: ["cotizacionesPipeline"], exact: false }, (old: any) => {
+        queryClient.setQueriesData({ queryKey: ["cotizacionesPipeline"], exact: false }, (old: unknown) => {
           if (!Array.isArray(old)) return old;
-          return old.map((q: any) => {
+
+          const arr = old as PipelineQuoteLite[];
+          return arr.map((q) => {
             if (q?._id !== quoteId) return q;
             return {
               ...q,
               ...(payload.op === "setCodigo" ? { codigo: payload.codigo } : {}),
               ...(payload.op === "setNombre" ? { nombre: payload.nombre } : {}),
-            };
+            } satisfies PipelineQuoteLite;
           });
         });
       }
 
-      return { prevDetail, prevLists, payload };
+      return { prevDetail, prevLists };
     },
 
     onError: (_err, _payload, ctx) => {
-      if (quoteId && ctx?.prevDetail) queryClient.setQueryData(["cotizacionDetalle", quoteId], ctx.prevDetail);
-      if (ctx?.prevLists) ctx.prevLists.forEach(([key, data]: any) => queryClient.setQueryData(key, data));
+      if (quoteId && ctx?.prevDetail !== undefined) {
+        queryClient.setQueryData(["cotizacionDetalle", quoteId], ctx.prevDetail);
+      }
+
+      if (ctx?.prevLists?.length) {
+        ctx.prevLists.forEach(([key, data]) => {
+          queryClient.setQueryData(key as QueryKey, data);
+        });
+      }
+
       toast.error("Error", { description: "No se pudo guardar el cambio." });
     },
 
     onSuccess: (updated, payload) => {
       queryClient.setQueryData(["cotizacionDetalle", quoteId], updated);
 
-      // server truth: listas
       if (payload.op === "setCodigo" || payload.op === "setNombre") {
-        queryClient.setQueriesData({ queryKey: ["cotizacionesPipeline"], exact: false }, (old: any) => {
+        queryClient.setQueriesData({ queryKey: ["cotizacionesPipeline"], exact: false }, (old: unknown) => {
           if (!Array.isArray(old)) return old;
-          return old.map((q: any) => {
+
+          const arr = old as PipelineQuoteLite[];
+          return arr.map((q) => {
             if (q?._id !== updated._id) return q;
             return {
               ...q,
               codigo: updated.codigo ?? q.codigo,
               nombre: updated.nombre ?? q.nombre,
               updatedAt: updated.updatedAt ?? q.updatedAt,
-            };
+            } satisfies PipelineQuoteLite;
           });
         });
       }
 
-      const msgByOp: Record<string, string> = {
+      const msgByOp: Record<PutOps["op"], string> = {
         setCodigo: "Código actualizado.",
         setNombre: "Nombre actualizado.",
         appendArchivos: "Adjunto(s) agregados.",
@@ -568,7 +574,7 @@ export function QuoteDetailsSheet({
         removeTicket: "Ticket eliminado.",
       };
 
-      toast.success("Listo", { description: msgByOp[(payload as any)?.op] ?? "Cambio guardado." });
+      toast.success("Listo", { description: msgByOp[payload.op] ?? "Cambio guardado." });
     },
   });
 
@@ -581,11 +587,9 @@ export function QuoteDetailsSheet({
         const form = new FormData();
         form.append("file", f);
 
-        const res = await axios.post(
-          `/api/uploads/cloudinary?folder=${encodeURIComponent(folder)}`,
-          form,
-          { headers: { "Content-Type": "multipart/form-data" } }
-        );
+        const res = await axios.post(`/api/uploads/cloudinary?folder=${encodeURIComponent(folder)}`, form, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
 
         const url = res.data.url as string;
         const publicId = res.data.public_id as string | undefined;
@@ -618,20 +622,7 @@ export function QuoteDetailsSheet({
   const materialPedido = quote?.materialPedido ?? [];
   const tickets = quote?.tickets ?? [];
 
-  // -------------------- Header edit handlers --------------------
-  const startEditName = () => {
-    setNameDraft(quote?.nombre?.trim() || "");
-    setIsEditingName(true);
-  };
-  const cancelEditName = () => {
-    setIsEditingName(false);
-    setNameDraft("");
-  };
-  const saveName = async () => {
-    await putMutation.mutateAsync({ op: "setNombre", nombre: nameDraft.trim() });
-    setIsEditingName(false);
-  };
-
+  // -------------------- Header edit handlers (solo código) --------------------
   const startEditCode = () => {
     setCodeDraft(quote?.codigo?.trim() || "");
     setIsEditingCode(true);
@@ -670,7 +661,6 @@ export function QuoteDetailsSheet({
     await putMutation.mutateAsync({ op: "appendArchivos", archivos: uploaded });
   };
 
-  // Facturas: solo adjunto (imagen/pdf). Otros campos “-” / 0 para no romper.
   const onFacturaSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const list = e.target.files;
     if (!list?.length) return;
@@ -697,7 +687,6 @@ export function QuoteDetailsSheet({
     }
   };
 
-  // Pagos: solo imagen. Otros campos “-” / 0.
   const onPagoSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const list = e.target.files;
     if (!list?.length) return;
@@ -730,7 +719,6 @@ export function QuoteDetailsSheet({
     }
   };
 
-  // Imágenes: drag/drop (solo imágenes)
   const onImagenesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const list = e.target.files;
     if (!list?.length) return;
@@ -803,7 +791,7 @@ export function QuoteDetailsSheet({
         {/* hidden inputs */}
         <input ref={attachmentsInputRef} type="file" multiple className="hidden" onChange={onAttachmentsSelected} />
 
-        {/* Facturas: permitimos imagen/pdf (drag/drop también). */}
+        {/* Facturas: imagen/pdf */}
         <input
           ref={facturaInputRef}
           type="file"
@@ -1064,46 +1052,25 @@ export function QuoteDetailsSheet({
                                       <div className="text-sm font-semibold truncate" title={a.name || fileNameFromUrl(a.url)}>
                                         {shownName}
                                       </div>
-                                      {/* ✅ NO mostramos URL */}
-                                      <div className="text-xs text-muted-foreground">
-                                        {isPdf ? "PDF" : isImg ? "Imagen" : "Archivo"}
-                                      </div>
+                                      <div className="text-xs text-muted-foreground">{isPdf ? "PDF" : isImg ? "Imagen" : "Archivo"}</div>
                                     </div>
                                   </div>
 
                                   <div className="flex items-center gap-1 shrink-0">
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 rounded-xl"
-                                      onClick={() => copyText(a.url)}
-                                      title="Copiar link"
-                                    >
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl" onClick={() => copyText(a.url)} title="Copiar link">
                                       <Copy className="h-4 w-4" />
                                     </Button>
 
-                                    {isPdf ? (
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="rounded-xl gap-2"
-                                        onClick={() => window.open(a.url, "_blank", "noopener,noreferrer")}
-                                        title="Abrir PDF"
-                                      >
-                                        <ExternalLink className="h-4 w-4" />
-                                        Abrir
-                                      </Button>
-                                    ) : (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 rounded-xl"
-                                        onClick={() => window.open(a.url, "_blank", "noopener,noreferrer")}
-                                        title="Abrir"
-                                      >
-                                        <ExternalLink className="h-4 w-4" />
-                                      </Button>
-                                    )}
+                                    <Button
+                                      variant={isPdf ? "outline" : "ghost"}
+                                      size={isPdf ? "sm" : "icon"}
+                                      className={isPdf ? "rounded-xl gap-2" : "h-8 w-8 rounded-xl"}
+                                      onClick={() => window.open(a.url, "_blank", "noopener,noreferrer")}
+                                      title="Abrir"
+                                    >
+                                      <ExternalLink className="h-4 w-4" />
+                                      {isPdf ? "Abrir" : null}
+                                    </Button>
 
                                     <Button
                                       variant="ghost"
@@ -1283,7 +1250,6 @@ export function QuoteDetailsSheet({
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="min-w-0">
                                     <div className="text-sm font-semibold truncate">{img.caption || truncate(fileNameFromUrl(img.url), 24)}</div>
-                                    {/* no mostramos url */}
                                     <div className="text-xs text-muted-foreground">{truncate(fileNameFromUrl(img.url), 28)}</div>
                                   </div>
                                   <div className="flex items-center gap-1">
@@ -1315,7 +1281,7 @@ export function QuoteDetailsSheet({
                       </AccordionContent>
                     </AccordionItem>
 
-                    {/* Material (igual que antes) */}
+                    {/* Material */}
                     <AccordionItem value="materials">
                       <AccordionTrigger className="px-3 hover:no-underline">
                         <div className="flex items-center gap-2">
@@ -1408,7 +1374,7 @@ export function QuoteDetailsSheet({
                       </AccordionContent>
                     </AccordionItem>
 
-                    {/* Tickets (igual que antes) */}
+                    {/* Tickets */}
                     <AccordionItem value="tickets">
                       <AccordionTrigger className="px-3 hover:no-underline">
                         <div className="flex items-center gap-2">
@@ -1486,7 +1452,7 @@ export function QuoteDetailsSheet({
                                         variant="outline"
                                         size="sm"
                                         className="rounded-xl gap-2"
-                                        onClick={() => window.open(t.url!, "_blank", "noopener,noreferrer")}
+                                        onClick={() => window.open(t.url, "_blank", "noopener,noreferrer")}
                                       >
                                         <ExternalLink className="h-4 w-4" />
                                         Ver
@@ -1544,7 +1510,13 @@ export function QuoteDetailsSheet({
                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl" onClick={() => copyText(clienteTelefono)} title="Copiar">
                               <Copy className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl" onClick={() => window.open(`tel:${clienteTelefono}`, "_self")} title="Llamar">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-xl"
+                              onClick={() => window.open(`tel:${clienteTelefono}`, "_self")}
+                              title="Llamar"
+                            >
                               <Phone className="h-4 w-4" />
                             </Button>
                           </>

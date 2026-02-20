@@ -3,7 +3,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import axios from "axios";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -154,6 +154,13 @@ type PutOps =
   | { op: "removeMaterial"; uid: string }
   | { op: "addTicket"; ticket: QuoteTicket }
   | { op: "removeTicket"; uid: string };
+
+type PipelineQuoteLite = {
+  _id: string;
+  codigo?: string;
+  nombre?: string;
+  updatedAt?: string;
+} & Record<string, unknown>;
 
 function uid() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
@@ -413,8 +420,7 @@ export function QuoteDetailsDialog({
   const pagoInputRef = useRef<HTMLInputElement | null>(null);
   const imagenesInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [nameDraft, setNameDraft] = useState("");
+  // ❌ eliminado: isEditingName/nameDraft/startEditName/cancelEditName/saveName (no se usaban)
 
   const [isEditingCode, setIsEditingCode] = useState(false);
   const [codeDraft, setCodeDraft] = useState("");
@@ -484,28 +490,30 @@ export function QuoteDetailsDialog({
       return res.data.data as QuoteDetails;
     },
 
-    onMutate: async (payload) => {
+    onMutate: async (payload: PutOps) => {
       if (!quoteId) return;
 
       await queryClient.cancelQueries({ queryKey: ["cotizacionDetalle", quoteId] });
       await queryClient.cancelQueries({ queryKey: ["cotizacionesPipeline"] });
 
       const prevDetail = queryClient.getQueryData<QuoteDetails | null>(["cotizacionDetalle", quoteId]);
-      const prevLists = queryClient.getQueriesData({ queryKey: ["cotizacionesPipeline"], exact: false });
+      const prevLists = queryClient.getQueriesData<unknown>({ queryKey: ["cotizacionesPipeline"], exact: false });
 
       queryClient.setQueryData(["cotizacionDetalle", quoteId], (old: QuoteDetails | null) => applyOptimistic(old, payload));
 
       // pipeline/tabla: solo nombre/codigo
       if (payload.op === "setCodigo" || payload.op === "setNombre") {
-        queryClient.setQueriesData({ queryKey: ["cotizacionesPipeline"], exact: false }, (old: any) => {
+        queryClient.setQueriesData({ queryKey: ["cotizacionesPipeline"], exact: false }, (old: unknown) => {
           if (!Array.isArray(old)) return old;
-          return old.map((q: any) => {
+
+          const arr = old as PipelineQuoteLite[];
+          return arr.map((q) => {
             if (q?._id !== quoteId) return q;
             return {
               ...q,
               ...(payload.op === "setCodigo" ? { codigo: payload.codigo } : {}),
               ...(payload.op === "setNombre" ? { nombre: payload.nombre } : {}),
-            };
+            } satisfies PipelineQuoteLite;
           });
         });
       }
@@ -514,8 +522,16 @@ export function QuoteDetailsDialog({
     },
 
     onError: (_err, _payload, ctx) => {
-      if (quoteId && ctx?.prevDetail) queryClient.setQueryData(["cotizacionDetalle", quoteId], ctx.prevDetail);
-      if (ctx?.prevLists) ctx.prevLists.forEach(([key, data]: any) => queryClient.setQueryData(key, data));
+      if (quoteId && ctx?.prevDetail !== undefined) {
+        queryClient.setQueryData(["cotizacionDetalle", quoteId], ctx.prevDetail);
+      }
+
+      if (ctx?.prevLists?.length) {
+        ctx.prevLists.forEach(([key, data]) => {
+          queryClient.setQueryData(key as QueryKey, data);
+        });
+      }
+
       toast.error("Error", { description: "No se pudo guardar el cambio." });
     },
 
@@ -523,21 +539,23 @@ export function QuoteDetailsDialog({
       queryClient.setQueryData(["cotizacionDetalle", quoteId], updated);
 
       if (payload.op === "setCodigo" || payload.op === "setNombre") {
-        queryClient.setQueriesData({ queryKey: ["cotizacionesPipeline"], exact: false }, (old: any) => {
+        queryClient.setQueriesData({ queryKey: ["cotizacionesPipeline"], exact: false }, (old: unknown) => {
           if (!Array.isArray(old)) return old;
-          return old.map((q: any) => {
+
+          const arr = old as PipelineQuoteLite[];
+          return arr.map((q) => {
             if (q?._id !== updated._id) return q;
             return {
               ...q,
               codigo: updated.codigo ?? q.codigo,
               nombre: updated.nombre ?? q.nombre,
               updatedAt: updated.updatedAt ?? q.updatedAt,
-            };
+            } satisfies PipelineQuoteLite;
           });
         });
       }
 
-      const msgByOp: Record<string, string> = {
+      const msgByOp: Record<PutOps["op"], string> = {
         setCodigo: "Código actualizado.",
         setNombre: "Nombre actualizado.",
         appendArchivos: "Adjunto(s) agregados.",
@@ -554,7 +572,7 @@ export function QuoteDetailsDialog({
         removeTicket: "Ticket eliminado.",
       };
 
-      toast.success("Listo", { description: msgByOp[(payload as any)?.op] ?? "Cambio guardado." });
+      toast.success("Listo", { description: msgByOp[payload.op] ?? "Cambio guardado." });
     },
   });
 
@@ -600,20 +618,7 @@ export function QuoteDetailsDialog({
   const materialPedido = quote?.materialPedido ?? [];
   const tickets = quote?.tickets ?? [];
 
-  // -------------------- Edit handlers --------------------
-  const startEditName = () => {
-    setNameDraft(quote?.nombre?.trim() || "");
-    setIsEditingName(true);
-  };
-  const cancelEditName = () => {
-    setIsEditingName(false);
-    setNameDraft("");
-  };
-  const saveName = async () => {
-    await putMutation.mutateAsync({ op: "setNombre", nombre: nameDraft.trim() });
-    setIsEditingName(false);
-  };
-
+  // -------------------- Edit handlers (solo código) --------------------
   const startEditCode = () => {
     setCodeDraft(quote?.codigo?.trim() || "");
     setIsEditingCode(true);
@@ -777,7 +782,14 @@ export function QuoteDetailsDialog({
       <DialogContent className="sm:max-w-[1100px] max-h-[88vh] p-0 overflow-hidden">
         {/* hidden inputs */}
         <input ref={attachmentsInputRef} type="file" multiple className="hidden" onChange={onAttachmentsSelected} />
-        <input ref={facturaInputRef} type="file" multiple className="hidden" accept="application/pdf,image/*" onChange={onFacturaSelected} />
+        <input
+          ref={facturaInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          accept="application/pdf,image/*"
+          onChange={onFacturaSelected}
+        />
         <input ref={pagoInputRef} type="file" multiple className="hidden" accept="image/*" onChange={onPagoSelected} />
         <input ref={imagenesInputRef} type="file" multiple className="hidden" accept="image/*" onChange={onImagenesSelected} />
 
@@ -786,9 +798,7 @@ export function QuoteDetailsDialog({
           <DialogHeader className="space-y-0">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <DialogTitle className="text-base sm:text-lg truncate">
-                  {isLoading ? "Cargando…" : "Detalle de negocio"}
-                </DialogTitle>
+                <DialogTitle className="text-base sm:text-lg truncate">{isLoading ? "Cargando…" : "Detalle de negocio"}</DialogTitle>
                 <div className="mt-2 flex items-center gap-2">
                   <Badge className="rounded-full border border-primary/20 bg-primary text-primary-foreground shadow-sm">
                     {quote?.etapa?.nombre || "Sin etapa"}
@@ -933,13 +943,11 @@ export function QuoteDetailsDialog({
                   {quote.detalle ? (
                     <Card className="rounded-3xl border shadow-sm p-5">
                       <div className="text-xs text-muted-foreground mb-2">Detalle</div>
-                      <div className="rounded-2xl border bg-background/60 p-4 text-sm whitespace-pre-wrap leading-relaxed">
-                        {quote.detalle}
-                      </div>
+                      <div className="rounded-2xl border bg-background/60 p-4 text-sm whitespace-pre-wrap leading-relaxed">{quote.detalle}</div>
                     </Card>
                   ) : null}
 
-                  {/* Premium block (igual que sheet) */}
+                  {/* Premium block */}
                   <Card className="rounded-3xl border shadow-sm overflow-hidden p-0">
                     <div className="p-5 bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10">
                       <div className="flex items-start justify-between gap-4">
@@ -952,9 +960,7 @@ export function QuoteDetailsDialog({
                             Un asistente IA que resume todo el negocio y responde preguntas como:
                             <span className="font-medium text-foreground"> “¿en qué estado está este negocio?”</span>
                           </div>
-                          <div className="mt-2 text-xs text-muted-foreground">
-                            *Requiere contratación. No está habilitado en este plan.
-                          </div>
+                          <div className="mt-2 text-xs text-muted-foreground">*Requiere contratación. No está habilitado en este plan.</div>
                         </div>
 
                         <Button variant="outline" className="rounded-xl gap-2" disabled title="Servicio premium - requiere contratación">
@@ -1080,14 +1086,7 @@ export function QuoteDetailsDialog({
                                         {isPdf ? "Abrir" : null}
                                       </Button>
 
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 rounded-xl"
-                                        onClick={() => removeArchivo(a.uid)}
-                                        disabled={busy}
-                                        title="Eliminar"
-                                      >
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl" onClick={() => removeArchivo(a.uid)} disabled={busy} title="Eliminar">
                                         <Trash2 className="h-4 w-4" />
                                       </Button>
                                     </div>
@@ -1194,9 +1193,7 @@ export function QuoteDetailsDialog({
                                   <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
                                       <div className="text-sm font-semibold">Pago</div>
-                                      <div className="text-xs text-muted-foreground">
-                                        {p.comprobanteUrl ? truncate(fileNameFromUrl(p.comprobanteUrl), 28) : "—"}
-                                      </div>
+                                      <div className="text-xs text-muted-foreground">{p.comprobanteUrl ? truncate(fileNameFromUrl(p.comprobanteUrl), 28) : "—"}</div>
                                     </div>
                                     <div className="flex items-center gap-2">
                                       <Button
@@ -1257,19 +1254,11 @@ export function QuoteDetailsDialog({
                                 <div key={img.uid} className="rounded-2xl border bg-background/60 p-4 shadow-sm">
                                   <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
-                                      <div className="text-sm font-semibold truncate">
-                                        {img.caption || truncate(fileNameFromUrl(img.url), 24)}
-                                      </div>
+                                      <div className="text-sm font-semibold truncate">{img.caption || truncate(fileNameFromUrl(img.url), 24)}</div>
                                       <div className="text-xs text-muted-foreground">{truncate(fileNameFromUrl(img.url), 28)}</div>
                                     </div>
                                     <div className="flex items-center gap-1">
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 rounded-xl"
-                                        onClick={() => window.open(img.url, "_blank", "noopener,noreferrer")}
-                                        title="Abrir"
-                                      >
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl" onClick={() => window.open(img.url, "_blank", "noopener,noreferrer")} title="Abrir">
                                         <ExternalLink className="h-4 w-4" />
                                       </Button>
                                       <Button
@@ -1291,7 +1280,7 @@ export function QuoteDetailsDialog({
                         </AccordionContent>
                       </AccordionItem>
 
-                      {/* Material (igual que antes) */}
+                      {/* Material */}
                       <AccordionItem value="materials">
                         <AccordionTrigger className="px-3 hover:no-underline">
                           <div className="flex items-center gap-2">
@@ -1305,34 +1294,14 @@ export function QuoteDetailsDialog({
                             <div className="text-sm font-semibold">Nuevo item</div>
 
                             <div className="mt-3 grid grid-cols-1 gap-2">
-                              <Input
-                                value={materialDraft.descripcion}
-                                onChange={(e) => setMaterialDraft((s) => ({ ...s, descripcion: e.target.value }))}
-                                placeholder="Descripción"
-                                className="h-9 rounded-xl"
-                              />
+                              <Input value={materialDraft.descripcion} onChange={(e) => setMaterialDraft((s) => ({ ...s, descripcion: e.target.value }))} placeholder="Descripción" className="h-9 rounded-xl" />
                               <div className="grid grid-cols-2 gap-2">
-                                <Input
-                                  value={materialDraft.cantidad}
-                                  onChange={(e) => setMaterialDraft((s) => ({ ...s, cantidad: e.target.value }))}
-                                  placeholder="Cantidad"
-                                  className="h-9 rounded-xl"
-                                />
-                                <Input
-                                  value={materialDraft.unidad}
-                                  onChange={(e) => setMaterialDraft((s) => ({ ...s, unidad: e.target.value }))}
-                                  placeholder="Unidad (ej: u, m2)"
-                                  className="h-9 rounded-xl"
-                                />
+                                <Input value={materialDraft.cantidad} onChange={(e) => setMaterialDraft((s) => ({ ...s, cantidad: e.target.value }))} placeholder="Cantidad" className="h-9 rounded-xl" />
+                                <Input value={materialDraft.unidad} onChange={(e) => setMaterialDraft((s) => ({ ...s, unidad: e.target.value }))} placeholder="Unidad (ej: u, m2)" className="h-9 rounded-xl" />
                               </div>
                               <Input
                                 value={materialDraft.estado}
-                                onChange={(e) =>
-                                  setMaterialDraft((s) => ({
-                                    ...s,
-                                    estado: e.target.value as QuoteMaterialPedido["estado"],
-                                  }))
-                                }
+                                onChange={(e) => setMaterialDraft((s) => ({ ...s, estado: e.target.value as QuoteMaterialPedido["estado"] }))}
                                 placeholder="Estado: pendiente|pedido|recibido|cancelado"
                                 className="h-9 rounded-xl"
                               />
@@ -1362,17 +1331,8 @@ export function QuoteDetailsDialog({
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                      <Badge variant="outline" className="rounded-full">
-                                        {m.estado || "pendiente"}
-                                      </Badge>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 rounded-xl"
-                                        onClick={() => putMutation.mutate({ op: "removeMaterial", uid: m.uid })}
-                                        disabled={busy}
-                                        title="Eliminar"
-                                      >
+                                      <Badge variant="outline" className="rounded-full">{m.estado || "pendiente"}</Badge>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl" onClick={() => putMutation.mutate({ op: "removeMaterial", uid: m.uid })} disabled={busy} title="Eliminar">
                                         <Trash2 className="h-4 w-4" />
                                       </Button>
                                     </div>
@@ -1384,7 +1344,7 @@ export function QuoteDetailsDialog({
                         </AccordionContent>
                       </AccordionItem>
 
-                      {/* Tickets (igual que antes) */}
+                      {/* Tickets */}
                       <AccordionItem value="tickets">
                         <AccordionTrigger className="px-3 hover:no-underline">
                           <div className="flex items-center gap-2">
@@ -1398,36 +1358,12 @@ export function QuoteDetailsDialog({
                             <div className="text-sm font-semibold">Nuevo ticket</div>
 
                             <div className="mt-3 grid grid-cols-1 gap-2">
-                              <Input
-                                value={ticketDraft.titulo}
-                                onChange={(e) => setTicketDraft((s) => ({ ...s, titulo: e.target.value }))}
-                                placeholder="Título"
-                                className="h-9 rounded-xl"
-                              />
+                              <Input value={ticketDraft.titulo} onChange={(e) => setTicketDraft((s) => ({ ...s, titulo: e.target.value }))} placeholder="Título" className="h-9 rounded-xl" />
                               <div className="grid grid-cols-2 gap-2">
-                                <Input
-                                  value={ticketDraft.estado}
-                                  onChange={(e) =>
-                                    setTicketDraft((s) => ({
-                                      ...s,
-                                      estado: e.target.value as QuoteTicket["estado"],
-                                    }))
-                                  }
-                                  placeholder="Estado: abierto|en_progreso|cerrado"
-                                  className="h-9 rounded-xl"
-                                />
-                                <Input
-                                  value={ticketDraft.url}
-                                  onChange={(e) => setTicketDraft((s) => ({ ...s, url: e.target.value }))}
-                                  placeholder="URL (opcional)"
-                                  className="h-9 rounded-xl"
-                                />
+                                <Input value={ticketDraft.estado} onChange={(e) => setTicketDraft((s) => ({ ...s, estado: e.target.value as QuoteTicket["estado"] }))} placeholder="Estado: abierto|en_progreso|cerrado" className="h-9 rounded-xl" />
+                                <Input value={ticketDraft.url} onChange={(e) => setTicketDraft((s) => ({ ...s, url: e.target.value }))} placeholder="URL (opcional)" className="h-9 rounded-xl" />
                               </div>
-                              <Textarea
-                                value={ticketDraft.descripcion}
-                                onChange={(e) => setTicketDraft((s) => ({ ...s, descripcion: e.target.value }))}
-                                placeholder="Descripción (opcional)"
-                              />
+                              <Textarea value={ticketDraft.descripcion} onChange={(e) => setTicketDraft((s) => ({ ...s, descripcion: e.target.value }))} placeholder="Descripción (opcional)" />
                               <div className="flex justify-end">
                                 <Button variant="outline" size="sm" className="rounded-xl gap-2" onClick={addTicket} disabled={busy}>
                                   <Plus className="h-4 w-4" />
@@ -1449,33 +1385,17 @@ export function QuoteDetailsDialog({
                                     <div className="min-w-0">
                                       <div className="text-sm font-semibold">{t.titulo}</div>
                                       <div className="text-xs text-muted-foreground">{t.createdAt ? fmtDate(t.createdAt) : "—"}</div>
-                                      {t.descripcion ? (
-                                        <div className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">{t.descripcion}</div>
-                                      ) : null}
+                                      {t.descripcion ? <div className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">{t.descripcion}</div> : null}
                                     </div>
                                     <div className="flex items-center gap-2">
-                                      <Badge variant="outline" className="rounded-full">
-                                        {t.estado || "abierto"}
-                                      </Badge>
+                                      <Badge variant="outline" className="rounded-full">{t.estado || "abierto"}</Badge>
                                       {t.url ? (
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          className="rounded-xl gap-2"
-                                          onClick={() => window.open(t.url!, "_blank", "noopener,noreferrer")}
-                                        >
+                                        <Button variant="outline" size="sm" className="rounded-xl gap-2" onClick={() => window.open(t.url, "_blank", "noopener,noreferrer")}>
                                           <ExternalLink className="h-4 w-4" />
                                           Ver
                                         </Button>
                                       ) : null}
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 rounded-xl"
-                                        onClick={() => putMutation.mutate({ op: "removeTicket", uid: t.uid })}
-                                        disabled={busy}
-                                        title="Eliminar"
-                                      >
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl" onClick={() => putMutation.mutate({ op: "removeTicket", uid: t.uid })} disabled={busy} title="Eliminar">
                                         <Trash2 className="h-4 w-4" />
                                       </Button>
                                     </div>

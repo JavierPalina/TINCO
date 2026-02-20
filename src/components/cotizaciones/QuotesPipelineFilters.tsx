@@ -6,13 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Filter, CalendarIcon, X } from "lucide-react";
@@ -33,11 +27,16 @@ interface User {
 type EtapaLite = { _id: string; nombre: string };
 type SucursalLite = { _id: string; nombre: string };
 
+type SessionUser = {
+  id?: string;
+  role?: string;
+};
+
 export interface Filters {
   searchTerm: string;
-  vendedorId: string;   // "" => todas
-  sucursalId: string;   // "" => todas
-  etapaId: string;      // "" => todas
+  vendedorId: string; // "" => todas
+  sucursalId: string; // "" => todas
+  etapaId: string; // "" => todas
   dateRange: DateRange | undefined;
 }
 
@@ -71,14 +70,13 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
   const router = useRouter();
   const sp = useSearchParams();
 
-  const sessionUserId = (session?.user?.id as string | undefined) || "";
-  const sessionRole = (session?.user as any)?.role as string | undefined;
+  const sessionUserId = ((session?.user as unknown as SessionUser | undefined)?.id ?? "") || "";
+  const sessionRole = (session?.user as unknown as SessionUser | undefined)?.role;
 
   // Vendedores (si tu endpoint devuelve solo vendedores, ok)
   const { data: vendedores } = useQuery<User[]>({
     queryKey: ["users", "vendedores"],
-    queryFn: async () =>
-      (await axios.get("/api/users", { params: { role: "vendedor" } })).data.data,
+    queryFn: async () => (await axios.get("/api/users", { params: { role: "vendedor" } })).data.data as User[],
   });
 
   // Sucursales
@@ -165,8 +163,7 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
   const clearFilters = () => {
     // Para admin, limpiar = ver todo (vendedorId vacío).
     // Para vendedor, limpiar = mis cotizaciones.
-    const defaultVendedor =
-      sessionRole === "admin" ? "" : sessionUserId;
+    const defaultVendedor = sessionRole === "admin" ? "" : sessionUserId;
 
     setFilters({
       searchTerm: "",
@@ -178,20 +175,14 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
   };
 
   const activeFilterCount = useMemo(() => {
-    const defaultVendedor =
-      sessionRole === "admin" ? "" : sessionUserId;
+    const defaultVendedor = sessionRole === "admin" ? "" : sessionUserId;
 
     const isVendedorActive = filters.vendedorId !== defaultVendedor;
     const isDateActive = !!filters.dateRange?.from;
     const isSucursalActive = !!filters.sucursalId;
     const isEtapaActive = !!filters.etapaId;
 
-    return (
-      (isVendedorActive ? 1 : 0) +
-      (isDateActive ? 1 : 0) +
-      (isSucursalActive ? 1 : 0) +
-      (isEtapaActive ? 1 : 0)
-    );
+    return (isVendedorActive ? 1 : 0) + (isDateActive ? 1 : 0) + (isSucursalActive ? 1 : 0) + (isEtapaActive ? 1 : 0);
   }, [filters, sessionRole, sessionUserId]);
 
   const vendedorName = useMemo(() => {
@@ -306,9 +297,7 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
                 <Label>Vendedor</Label>
                 <Select
                   value={filters.vendedorId || "all"}
-                  onValueChange={(value) =>
-                    handleFilterChange("vendedorId", value === "all" ? "" : value)
-                  }
+                  onValueChange={(value) => handleFilterChange("vendedorId", value === "all" ? "" : value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Filtrar por vendedor..." />
@@ -317,9 +306,7 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
                     <SelectItem value="all">Todas</SelectItem>
 
                     {/* Si querés “Mis Cotizaciones” para todos */}
-                    {sessionUserId && (
-                      <SelectItem value={sessionUserId}>Mis Cotizaciones</SelectItem>
-                    )}
+                    {sessionUserId && <SelectItem value={sessionUserId}>Mis Cotizaciones</SelectItem>}
 
                     {vendedores
                       ?.filter((v) => v._id !== sessionUserId)
@@ -337,9 +324,7 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
                 <Label>Sucursal</Label>
                 <Select
                   value={filters.sucursalId || "all"}
-                  onValueChange={(value) =>
-                    handleFilterChange("sucursalId", value === "all" ? "" : value)
-                  }
+                  onValueChange={(value) => handleFilterChange("sucursalId", value === "all" ? "" : value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Filtrar por sucursal..." />
@@ -360,9 +345,7 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
                 <Label>Etapa</Label>
                 <Select
                   value={filters.etapaId || "all"}
-                  onValueChange={(value) =>
-                    handleFilterChange("etapaId", value === "all" ? "" : value)
-                  }
+                  onValueChange={(value) => handleFilterChange("etapaId", value === "all" ? "" : value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Filtrar por etapa..." />
@@ -400,12 +383,7 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="range"
-                      selected={filters.dateRange}
-                      onSelect={(range) => handleFilterChange("dateRange", range)}
-                      initialFocus
-                    />
+                    <Calendar mode="range" selected={filters.dateRange} onSelect={(range) => handleFilterChange("dateRange", range)} initialFocus />
                   </PopoverContent>
                 </Popover>
               </div>

@@ -1199,7 +1199,7 @@ export default function PipelinePage() {
 
   // ✅ set default vendedor solo si NO sos admin
   useEffect(() => {
-    const role = (session?.user as any)?.role as string | undefined;
+    const role = (session?.user as { role?: string } | undefined)?.role;
     if (!session?.user?.id) return;
 
     if (role !== "admin" && !filters.vendedorId) {
