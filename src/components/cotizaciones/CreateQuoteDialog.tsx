@@ -18,10 +18,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-// Cliente: seguís usando tu combobox2 (no lo cambio para no romperte estilos/props)
+// Cliente: seguís usando tu combobox2
 import { Combobox as Combobox2 } from "../ui/combobox2";
 
-// Sucursal y Tipo de obra: combobox estándar
+// Sucursal / Tipo de obra / Prioridad: combobox estándar
 import { Combobox } from "@/components/ui/combobox";
 
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -45,6 +45,7 @@ type FormInputs = {
     telefono: string;
     email: string;
     direccion?: string;
+    prioridad?: string;
   };
 
   // cotización
@@ -97,6 +98,7 @@ export function CreateQuoteDialog() {
           telefono: "",
           email: "",
           direccion: "",
+          prioridad: "Media",
         },
       },
     });
@@ -137,6 +139,17 @@ export function CreateQuoteDialog() {
       { value: "Departamento", label: "Departamento" },
       { value: "Obra nueva", label: "Obra nueva" },
       { value: "Remodelación", label: "Remodelación" },
+    ],
+    []
+  );
+
+  // ---- Prioridad cliente
+  const prioridadOptions = useMemo(
+    () => [
+      { value: "Alta", label: "Alta" },
+      { value: "Media", label: "Media" },
+      { value: "Baja", label: "Baja" },
+      { value: "Compleja", label: "Compleja" },
     ],
     []
   );
@@ -183,6 +196,7 @@ export function CreateQuoteDialog() {
           telefono: formData.newClient.telefono,
           email: formData.newClient.email,
           direccion: formData.newClient.direccion,
+          prioridad: formData.newClient.prioridad || "Media",
         });
 
         clienteId = clientResponse.data.data._id;
@@ -231,6 +245,7 @@ export function CreateQuoteDialog() {
           telefono: "",
           email: "",
           direccion: "",
+          prioridad: "Media",
         },
       });
       setOpen(false);
@@ -330,7 +345,9 @@ export function CreateQuoteDialog() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="newClient.telefono">Teléfono / WhatsApp*</Label>
+                  <Label htmlFor="newClient.telefono">
+                    Teléfono / WhatsApp*
+                  </Label>
                   <Input
                     id="newClient.telefono"
                     {...register("newClient.telefono", {
@@ -355,6 +372,22 @@ export function CreateQuoteDialog() {
                   id="newClient.direccion"
                   placeholder="Ej: Palermo, Av. Santa Fe 1234"
                   {...register("newClient.direccion")}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Prioridad</Label>
+                <Controller
+                  name="newClient.prioridad"
+                  control={control}
+                  render={({ field }) => (
+                    <Combobox
+                      options={prioridadOptions}
+                      value={field.value ?? "Media"}
+                      onChange={field.onChange}
+                      placeholder="Selecciona la prioridad..."
+                    />
+                  )}
                 />
               </div>
             </div>
