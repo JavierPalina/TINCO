@@ -68,6 +68,7 @@ export interface ICotizacion extends Document {
 
   tipoAbertura?: string;
   comoNosConocio?: string;
+  tipoObra?: string;
 
   detalle?: string;
   productos: { descripcion: string; cantidad: number; precioUnitario: number }[];
@@ -111,7 +112,11 @@ const FacturaSchema: Schema = new Schema(
     numero: { type: String, trim: true },
     fecha: { type: Date },
     monto: { type: Number },
-    estado: { type: String, enum: ["pendiente", "pagada", "vencida", "anulada"], default: "pendiente" },
+    estado: {
+      type: String,
+      enum: ["pendiente", "pagada", "vencida", "anulada"],
+      default: "pendiente",
+    },
     url: { type: String, trim: true },
   },
   { _id: false }
@@ -144,7 +149,11 @@ const MaterialPedidoSchema: Schema = new Schema(
     descripcion: { type: String, required: true, trim: true },
     cantidad: { type: Number },
     unidad: { type: String, trim: true },
-    estado: { type: String, enum: ["pendiente", "pedido", "recibido", "cancelado"], default: "pendiente" },
+    estado: {
+      type: String,
+      enum: ["pendiente", "pedido", "recibido", "cancelado"],
+      default: "pendiente",
+    },
   },
   { _id: false }
 );
@@ -153,7 +162,11 @@ const TicketSoporteSchema: Schema = new Schema(
   {
     uid: { type: String, required: true, index: true },
     titulo: { type: String, required: true, trim: true },
-    estado: { type: String, enum: ["abierto", "en_progreso", "cerrado"], default: "abierto" },
+    estado: {
+      type: String,
+      enum: ["abierto", "en_progreso", "cerrado"],
+      default: "abierto",
+    },
     createdAt: { type: Date, default: Date.now },
     descripcion: { type: String, trim: true },
     url: { type: String, trim: true },
@@ -176,6 +189,7 @@ const CotizacionSchema: Schema = new Schema(
 
     tipoAbertura: { type: String, trim: true },
     comoNosConocio: { type: String, trim: true },
+    tipoObra: { type: String, trim: true },
 
     detalle: { type: String, trim: true },
 

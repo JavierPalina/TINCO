@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     if (vendedorId) matchFilter.vendedor = new mongoose.Types.ObjectId(vendedorId);
     if (clienteId) matchFilter.cliente = new mongoose.Types.ObjectId(clienteId);
 
-    // ✅ rango de fechas robusto: soporta solo desde, solo hasta, o ambos
+    // rango de fechas robusto: soporta solo desde, solo hasta, o ambos
     if (fechaDesde || fechaHasta) {
       const createdAt: Record<string, Date> = {};
       if (fechaDesde) createdAt.$gte = startOfDay(parseISO(fechaDesde));
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
       { $lookup: { from: "users", localField: "vendedor", foreignField: "_id", as: "vendedorInfo" } },
       { $unwind: { path: "$vendedorInfo", preserveNullAndEmptyArrays: true } },
 
-      // ✅ searchTerm ahora matchea cliente o código
+      // searchTerm matchea cliente o código
       {
         $match: searchTerm
           ? {
@@ -106,6 +106,7 @@ export async function GET(request: NextRequest) {
           sucursalId: 1,
           tipoAbertura: 1,
           comoNosConocio: 1,
+          tipoObra: 1,
 
           historialEtapas: {
             $map: {
@@ -128,6 +129,7 @@ export async function GET(request: NextRequest) {
             nombreCompleto: "$clienteInfo.nombreCompleto",
             prioridad: "$clienteInfo.prioridad",
             telefono: "$clienteInfo.telefono",
+            direccion: "$clienteInfo.direccion",
           },
 
           etapa: {
@@ -163,6 +165,7 @@ type CreateCotizacionBody = {
   sucursalId: string;
   tipoAbertura?: string;
   comoNosConocio?: string;
+  tipoObra?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -181,6 +184,7 @@ export async function POST(request: NextRequest) {
       sucursalId,
       tipoAbertura,
       comoNosConocio,
+      tipoObra,
     } = body;
 
     if (!clienteId) throw new Error("cliente es obligatorio");
@@ -213,9 +217,11 @@ export async function POST(request: NextRequest) {
     const parsedMonto = typeof montoTotal === "number" ? montoTotal : Number(montoTotal ?? 0);
     const safeMonto = Number.isFinite(parsedMonto) ? parsedMonto : 0;
 
-    const detalle = `Tipo de Abertura: ${tipoAbertura || "No especificado"}\n | Cómo nos conoció: ${
-      comoNosConocio || "No especificado"
-    }`;
+    const detalle = [
+      `Tipo de Abertura: ${tipoAbertura || "No especificado"}`,
+      `Cómo nos conoció: ${comoNosConocio || "No especificado"}`,
+      `Tipo de obra: ${tipoObra || "No especificado"}`,
+    ].join("\n");
 
     const nuevaCotizacion = await Cotizacion.create({
       cliente: clienteId,
@@ -223,11 +229,11 @@ export async function POST(request: NextRequest) {
       montoTotal: safeMonto,
       detalle,
 
-      // ✅ ObjectId garantizado (aunque Mongoose castee, acá queda explícito)
       sucursalId: new mongoose.Types.ObjectId(sucursalId),
 
       tipoAbertura: tipoAbertura || undefined,
       comoNosConocio: comoNosConocio || undefined,
+      tipoObra: tipoObra || undefined,
 
       archivos: [],
       vendedor: session.user.id,
@@ -240,6 +246,7 @@ export async function POST(request: NextRequest) {
           datosFormulario: {
             __precioAnterior: 0,
             __precioNuevo: safeMonto,
+            tipoObra: tipoObra || null,
           },
         },
       ],

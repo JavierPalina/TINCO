@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 // Cliente: seguís usando tu combobox2 (no lo cambio para no romperte estilos/props)
 import { Combobox as Combobox2 } from "../ui/combobox2";
 
-// Sucursal: como tu ejemplo, combobox “estándar”
+// Sucursal y Tipo de obra: combobox estándar
 import { Combobox } from "@/components/ui/combobox";
 
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -44,32 +44,32 @@ type FormInputs = {
     nombreCompleto: string;
     telefono: string;
     email: string;
+    direccion?: string;
   };
 
   // cotización
-  montoTotal: number; // Precio (entero, sin centavos)
-  etapa: string; // Columna/Etapa inicial
+  montoTotal: number;
+  etapa: string;
 
-  // sucursal (ID)
+  // sucursal
   sucursalId: string;
 
   // opcionales
   tipoAbertura?: string;
   comoNosConocio?: string;
+  tipoObra?: string;
 };
 
-// --- Helpers: formateo AR (miles con ".") y parseo sin centavos
+// Helpers
 const formatARSInteger = (n: number) =>
   new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(
     Number.isFinite(n) ? n : 0
   );
 
 const parseDigitsToNumber = (raw: string) => {
-  // deja solo dígitos
   const digits = raw.replace(/[^\d]/g, "");
   if (!digits) return 0;
 
-  // evita números absurdos si pegan un string enorme
   const trimmed = digits.slice(0, 15);
   return Number(trimmed);
 };
@@ -88,6 +88,16 @@ export function CreateQuoteDialog() {
       defaultValues: {
         montoTotal: 0,
         sucursalId: "",
+        tipoObra: "",
+        tipoAbertura: "",
+        comoNosConocio: "",
+        cliente: "",
+        newClient: {
+          nombreCompleto: "",
+          telefono: "",
+          email: "",
+          direccion: "",
+        },
       },
     });
 
@@ -100,7 +110,7 @@ export function CreateQuoteDialog() {
   const clienteOptions =
     clientes?.map((c) => ({ value: c._id, label: c.nombreCompleto })) || [];
 
-  // ---- Etapas (columna inicial)
+  // ---- Etapas
   const { data: etapas, isLoading: isLoadingEtapas } = useQuery<Etapa[]>({
     queryKey: ["etapasCotizacion"],
     queryFn: async () => (await axios.get("/api/etapas-cotizacion")).data.data,
@@ -109,7 +119,7 @@ export function CreateQuoteDialog() {
   const etapaOptions =
     etapas?.map((e) => ({ value: e._id, label: e.nombre })) || [];
 
-  // ---- Sucursales (como AddClientDialog)
+  // ---- Sucursales
   const {
     data: sucursales = [],
     isLoading: sucursalesLoading,
@@ -120,9 +130,19 @@ export function CreateQuoteDialog() {
     return sucursales.map((s) => ({ value: s._id, label: s.nombre }));
   }, [sucursales]);
 
+  // ---- Tipo de obra
+  const tipoObraOptions = useMemo(
+    () => [
+      { value: "Casa", label: "Casa" },
+      { value: "Departamento", label: "Departamento" },
+      { value: "Obra nueva", label: "Obra nueva" },
+      { value: "Remodelación", label: "Remodelación" },
+    ],
+    []
+  );
+
   const bloquearSucursal = sucursalesLoading || sucursalesError;
 
-  // Al abrir: setear sucursal por default desde el usuario o primera sucursal
   useEffect(() => {
     if (!open) return;
 
@@ -148,7 +168,6 @@ export function CreateQuoteDialog() {
     mutationFn: async (formData: FormInputs) => {
       let clienteId = formData.cliente;
 
-      // 1) Crear cliente si corresponde
       if (clienteMode === "crear") {
         if (
           !formData.newClient?.nombreCompleto ||
@@ -158,10 +177,14 @@ export function CreateQuoteDialog() {
             "Nombre y teléfono son obligatorios para un nuevo cliente."
           );
         }
-        const clientResponse = await axios.post(
-          "/api/clientes",
-          formData.newClient
-        );
+
+        const clientResponse = await axios.post("/api/clientes", {
+          nombreCompleto: formData.newClient.nombreCompleto,
+          telefono: formData.newClient.telefono,
+          email: formData.newClient.email,
+          direccion: formData.newClient.direccion,
+        });
+
         clienteId = clientResponse.data.data._id;
       }
 
@@ -180,15 +203,14 @@ export function CreateQuoteDialog() {
         throw new Error("Precio inválido.");
       }
 
-      // 2) Crear cotización/lead
       const quoteData = {
         cliente: clienteId,
         montoTotal: formData.montoTotal,
         etapa: formData.etapa,
         sucursalId: formData.sucursalId,
-
         tipoAbertura: formData.tipoAbertura,
         comoNosConocio: formData.comoNosConocio,
+        tipoObra: formData.tipoObra,
       };
 
       return axios.post("/api/cotizaciones", quoteData);
@@ -197,7 +219,20 @@ export function CreateQuoteDialog() {
       toast.success("Lead y cotización inicial creados con éxito.");
       queryClient.invalidateQueries({ queryKey: ["cotizacionesPipeline"] });
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
-      reset({ montoTotal: 0, sucursalId: "" });
+      reset({
+        montoTotal: 0,
+        sucursalId: "",
+        tipoObra: "",
+        tipoAbertura: "",
+        comoNosConocio: "",
+        cliente: "",
+        newClient: {
+          nombreCompleto: "",
+          telefono: "",
+          email: "",
+          direccion: "",
+        },
+      });
       setOpen(false);
       setClienteMode("seleccionar");
     },
@@ -221,7 +256,6 @@ export function CreateQuoteDialog() {
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* Modo cliente */}
           <RadioGroup
             value={clienteMode}
             onValueChange={(value: "seleccionar" | "crear") =>
@@ -244,7 +278,11 @@ export function CreateQuoteDialog() {
             </div>
 
             <div>
-              <RadioGroupItem value="crear" id="crear" className="peer sr-only" />
+              <RadioGroupItem
+                value="crear"
+                id="crear"
+                className="peer sr-only"
+              />
               <Label
                 htmlFor="crear"
                 className="flex items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
@@ -310,16 +348,22 @@ export function CreateQuoteDialog() {
                   />
                 </div>
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="newClient.direccion">Zona / Dirección</Label>
+                <Input
+                  id="newClient.direccion"
+                  placeholder="Ej: Palermo, Av. Santa Fe 1234"
+                  {...register("newClient.direccion")}
+                />
+              </div>
             </div>
           )}
 
-          {/* Precio + Etapa inicial */}
           <div className="pt-2 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="montoTotal">Precio*</Label>
-
-                {/* INPUT FORMATEADO (sin centavos) */}
                 <Controller
                   name="montoTotal"
                   control={control}
@@ -374,7 +418,6 @@ export function CreateQuoteDialog() {
               </div>
             </div>
 
-            {/* Sucursal (ID) como AddClientDialog */}
             <div className="space-y-2">
               <Label>Sucursal *</Label>
 
@@ -403,7 +446,6 @@ export function CreateQuoteDialog() {
               </div>
             </div>
 
-            {/* Campos extra */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Tipo de Abertura de Interés</Label>
@@ -420,6 +462,22 @@ export function CreateQuoteDialog() {
                   {...register("comoNosConocio")}
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Tipo de obra</Label>
+              <Controller
+                name="tipoObra"
+                control={control}
+                render={({ field }) => (
+                  <Combobox
+                    options={tipoObraOptions}
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    placeholder="Selecciona el tipo de obra..."
+                  />
+                )}
+              />
             </div>
           </div>
 

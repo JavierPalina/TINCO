@@ -56,6 +56,7 @@ type QuoteTicket = {
 type PutOps =
   | { op: "setNombre"; nombre: string }
   | { op: "setCodigo"; codigo: string }
+  | { op: "setTipoObra"; tipoObra: string }
   | { op: "appendArchivos"; archivos: QuoteArchivo[] }
   | { op: "removeArchivo"; uid: string }
   | { op: "addFactura"; factura: QuoteFactura }
@@ -84,7 +85,10 @@ export async function GET(request: Request, { params }: RouteContext) {
       .populate("historialEtapas.etapa", "nombre color");
 
     if (!cotizacion) {
-      return NextResponse.json({ success: false, error: "Cotización no encontrada" }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: "Cotización no encontrada" },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({ success: true, data: cotizacion });
@@ -113,11 +117,26 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
         const next = body.codigo.trim().toUpperCase();
         if (!next) throw new Error("codigo es obligatorio");
 
-        // validar unicidad manual para devolver error legible
-        const exists = await Cotizacion.findOne({ codigo: next, _id: { $ne: id } }).select("_id").lean();
+        const exists = await Cotizacion.findOne({
+          codigo: next,
+          _id: { $ne: id },
+        })
+          .select("_id")
+          .lean();
+
         if (exists) throw new Error("Ya existe una cotización con ese código");
 
         update.$set = { codigo: next };
+        break;
+      }
+
+      case "setTipoObra": {
+        const next = body.tipoObra.trim();
+
+        update.$set = {
+          tipoObra: next || undefined,
+        };
+
         break;
       }
 
@@ -170,7 +189,10 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
         break;
 
       default:
-        return NextResponse.json({ success: false, error: "Operación inválida" }, { status: 400 });
+        return NextResponse.json(
+          { success: false, error: "Operación inválida" },
+          { status: 400 }
+        );
     }
 
     const updated = await Cotizacion.findByIdAndUpdate(id, update, { new: true })
@@ -180,7 +202,10 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       .populate("historialEtapas.etapa", "nombre color");
 
     if (!updated) {
-      return NextResponse.json({ success: false, error: "Cotización no encontrada" }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: "Cotización no encontrada" },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({ success: true, data: updated });
@@ -200,7 +225,10 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
   try {
     const deleted = await Cotizacion.findByIdAndDelete(id);
     if (!deleted) {
-      return NextResponse.json({ success: false, error: "Cotización no encontrada" }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: "Cotización no encontrada" },
+        { status: 404 }
+      );
     }
     return new NextResponse(null, { status: 204 });
   } catch {

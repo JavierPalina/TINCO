@@ -1,3 +1,5 @@
+// src/app/api/clientes/[id]/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Cliente from "@/models/Cliente";
