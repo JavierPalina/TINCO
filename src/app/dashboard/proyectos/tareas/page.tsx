@@ -52,15 +52,31 @@ import { VerificacionView } from "@/components/proyectos/VerificacionView";
 import TallerFormModal from "@/components/proyectos/FormTaller";
 import { TallerView } from "@/components/proyectos/TallerView";
 
-type DestinoEstado = "Medición" | "Verificación" | "Taller" | "Depósito" | "Logística";
+import { UserSelect } from "@/components/ui/UserSelect";
+
+type DestinoEstado =
+  | "Visita Técnica"
+  | "Medición"
+  | "Verificación"
+  | "Taller"
+  | "Depósito"
+  | "Logística";
+
+type ProgresoEstado = "No iniciado" | "Iniciado" | "Finalizado";
 
 const ESTADOS_INICIALES: DestinoEstado[] = [
+  "Visita Técnica",
   "Medición",
   "Verificación",
   "Taller",
   "Depósito",
   "Logística",
 ];
+
+const PROGRESOS: ProgresoEstado[] = ["No iniciado", "Iniciado", "Finalizado"];
+
+const PRIORIDADES = ["Baja", "Media", "Alta", "Urgente"] as const;
+type Prioridad = (typeof PRIORIDADES)[number];
 
 type AsignadoARef =
   | {
@@ -104,6 +120,12 @@ type ProyectoLite = ProyectoDTO & {
   visitaTecnica?: VisitaTecnicaLite;
   cliente?: ClienteLite | string | null;
   vendedor?: VendedorLite | string | null;
+
+  // ⬇️ NUEVO (si tu back ya lo tiene o lo vas a agregar)
+  prioridad?: Prioridad | string | null;
+  fechaLimite?: string | Date | null;
+  tecnicoAsignado?: string | { _id?: string; name?: string } | null;
+  progresoEstado?: ProgresoEstado | string | null;
 };
 
 type Filters = {
@@ -142,6 +164,13 @@ const getEstadoBadgeColor = (estado?: string | null) => {
   }
 };
 
+const getProgresoBadgeColor = (p?: string | null) => {
+  if (!p) return "bg-muted text-muted-foreground";
+  if (p === "Finalizado") return "bg-green-600 hover:bg-green-700";
+  if (p === "Iniciado") return "bg-blue-600 hover:bg-blue-700";
+  return "bg-slate-500 hover:bg-slate-600";
+};
+
 function toClienteLite(ref: ClienteLite | string | null | undefined): ClienteLite {
   return ref && typeof ref === "object" ? ref : {};
 }
@@ -166,6 +195,16 @@ async function fetchProyectosVisitaTecnica(): Promise<ProyectoLite[]> {
   return data.data as ProyectoLite[];
 }
 
+/**
+ * Normaliza Date/string → YYYY-MM-DD para input type="date"
+ */
+function toDateInputValue(v?: string | Date | null): string {
+  if (!v) return "";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
 export default function VisitaTecnicaPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -183,7 +222,12 @@ export default function VisitaTecnicaPage() {
 
   const [estadoDialog, setEstadoDialog] = useState<{ proyecto: ProyectoLite } | null>(null);
 
+  // ⬇️ Modal inicial: campos nuevos
   const [estadoSeleccionado, setEstadoSeleccionado] = useState<DestinoEstado | "">("");
+  const [progresoSeleccionado, setProgresoSeleccionado] = useState<ProgresoEstado>("No iniciado");
+  const [prioridadSeleccionada, setPrioridadSeleccionada] = useState<Prioridad>("Media");
+  const [fechaLimiteSeleccionada, setFechaLimiteSeleccionada] = useState<string>("");
+  const [tecnicoAsignadoSeleccionado, setTecnicoAsignadoSeleccionado] = useState<string>("");
 
   const [proyectoEditandoVisita, setProyectoEditandoVisita] = useState<ProyectoLite | null>(null);
   const [proyectoEditandoMedicion, setProyectoEditandoMedicion] = useState<ProyectoLite | null>(
@@ -208,7 +252,6 @@ export default function VisitaTecnicaPage() {
   });
 
   const hasActiveFilters = useMemo(() => Object.values(filters).some(Boolean), [filters]);
-
   const activeFilterCount = useMemo(() => Object.values(filters).filter(Boolean).length, [filters]);
 
   const { data: proyectos, isLoading, isError } = useQuery({
@@ -216,12 +259,38 @@ export default function VisitaTecnicaPage() {
     queryFn: fetchProyectosVisitaTecnica,
   });
 
-  const setEstadoActualMutation = useMutation({
-    mutationFn: async ({ proyectoId, estado }: { proyectoId: string; estado: DestinoEstado }) => {
-      return axios.put(`/api/proyectos/${proyectoId}`, { forzarEstado: estado });
+  /**
+   * ✅ Cambio 2:
+   * En “estado inicial” guardamos también:
+   * - estado inicial (forzarEstado)
+   * - prioridad
+   * - fechaLimite
+   * - tecnicoAsignado
+   * - progresoEstado (No iniciado/Iniciado/Finalizado)
+   *
+   * Nota: acá lo mando en top-level. Si tu API lo requiere en otra estructura
+   * (ej: datosFormulario.meta), decime y lo adaptamos.
+   */
+  const setEstadoInicialMutation = useMutation({
+    mutationFn: async (payload: {
+      proyectoId: string;
+      estado: DestinoEstado;
+      prioridad: Prioridad;
+      fechaLimite?: string;
+      tecnicoAsignado?: string;
+      progresoEstado: ProgresoEstado;
+    }) => {
+      const { proyectoId, ...rest } = payload;
+      return axios.put(`/api/proyectos/${proyectoId}`, {
+        forzarEstado: rest.estado,
+        prioridad: rest.prioridad,
+        fechaLimite: rest.fechaLimite || undefined,
+        tecnicoAsignado: rest.tecnicoAsignado || undefined,
+        progresoEstado: rest.progresoEstado,
+      });
     },
     onSuccess: async () => {
-      toast.success("Estado asignado");
+      toast.success("Estado inicial guardado");
       await queryClient.invalidateQueries({ queryKey: ["proyectos-visita-tecnica"] });
 
       const p = estadoDialog?.proyecto;
@@ -229,9 +298,20 @@ export default function VisitaTecnicaPage() {
 
       setEstadoDialog(null);
       setEstadoSeleccionado("");
+      setProgresoSeleccionado("No iniciado");
+      setPrioridadSeleccionada("Media");
+      setFechaLimiteSeleccionada("");
+      setTecnicoAsignadoSeleccionado("");
 
       if (p && estado) {
-        const proyectoActualizado: ProyectoLite = { ...p, estadoActual: estado };
+        const proyectoActualizado: ProyectoLite = {
+          ...p,
+          estadoActual: estado,
+          prioridad: prioridadSeleccionada,
+          fechaLimite: fechaLimiteSeleccionada ? new Date(fechaLimiteSeleccionada) : null,
+          tecnicoAsignado: tecnicoAsignadoSeleccionado || null,
+          progresoEstado: progresoSeleccionado,
+        };
         setProyectoSeleccionado(proyectoActualizado);
 
         if (estado === "Medición") setViewStage("medicion");
@@ -246,7 +326,7 @@ export default function VisitaTecnicaPage() {
         : error instanceof Error
           ? error.message
           : "Error desconocido";
-      toast.error("No se pudo asignar el estado: " + message);
+      toast.error("No se pudo guardar el estado inicial: " + message);
     },
   });
 
@@ -336,14 +416,14 @@ export default function VisitaTecnicaPage() {
         ),
         cell: ({ row }) => {
           const proyecto = row.original;
-        
+
           return (
             <Button
               variant="link"
               className="p-0 h-auto font-semibold"
               onClick={(e) => {
                 e.preventDefault();
-                e.stopPropagation(); // evita que se dispare onRowClick
+                e.stopPropagation();
                 router.push(`/dashboard/proyectos/${proyecto._id}`);
               }}
             >
@@ -409,8 +489,17 @@ export default function VisitaTecnicaPage() {
           return <Badge className={getEstadoBadgeColor(estado)}>{estado || "Sin estado"}</Badge>;
         },
       },
+      // ✅ Cambio 3: sub-estado No iniciado/Iniciado/Finalizado visible en tabla
+      {
+        accessorKey: "progresoEstado",
+        header: "Progreso",
+        cell: ({ row }) => {
+          const prog = (row.original.progresoEstado as string | null) ?? null;
+          return <Badge className={getProgresoBadgeColor(prog)}>{prog || "No iniciado"}</Badge>;
+        },
+      },
     ];
-  }, []);
+  }, [router]);
 
   const filteredData: ProyectoLite[] = useMemo(() => {
     if (!proyectos) return [];
@@ -551,34 +640,102 @@ export default function VisitaTecnicaPage() {
           if (!open) {
             setEstadoDialog(null);
             setEstadoSeleccionado("");
+            setProgresoSeleccionado("No iniciado");
+            setPrioridadSeleccionada("Media");
+            setFechaLimiteSeleccionada("");
+            setTecnicoAsignadoSeleccionado("");
           }
         }}
       >
         {estadoDialog && (
-          <DialogContent className="sm:max-w-[520px]">
+          <DialogContent className="sm:max-w-[560px]">
             <DialogHeader>
               <DialogTitle>Seleccionar estado inicial</DialogTitle>
               <DialogDescription>
-                Este proyecto fue creado sin estado. Elegí el estado inicial para continuar.
+                Este proyecto fue creado sin estado. Elegí el estado inicial y configurá prioridad,
+                fecha límite y técnico asignado.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-3 mt-2">
-              <Select
-                value={estadoSeleccionado}
-                onValueChange={(v) => setEstadoSeleccionado(v as DestinoEstado)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Elegí un estado..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {ESTADOS_INICIALES.map((e) => (
-                    <SelectItem key={e} value={e}>
-                      {e}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="space-y-4 mt-2">
+              {/* Estado inicial */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Estado inicial</p>
+                <Select
+                  value={estadoSeleccionado}
+                  onValueChange={(v) => setEstadoSeleccionado(v as DestinoEstado)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Elegí un estado..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ESTADOS_INICIALES.map((e) => (
+                      <SelectItem key={e} value={e}>
+                        {e}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Progreso (No iniciado/Iniciado/Finalizado) */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Progreso</p>
+                <Select
+                  value={progresoSeleccionado}
+                  onValueChange={(v) => setProgresoSeleccionado(v as ProgresoEstado)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Elegí un progreso..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROGRESOS.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Prioridad */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Prioridad</p>
+                <Select
+                  value={prioridadSeleccionada}
+                  onValueChange={(v) => setPrioridadSeleccionada(v as Prioridad)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Elegí una prioridad..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRIORIDADES.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Fecha límite */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Fecha límite</p>
+                <Input
+                  type="date"
+                  value={fechaLimiteSeleccionada}
+                  onChange={(e) => setFechaLimiteSeleccionada(e.target.value)}
+                />
+              </div>
+
+              {/* Técnico asignado */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Técnico asignado</p>
+                <UserSelect
+                  value={tecnicoAsignadoSeleccionado}
+                  onChange={(val) => setTecnicoAsignadoSeleccionado(val)}
+                />
+              </div>
 
               <div className="flex justify-end gap-2 pt-2">
                 <Button
@@ -586,21 +743,30 @@ export default function VisitaTecnicaPage() {
                   onClick={() => {
                     setEstadoDialog(null);
                     setEstadoSeleccionado("");
+                    setProgresoSeleccionado("No iniciado");
+                    setPrioridadSeleccionada("Media");
+                    setFechaLimiteSeleccionada("");
+                    setTecnicoAsignadoSeleccionado("");
                   }}
                 >
                   Cancelar
                 </Button>
                 <Button
-                  disabled={!estadoSeleccionado || setEstadoActualMutation.isPending}
+                  disabled={!estadoSeleccionado || setEstadoInicialMutation.isPending}
                   onClick={() => {
                     if (!estadoDialog?.proyecto?._id || !estadoSeleccionado) return;
-                    setEstadoActualMutation.mutate({
+
+                    setEstadoInicialMutation.mutate({
                       proyectoId: estadoDialog.proyecto._id as unknown as string,
                       estado: estadoSeleccionado,
+                      prioridad: prioridadSeleccionada,
+                      fechaLimite: fechaLimiteSeleccionada || undefined,
+                      tecnicoAsignado: tecnicoAsignadoSeleccionado || undefined,
+                      progresoEstado: progresoSeleccionado,
                     });
                   }}
                 >
-                  {setEstadoActualMutation.isPending ? (
+                  {setEstadoInicialMutation.isPending ? (
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Guardando...
@@ -633,6 +799,20 @@ export default function VisitaTecnicaPage() {
               </DialogTitle>
               <DialogDescription>{stageDescription}</DialogDescription>
             </DialogHeader>
+
+            {/* Header info extra (prioridad/progreso/fecha límite) */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Badge className="bg-muted text-muted-foreground">
+                Prioridad: {proyectoSeleccionado.prioridad || "—"}
+              </Badge>
+              <Badge className={getProgresoBadgeColor(proyectoSeleccionado.progresoEstado as string)}>
+                Progreso: {(proyectoSeleccionado.progresoEstado as string) || "No iniciado"}
+              </Badge>
+              <Badge className="bg-muted text-muted-foreground">
+                Fecha límite:{" "}
+                {toDateInputValue(proyectoSeleccionado.fechaLimite) || "—"}
+              </Badge>
+            </div>
 
             <div className="mt-4">
               {viewStage === "medicion" ? (
@@ -1061,6 +1241,16 @@ export default function VisitaTecnicaPage() {
             if (!estado) {
               setEstadoDialog({ proyecto });
               setEstadoSeleccionado("");
+              setProgresoSeleccionado("No iniciado");
+              setPrioridadSeleccionada("Media");
+
+              // precargar si el proyecto ya trae algo
+              setFechaLimiteSeleccionada(toDateInputValue(proyecto.fechaLimite));
+              setTecnicoAsignadoSeleccionado(
+                typeof proyecto.tecnicoAsignado === "string"
+                  ? proyecto.tecnicoAsignado
+                  : proyecto.tecnicoAsignado?._id || "",
+              );
               return;
             }
 

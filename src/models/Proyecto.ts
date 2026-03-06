@@ -1,3 +1,5 @@
+// src/models/Proyecto.ts
+
 import mongoose, { Schema, Document, Types } from 'mongoose';
 
 import { VisitaTecnicaSchema, IVisitaTecnica } from './schemas/VisitaTecnicaSchema';

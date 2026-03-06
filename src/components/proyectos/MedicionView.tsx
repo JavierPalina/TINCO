@@ -1,7 +1,6 @@
-// /components/proyectos/MedicionView.tsx
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import axios from "axios";
 import { useQuery } from "@tanstack/react-query";
 import { ProyectoDTO } from "@/types/proyecto";
@@ -18,8 +17,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trash2, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Trash2, Loader2, CheckCircle2, XCircle, Download } from "lucide-react";
 import { toast } from "sonner";
+import { exportElementToPdf } from "@/lib/pdf/exportElementToPdf";
 
 type Props = {
   proyecto: ProyectoDTO;
@@ -40,6 +40,11 @@ type ProyectoWithExtras = ProyectoDTO & {
   cliente?: {
     nombreCompleto?: string;
   } | null;
+
+  // opcional por si lo agregaste
+  progresoEstado?: string | null;
+  prioridad?: string | null;
+  fechaLimite?: string | Date | null;
 };
 
 // Medición
@@ -80,6 +85,7 @@ type MedicionData = {
 
 // estados a los que se puede pasar con el botón "Finalizar"
 const NEXT_ESTADOS: string[] = [
+  "Visita Técnica",
   "Medición",
   "Verificación",
   "Taller",
@@ -107,6 +113,13 @@ const getEstadoBadgeColor = (estado?: string | null) => {
     default:
       return "bg-gray-400 hover:bg-gray-500";
   }
+};
+
+const getProgresoBadgeColor = (p?: string | null) => {
+  if (!p) return "bg-muted text-muted-foreground";
+  if (p === "Finalizado") return "bg-green-600 hover:bg-green-700";
+  if (p === "Iniciado") return "bg-blue-600 hover:bg-blue-700";
+  return "bg-slate-500 hover:bg-slate-600";
 };
 
 /**
@@ -151,6 +164,10 @@ const getCotizacionIdFromProyecto = (
 export function MedicionView({ proyecto, onDeleted }: Props) {
   const proyectoExtras = proyecto as ProyectoWithExtras;
 
+  // ✅ Para PDF
+  const pdfRef = useRef<HTMLDivElement | null>(null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
   // Eliminar SOLO la medición
   const [deleteMedicionOpen, setDeleteMedicionOpen] = useState(false);
   const [isDeletingMedicion, setIsDeletingMedicion] = useState(false);
@@ -164,26 +181,16 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
 
   // Dialog para "Finalizado" → elegir próximo estado
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
-  const [selectedNextEstado, setSelectedNextEstado] = useState<string | null>(
-    null,
-  );
+  const [selectedNextEstado, setSelectedNextEstado] = useState<string | null>(null);
   const [isMovingEstado, setIsMovingEstado] = useState(false);
 
   const md: MedicionData = proyectoExtras.medicion || {};
   const cliente = proyectoExtras.cliente || {};
 
-  const medidas: MedicionMedida[] = Array.isArray(md.medidasTomadas)
-    ? md.medidasTomadas
-    : [];
-  const condicionVanos: string[] = Array.isArray(md.condicionVanos)
-    ? md.condicionVanos
-    : [];
-  const planos: string[] = Array.isArray(md.planosAdjuntos)
-    ? md.planosAdjuntos
-    : [];
-  const fotos: string[] = Array.isArray(md.fotosMedicion)
-    ? md.fotosMedicion
-    : [];
+  const medidas: MedicionMedida[] = Array.isArray(md.medidasTomadas) ? md.medidasTomadas : [];
+  const condicionVanos: string[] = Array.isArray(md.condicionVanos) ? md.condicionVanos : [];
+  const planos: string[] = Array.isArray(md.planosAdjuntos) ? md.planosAdjuntos : [];
+  const fotos: string[] = Array.isArray(md.fotosMedicion) ? md.fotosMedicion : [];
 
   const fechaMedicion =
     md?.fechaMedicion && !Number.isNaN(new Date(md.fechaMedicion).getTime())
@@ -191,14 +198,10 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
       : "-";
 
   // Traemos etapas de cotización (pipeline) para mover a "Proyecto Finalizado" / "Proyectos no realizados"
-  const { data: etapasCotizacion, isLoading: isLoadingEtapas } = useQuery<
-    EtapaCotizacion[]
-  >({
+  const { data: etapasCotizacion, isLoading: isLoadingEtapas } = useQuery<EtapaCotizacion[]>({
     queryKey: ["etapasCotizacion"],
     queryFn: async () => {
-      const { data } = await axios.get<{ data: EtapaCotizacion[] }>(
-        "/api/etapas-cotizacion",
-      );
+      const { data } = await axios.get<{ data: EtapaCotizacion[] }>("/api/etapas-cotizacion");
       return data.data;
     },
   });
@@ -209,10 +212,6 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
     return etapa?._id ?? null;
   };
 
-  /**
-   * Mueve la cotización asociada al proyecto a una etapa del pipeline
-   * según su nombre ("Proyecto Finalizado", "Proyectos no realizados", etc.).
-   */
   const moveCotizacionToEtapa = async (nombreEtapa: string) => {
     const cotizacionId = getCotizacionIdFromProyecto(proyectoExtras);
     if (!cotizacionId) {
@@ -222,18 +221,13 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
 
     const etapaId = findEtapaIdByNombre(nombreEtapa);
     if (!etapaId) {
-      toast.error(
-        `No se encontró la etapa "${nombreEtapa}" en el pipeline de cotizaciones.`,
-      );
+      toast.error(`No se encontró la etapa "${nombreEtapa}" en el pipeline de cotizaciones.`);
       return;
     }
 
-    await axios.put(`/api/cotizaciones/${cotizacionId}`, {
-      etapa: etapaId,
-    });
+    await axios.put(`/api/cotizaciones/${cotizacionId}`, { etapa: etapaId });
   };
 
-  // 🔴 Eliminar SOLO la medición
   const handleConfirmDeleteMedicion = async () => {
     try {
       setIsDeletingMedicion(true);
@@ -252,8 +246,7 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
 
       if (axios.isAxiosError(error)) {
         const msg =
-          (error.response?.data as { error?: string } | undefined)?.error ??
-          error.message;
+          (error.response?.data as { error?: string } | undefined)?.error ?? error.message;
         toast.error("Error al eliminar la medición: " + msg);
       } else {
         toast.error(
@@ -266,20 +259,16 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
     }
   };
 
-  // 🟡 "Eliminar proyecto" → pipeline a "Proyectos no realizados" + Proyecto.estadoActual = "Rechazado"
   const handleEliminarProyecto = async () => {
     try {
       setIsDeletingProject(true);
 
-      // 1) Mover la cotización en el pipeline
       await moveCotizacionToEtapa("Proyectos no realizados");
 
-      // 2) Marcar el proyecto como Rechazado
       await axios.put(`/api/proyectos/${proyecto._id}`, {
         estadoActual: "Rechazado",
       });
 
-      // 3) Eliminar el proyecto de la base de datos
       await axios.delete(`/api/proyectos/${proyecto._id}`);
 
       toast.success(
@@ -292,8 +281,7 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
 
       if (axios.isAxiosError(error)) {
         const msg =
-          (error.response?.data as { error?: string } | undefined)?.error ??
-          error.message;
+          (error.response?.data as { error?: string } | undefined)?.error ?? error.message;
         toast.error("Error al eliminar el proyecto: " + msg);
       } else {
         toast.error(
@@ -306,30 +294,24 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
     }
   };
 
-  // ✅ "Terminar proyecto" → pipeline a "Proyecto Finalizado" + Proyecto.estadoActual = "Completado"
   const handleTerminarProyecto = async () => {
     try {
       setIsTerminatingProject(true);
 
-      // 1) Mover la cotización en el pipeline
       await moveCotizacionToEtapa("Proyecto Finalizado");
 
-      // 2) Marcar el proyecto como Completado
       await axios.put(`/api/proyectos/${proyecto._id}`, {
         estadoActual: "Completado",
       });
 
-      toast.success(
-        "Proyecto completado y cotización movida a 'Proyecto Finalizado' en el pipeline.",
-      );
+      toast.success("Proyecto completado y cotización movida a 'Proyecto Finalizado'.");
       onDeleted?.();
     } catch (error: unknown) {
       console.error(error);
 
       if (axios.isAxiosError(error)) {
         const msg =
-          (error.response?.data as { error?: string } | undefined)?.error ??
-          error.message;
+          (error.response?.data as { error?: string } | undefined)?.error ?? error.message;
         toast.error("Error al terminar el proyecto: " + msg);
       } else {
         toast.error(
@@ -342,7 +324,6 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
     }
   };
 
-  // 🟢 Confirmar movimiento con botón "Finalizado"
   const handleConfirmMoveEstado = async () => {
     if (!selectedNextEstado) {
       toast.error("Seleccioná a dónde querés pasar la orden.");
@@ -365,8 +346,7 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
 
       if (axios.isAxiosError(error)) {
         const msg =
-          (error.response?.data as { error?: string } | undefined)?.error ??
-          error.message;
+          (error.response?.data as { error?: string } | undefined)?.error ?? error.message;
         toast.error("Error al mover el proyecto: " + msg);
       } else {
         toast.error(
@@ -379,486 +359,440 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
     }
   };
 
-    const estadoLabel = proyecto.estadoActual ?? "Sin estado";
+  const estadoLabel = proyecto.estadoActual ?? "Sin estado";
+
+  const handleExportPdf = async () => {
+    const el = pdfRef.current;
+    if (!el) return;
+
+    try {
+      setIsExportingPdf(true);
+      await exportElementToPdf({
+        element: el,
+        filename: `Medicion-${proyecto.numeroOrden}.pdf`,
+        title: `Medición – ${proyecto.numeroOrden}`,
+      });
+    } catch (e) {
+      console.error(e);
+      toast.error("No se pudo generar el PDF.");
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   return (
-    <div className="space-y-8 text-sm">
-      {/* Alert para confirmar eliminación de MEDICIÓN */}
-      <AlertDialog open={deleteMedicionOpen} onOpenChange={setDeleteMedicionOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              ¿Eliminar datos de la medición?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción eliminará todos los datos cargados en la medición del
-              proyecto <strong>{proyecto.numeroOrden}</strong>.
-              <br />
-              El proyecto seguirá existiendo, pero la sección de medición quedará
-              vacía.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeletingMedicion}>
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive hover:bg-destructive/90"
-              onClick={handleConfirmDeleteMedicion}
-              disabled={isDeletingMedicion}
-            >
-              {isDeletingMedicion ? (
-                <span className="inline-flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Eliminando...
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-2">
-                  <Trash2 className="h-4 w-4" />
-                  Sí, eliminar medición
-                </span>
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Alert para confirmar "Eliminar proyecto" */}
-      <AlertDialog
-        open={deleteProjectOpen}
-        onOpenChange={setDeleteProjectOpen}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              ¿Marcar proyecto como no realizado?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Esto marcará el proyecto{" "}
-              <strong>{proyecto.numeroOrden}</strong> como{" "}
-              <strong>Rechazado</strong> y moverá la cotización asociada a la
-              etapa <strong>&quot;Proyectos no realizados&quot;</strong> en el
-              pipeline de cotizaciones.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeletingProject}>
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive hover:bg-destructive/90"
-              onClick={handleEliminarProyecto}
-              disabled={isDeletingProject || isLoadingEtapas}
-            >
-              {isDeletingProject ? (
-                <span className="inline-flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Procesando...
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-2">
-                  <XCircle className="h-4 w-4" />
-                  Sí, marcar como no realizado
-                </span>
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Alert para botón "Finalizado" → elegir a dónde pasa */}
-      <AlertDialog open={moveDialogOpen} onOpenChange={setMoveDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              ¿A dónde querés pasar la orden?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción cambiará el estado del proyecto{" "}
-              <strong>{proyecto.numeroOrden}</strong> a la etapa seleccionada.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <div className="space-y-2 py-2">
-            <p className="text-xs text-muted-foreground">
-              Seleccioná la siguiente etapa del flujo:
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {NEXT_ESTADOS.map((estado) => {
-                const isActive = selectedNextEstado === estado;
-                return (
-                  <Button
-                    key={estado}
-                    type="button"
-                    size="sm"
-                    variant={isActive ? "default" : "outline"}
-                    className={
-                      isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "border-muted-foreground/40 text-muted-foreground"
-                    }
-                    onClick={() => setSelectedNextEstado(estado)}
-                    disabled={isMovingEstado}
-                  >
-                    {estado}
-                  </Button>
-                );
-              })}
-            </div>
-          </div>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              disabled={isMovingEstado}
-              onClick={() => setSelectedNextEstado(null)}
-            >
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmMoveEstado}
-              disabled={isMovingEstado || !selectedNextEstado}
-            >
-              {isMovingEstado ? (
-                <span className="inline-flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Moviendo...
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4" />
-                  Confirmar
-                </span>
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-2">
-          <h3 className="text-lg font-semibold">Datos generales</h3>
-          <p className="text-xs text-muted-foreground">
-            Información básica del proyecto y su estado actual.
-          </p>
-        </div>
-        <Badge className={getEstadoBadgeColor(proyecto.estadoActual)}>
-          {estadoLabel}
-        </Badge>
+    <div className="space-y-6 text-sm">
+      {/* Acciones top */}
+      <div className="flex flex-wrap gap-2 justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="inline-flex items-center gap-2"
+          onClick={handleExportPdf}
+          disabled={isExportingPdf}
+        >
+          {isExportingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          Descargar PDF
+        </Button>
       </div>
 
-      {/* DATOS GENERALES */}
-      <section className="space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <p className="text-muted-foreground text-xs">N° Orden</p>
-            <p className="font-medium">{proyecto.numeroOrden}</p>
-          </div>
-
-          <div className="space-y-1">
-            <p className="text-muted-foreground text-xs">Cliente</p>
-            <p className="font-medium">
-              {cliente?.nombreCompleto || "Sin nombre"}
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <p className="text-muted-foreground text-xs">Técnico</p>
-            <p className="font-medium">
-              {typeof md?.asignadoA === "string"
-                ? md.asignadoA
-                : md?.asignadoA?.name || "Sin asignar"}
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <p className="text-muted-foreground text-xs">
-              N° de orden de medición
-            </p>
-            <p className="font-medium">
-              {md?.numeroOrdenMedicion || proyecto.numeroOrden || "-"}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <Separator />
-
-      {/* MEDICIÓN / DIRECCIÓN */}
-      <section className="space-y-3">
-        <h3 className="text-lg font-semibold">Datos de la medición</h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <p className="text-muted-foreground text-xs">Fecha de medición</p>
-            <p className="font-medium">{fechaMedicion}</p>
-          </div>
-
-          <div className="space-y-1">
-            <p className="text-muted-foreground text-xs">
-              Tipo de abertura medida
-            </p>
-            <p className="font-medium">{md?.tipoAberturaMedida || "-"}</p>
-          </div>
-
-          <div className="space-y-1 sm:col-span-2">
-            <p className="text-muted-foreground text-xs">Dirección de obra</p>
-            <p className="font-medium">{md?.direccionObra || "-"}</p>
-          </div>
-
-          <div className="space-y-1">
-            <p className="text-muted-foreground text-xs">
-              Cliente / Obra / Empresa
-            </p>
-            <p className="font-medium">
-              {md?.clienteObraEmpresa || cliente?.nombreCompleto || "-"}
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <p className="text-muted-foreground text-xs">
-              Cantidad de aberturas medidas
-            </p>
-            <p className="font-medium">
-              {md?.cantidadAberturasMedidas || medidas.length || "-"}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <Separator />
-
-      {/* MEDIDAS TOMADAS */}
-      <section className="space-y-3">
-        <h3 className="text-lg font-semibold">Medidas tomadas</h3>
-        <p className="text-xs text-muted-foreground">
-          Cada fila corresponde a una abertura medida. Valores en mm o cm (según
-          cómo hayan sido cargados).
-        </p>
-
-        {medidas.length ? (
-          <div className="space-y-2">
-            {medidas.map((m, idx) => (
-              <div
-                key={idx}
-                className="border rounded-md px-3 py-2 flex flex-wrap gap-3 bg-muted/40"
+      {/* ✅ Todo lo que esté dentro de este contenedor se captura para el PDF */}
+      <div ref={pdfRef} className="rounded-lg border bg-white p-6">
+        {/* Alert para confirmar eliminación de MEDICIÓN */}
+        <AlertDialog open={deleteMedicionOpen} onOpenChange={setDeleteMedicionOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Eliminar datos de la medición?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción eliminará todos los datos cargados en la medición del proyecto{" "}
+                <strong>{proyecto.numeroOrden}</strong>.
+                <br />
+                El proyecto seguirá existiendo, pero la sección de medición quedará vacía.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeletingMedicion}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive hover:bg-destructive/90"
+                onClick={handleConfirmDeleteMedicion}
+                disabled={isDeletingMedicion}
               >
-                <span className="text-xs text-muted-foreground">
-                  #{idx + 1}
-                </span>
-                <span>Alto: {m.alto ?? "-"}</span>
-                <span>Ancho: {m.ancho ?? "-"}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Sin medidas cargadas.
-          </p>
-        )}
-
-        <div className="space-y-1">
-          <p className="text-muted-foreground text-xs">
-            Tolerancias o ajustes recomendados
-          </p>
-          <p className="font-medium whitespace-pre-line">
-            {md?.toleranciasRecomendadas || "-"}
-          </p>
-        </div>
-      </section>
-
-      <Separator />
-
-      {/* CONDICIÓN DE VANOS / ESTADO OBRA */}
-      <section className="space-y-3">
-        <h3 className="text-lg font-semibold">
-          Condición de vanos y estado de la obra
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <p className="text-muted-foreground text-xs">
-              Condición de los vanos
-            </p>
-            {condicionVanos.length ? (
-              <div className="flex flex-wrap gap-1.5">
-                {condicionVanos.map((c) => (
-                  <span
-                    key={c}
-                    className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs"
-                  >
-                    {c}
+                {isDeletingMedicion ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Eliminando...
                   </span>
+                ) : (
+                  <span className="inline-flex items-center gap-2">
+                    <Trash2 className="h-4 w-4" />
+                    Sí, eliminar medición
+                  </span>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Alert para confirmar "Eliminar proyecto" */}
+        <AlertDialog open={deleteProjectOpen} onOpenChange={setDeleteProjectOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Marcar proyecto como no realizado?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esto marcará el proyecto <strong>{proyecto.numeroOrden}</strong> como{" "}
+                <strong>Rechazado</strong> y moverá la cotización asociada a{" "}
+                <strong>&quot;Proyectos no realizados&quot;</strong>.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeletingProject}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive hover:bg-destructive/90"
+                onClick={handleEliminarProyecto}
+                disabled={isDeletingProject || isLoadingEtapas}
+              >
+                {isDeletingProject ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Procesando...
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-2">
+                    <XCircle className="h-4 w-4" />
+                    Sí, marcar como no realizado
+                  </span>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Alert para botón "Finalizado" → elegir a dónde pasa */}
+        <AlertDialog open={moveDialogOpen} onOpenChange={setMoveDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿A dónde querés pasar la orden?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción cambiará el estado del proyecto <strong>{proyecto.numeroOrden}</strong>.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+
+            <div className="space-y-2 py-2">
+              <p className="text-xs text-muted-foreground">Seleccioná la siguiente etapa del flujo:</p>
+              <div className="flex flex-wrap gap-2">
+                {NEXT_ESTADOS.map((estado) => {
+                  const isActive = selectedNextEstado === estado;
+                  return (
+                    <Button
+                      key={estado}
+                      type="button"
+                      size="sm"
+                      variant={isActive ? "default" : "outline"}
+                      className={
+                        isActive
+                          ? "bg-primary text-primary-foreground"
+                          : "border-muted-foreground/40 text-muted-foreground"
+                      }
+                      onClick={() => setSelectedNextEstado(estado)}
+                      disabled={isMovingEstado}
+                    >
+                      {estado}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isMovingEstado} onClick={() => setSelectedNextEstado(null)}>
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmMoveEstado} disabled={isMovingEstado || !selectedNextEstado}>
+                {isMovingEstado ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Moviendo...
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Confirmar
+                  </span>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Header */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold">Datos generales</h3>
+            <p className="text-xs text-muted-foreground">Información básica del proyecto y su estado.</p>
+            <div className="flex flex-wrap gap-2">
+              <Badge className={getProgresoBadgeColor(proyectoExtras.progresoEstado ?? null)}>
+                Progreso: {proyectoExtras.progresoEstado || "No iniciado"}
+              </Badge>
+              <Badge className="bg-muted text-muted-foreground">
+                Prioridad: {proyectoExtras.prioridad || "—"}
+              </Badge>
+            </div>
+          </div>
+          <Badge className={getEstadoBadgeColor(proyecto.estadoActual)}>{estadoLabel}</Badge>
+        </div>
+
+        {/* DATOS GENERALES */}
+        <section className="space-y-3 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-xs">N° Orden</p>
+              <p className="font-medium">{proyecto.numeroOrden}</p>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-xs">Cliente</p>
+              <p className="font-medium">{cliente?.nombreCompleto || "Sin nombre"}</p>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-xs">Técnico</p>
+              <p className="font-medium">
+                {typeof md?.asignadoA === "string" ? md.asignadoA : md?.asignadoA?.name || "Sin asignar"}
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-xs">N° de orden de medición</p>
+              <p className="font-medium">{md?.numeroOrdenMedicion || proyecto.numeroOrden || "-"}</p>
+            </div>
+          </div>
+        </section>
+
+        <Separator className="my-6" />
+
+        {/* MEDICIÓN / DIRECCIÓN */}
+        <section className="space-y-3">
+          <h3 className="text-lg font-semibold">Datos de la medición</h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-xs">Fecha de medición</p>
+              <p className="font-medium">{fechaMedicion}</p>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-xs">Tipo de abertura medida</p>
+              <p className="font-medium">{md?.tipoAberturaMedida || "-"}</p>
+            </div>
+
+            <div className="space-y-1 sm:col-span-2">
+              <p className="text-muted-foreground text-xs">Dirección de obra</p>
+              <p className="font-medium">{md?.direccionObra || "-"}</p>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-xs">Cliente / Obra / Empresa</p>
+              <p className="font-medium">{md?.clienteObraEmpresa || cliente?.nombreCompleto || "-"}</p>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-xs">Cantidad de aberturas medidas</p>
+              <p className="font-medium">{md?.cantidadAberturasMedidas || medidas.length || "-"}</p>
+            </div>
+          </div>
+        </section>
+
+        <Separator className="my-6" />
+
+        {/* MEDIDAS TOMADAS */}
+        <section className="space-y-3">
+          <h3 className="text-lg font-semibold">Medidas tomadas</h3>
+          <p className="text-xs text-muted-foreground">
+            Cada fila corresponde a una abertura medida.
+          </p>
+
+          {medidas.length ? (
+            <div className="space-y-2">
+              {medidas.map((m, idx) => (
+                <div
+                  key={idx}
+                  className="border rounded-md px-3 py-2 flex flex-wrap gap-3 bg-muted/40"
+                >
+                  <span className="text-xs text-muted-foreground">#{idx + 1}</span>
+                  <span>Alto: {m.alto ?? "-"}</span>
+                  <span>Ancho: {m.ancho ?? "-"}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Sin medidas cargadas.</p>
+          )}
+
+          <div className="space-y-1">
+            <p className="text-muted-foreground text-xs">Tolerancias o ajustes recomendados</p>
+            <p className="font-medium whitespace-pre-line">{md?.toleranciasRecomendadas || "-"}</p>
+          </div>
+        </section>
+
+        <Separator className="my-6" />
+
+        {/* CONDICIÓN DE VANOS / ESTADO OBRA */}
+        <section className="space-y-3">
+          <h3 className="text-lg font-semibold">Condición de vanos y estado de la obra</h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-xs">Condición de los vanos</p>
+              {condicionVanos.length ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {condicionVanos.map((c) => (
+                    <span
+                      key={c}
+                      className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs"
+                    >
+                      {c}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="font-medium">-</p>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-xs">Estado de la obra al medir</p>
+              <p className="font-medium">{md?.estadoObraMedicion || "-"}</p>
+            </div>
+          </div>
+        </section>
+
+        <Separator className="my-6" />
+
+        {/* CONFIGURACIÓN DE CARPINTERÍA / VIDRIO */}
+        <section className="space-y-3">
+          <h3 className="text-lg font-semibold">Configuración de carpintería y vidrio</h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-xs">Tipo de perfil previsto</p>
+              <p className="font-medium">{md?.tipoPerfilPrevisto || "-"}</p>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-xs">Color</p>
+              <p className="font-medium">{md?.color || "-"}</p>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-xs">Tipo de vidrio solicitado</p>
+              <p className="font-medium">{md?.tipoVidrioSolicitado || "-"}</p>
+            </div>
+          </div>
+        </section>
+
+        <Separator className="my-6" />
+
+        {/* PLANOS / FOTOS */}
+        <section className="space-y-3">
+          <h3 className="text-lg font-semibold">Documentación gráfica</h3>
+
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">Referencia del plano o croquis</p>
+            {planos.length ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {planos.map((url) => (
+                  <a
+                    key={url}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group relative block aspect-[4/3] overflow-hidden rounded-md border bg-muted"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={url}
+                      alt="Plano / croquis"
+                      className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                    />
+                  </a>
                 ))}
               </div>
             ) : (
-              <p className="font-medium">-</p>
+              <p className="text-xs text-muted-foreground">Sin planos/croquis adjuntos.</p>
             )}
           </div>
 
-          <div className="space-y-1">
-            <p className="text-muted-foreground text-xs">
-              Estado de la obra al medir
-            </p>
-            <p className="font-medium">{md?.estadoObraMedicion || "-"}</p>
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">Fotos de medición</p>
+            {fotos.length ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {fotos.map((url) => (
+                  <a
+                    key={url}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group relative block aspect-[4/3] overflow-hidden rounded-md border bg-muted"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={url}
+                      alt="Foto de medición"
+                      className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                    />
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">Sin fotos de medición.</p>
+            )}
           </div>
-        </div>
-      </section>
+        </section>
 
-      <Separator />
+        <Separator className="my-6" />
 
-      {/* CONFIGURACIÓN DE CARPINTERÍA / VIDRIO */}
-      <section className="space-y-3">
-        <h3 className="text-lg font-semibold">
-          Configuración de carpintería y vidrio
-        </h3>
+        {/* OBSERVACIONES / FIRMA / ESTADOS */}
+        <section className="space-y-3">
+          <h3 className="text-lg font-semibold">Cierre de medición</h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-1">
-            <p className="text-muted-foreground text-xs">
-              Tipo de perfil previsto
-            </p>
-            <p className="font-medium">{md?.tipoPerfilPrevisto || "-"}</p>
+            <p className="text-muted-foreground text-xs">Observaciones técnicas</p>
+            <p className="font-medium whitespace-pre-line">{md?.observacionesMedicion || "Sin observaciones."}</p>
           </div>
 
           <div className="space-y-1">
-            <p className="text-muted-foreground text-xs">Color</p>
-            <p className="font-medium">{md?.color || "-"}</p>
+            <p className="text-muted-foreground text-xs">Estado final</p>
+            <p className="font-medium">{md?.estadoFinalMedicion || "-"}</p>
           </div>
 
           <div className="space-y-1">
-            <p className="text-muted-foreground text-xs">
-              Tipo de vidrio solicitado
-            </p>
-            <p className="font-medium">{md?.tipoVidrioSolicitado || "-"}</p>
+            <p className="text-muted-foreground text-xs">Enviar a verificación</p>
+            <p className="font-medium">{md?.enviarAVerificacion || "-"}</p>
           </div>
-        </div>
-      </section>
 
-      <Separator />
+          <div className="space-y-1">
+            <p className="text-muted-foreground text-xs">Firma del técnico</p>
+            {md?.firmaValidacionTecnico ? (
+              <div className="inline-flex items-center justify-center rounded-md border bg-muted px-3 py-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={md.firmaValidacionTecnico}
+                  alt="Firma de validación"
+                  className="max-h-24 object-contain"
+                />
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No hay firma cargada.</p>
+            )}
+          </div>
+        </section>
+      </div>
 
-      {/* PLANOS / FOTOS */}
+      {/* 👉 BOTONES DE ACCIÓN ABAJO (fuera del área PDF si querés que no aparezcan) */}
       <section className="space-y-3">
-        <h3 className="text-lg font-semibold">Documentación gráfica</h3>
-
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">
-            Referencia del plano o croquis
-          </p>
-          {planos.length ? (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {planos.map((url) => (
-                <a
-                  key={url}
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group relative block aspect-[4/3] overflow-hidden rounded-md border bg-muted"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={url}
-                    alt="Plano / croquis"
-                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                  />
-                </a>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Sin planos/croquis adjuntos.
-            </p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">Fotos de medición</p>
-          {fotos.length ? (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {fotos.map((url) => (
-                <a
-                  key={url}
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group relative block aspect-[4/3] overflow-hidden rounded-md border bg-muted"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={url}
-                    alt="Foto de medición"
-                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                  />
-                </a>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Sin fotos de medición.
-            </p>
-          )}
-        </div>
-      </section>
-
-      <Separator />
-
-      {/* OBSERVACIONES / FIRMA / ESTADOS */}
-      <section className="space-y-3">
-        <h3 className="text-lg font-semibold">Cierre de medición</h3>
-
-        <div className="space-y-1">
-          <p className="text-muted-foreground text-xs">
-            Observaciones técnicas de medición
-          </p>
-          <p className="font-medium whitespace-pre-line">
-            {md?.observacionesMedicion || "Sin observaciones."}
-          </p>
-        </div>
-
-        <div className="space-y-1">
-          <p className="text-muted-foreground text-xs">
-            Estado final de la medición
-          </p>
-          <p className="font-medium">{md?.estadoFinalMedicion || "-"}</p>
-        </div>
-
-        <div className="space-y-1">
-          <p className="text-muted-foreground text-xs">
-            Enviar a verificación
-          </p>
-          <p className="font-medium">{md?.enviarAVerificacion || "-"}</p>
-        </div>
-
-        <div className="space-y-1">
-          <p className="text-muted-foreground text-xs">
-            Firma de validación del técnico
-          </p>
-          {md?.firmaValidacionTecnico ? (
-            <div className="inline-flex items-center justify-center rounded-md border bg-muted px-3 py-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={md.firmaValidacionTecnico}
-                alt="Firma de validación"
-                className="max-h-24 object-contain"
-              />
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              No hay firma cargada.
-            </p>
-          )}
-        </div>
-      </section>
-
-      <Separator />
-
-      {/* 👉 BOTONES DE ACCIÓN ABAJO */}
-      <section className="space-y-3">
-        <h3 className="text-sm font-semibold text-muted-foreground">
-          Acciones sobre el proyecto
-        </h3>
+        <h3 className="text-sm font-semibold text-muted-foreground">Acciones sobre el proyecto</h3>
         <div className="flex flex-wrap gap-2">
-          {/* Botón FINALIZADO → abre diálogo para elegir siguiente etapa */}
           <Button
             type="button"
             size="sm"
@@ -873,7 +807,6 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
             Finalizar
           </Button>
 
-          {/* Terminar proyecto (Proyecto Finalizado + Completado) */}
           <Button
             type="button"
             size="sm"
@@ -895,7 +828,6 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
             )}
           </Button>
 
-          {/* Eliminar proyecto / no realizado */}
           <Button
             type="button"
             size="sm"
@@ -908,7 +840,6 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
             Eliminar proyecto
           </Button>
 
-          {/* Eliminar solo medición */}
           <Button
             type="button"
             variant="outline"
