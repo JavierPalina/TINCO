@@ -21,6 +21,12 @@ import {
 import { createPortal } from "react-dom";
 import { useDebounce } from "use-debounce";
 import { useSession } from "next-auth/react";
+import {
+  useForm,
+  SubmitHandler,
+  useFieldArray,
+  Controller,
+} from "react-hook-form";
 import { TableCellActions } from "@/components/clientes/TableCellActions";
 import {
   Loader2,
@@ -36,6 +42,9 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
+  Pencil,
+  FilePenLine,
+  Plus,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { CreateQuoteDialog } from "@/components/cotizaciones/CreateQuoteDialog";
@@ -65,6 +74,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { FaWhatsapp } from "react-icons/fa";
 import {
@@ -85,6 +102,16 @@ import Link from "next/link";
 import axios, { AxiosError } from "axios";
 import { QuoteDetailsSheet } from "@/components/cotizaciones/QuoteDetailsSheet";
 import { QuoteDetailsDialog } from "@/components/cotizaciones/QuoteDetailsDialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // ✅ Tooltip imports (shadcn)
 import {
@@ -161,12 +188,59 @@ type StageColorMap = { [key: string]: string };
 type FormValue = string | number | boolean | string[] | undefined;
 type IFormularioData = Record<string, FormValue>;
 
+type Campo = {
+  titulo: string;
+  tipo:
+    | "texto"
+    | "textarea"
+    | "numero"
+    | "precio"
+    | "fecha"
+    | "checkbox"
+    | "seleccion"
+    | "combobox"
+    | "archivo";
+  opciones?: string | string[];
+  requerido: boolean;
+  _id?: string;
+};
+
+type StageFormInputs = {
+  nombre: string;
+  campos: Campo[];
+};
+
+type FormularioEtapaResponse = {
+  _id?: string;
+  etapaId?: string;
+  campos?: IFormField[];
+  [key: string]: unknown;
+};
+
+type ApiErrorResponse = {
+  error: string;
+};
+
+const tiposDeCampo: Array<{ value: Campo["tipo"]; label: string }> = [
+  { value: "texto", label: "Texto Corto" },
+  { value: "textarea", label: "Párrafo / Texto Largo" },
+  { value: "numero", label: "Número" },
+  { value: "precio", label: "Precio" },
+  { value: "fecha", label: "Fecha" },
+  { value: "checkbox", label: "Casilla Única (Sí/No)" },
+  { value: "seleccion", label: "Lista Desplegable" },
+  { value: "combobox", label: "Lista Desplegable con Buscador" },
+  { value: "archivo", label: "Subir Archivo(s)" },
+];
+
 interface PipelineViewProps {
   etapas: Etapa[];
   columns: Columns;
   onDelete: (quoteId: string) => void;
   onUndo: (quoteId: string) => void;
   onDeleteStage: (etapa: Etapa) => void;
+  onOpenEditStageName: (etapa: Etapa) => void;
+  onOpenEditStageForm: (etapa: Etapa) => void;
   sensors: ReturnType<typeof useSensors>;
   onDragStart: (event: DragStartEvent) => void;
   onDragEnd: (event: DragEndEvent) => void;
@@ -529,6 +603,8 @@ function QuoteColumn({
   isFetching,
   onUndo,
   onDeleteStage,
+  onOpenEditStageName,
+  onOpenEditStageForm,
   highlight = false,
   collapsed = false,
   onToggleCollapse,
@@ -542,6 +618,8 @@ function QuoteColumn({
   stageColors: StageColorMap;
   isFetching: boolean;
   onDeleteStage: (etapa: Etapa) => void;
+  onOpenEditStageName: (etapa: Etapa) => void;
+  onOpenEditStageForm: (etapa: Etapa) => void;
   highlight?: boolean;
   collapsed?: boolean;
   onToggleCollapse: () => void;
@@ -644,6 +722,16 @@ function QuoteColumn({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={() => onOpenEditStageName(etapa)}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Editar nombre
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem onSelect={() => onOpenEditStageForm(etapa)}>
+                      <FilePenLine className="mr-2 h-4 w-4" />
+                      Modificar formulario
+                    </DropdownMenuItem>
+
                     <DropdownMenuItem
                       className="text-red-600 focus:text-red-600"
                       disabled={isGreenLocked}
@@ -956,6 +1044,8 @@ function PipelineView({
   onDelete,
   onUndo,
   onDeleteStage,
+  onOpenEditStageName,
+  onOpenEditStageForm,
   sensors,
   onDragStart,
   onDragEnd,
@@ -991,6 +1081,8 @@ function PipelineView({
                   onDelete={onDelete}
                   onUndo={onUndo}
                   onDeleteStage={onDeleteStage}
+                  onOpenEditStageName={onOpenEditStageName}
+                  onOpenEditStageForm={onOpenEditStageForm}
                   stageColors={stageColors}
                   isFetching={isFetching}
                   highlight={
@@ -1049,6 +1141,8 @@ function PipelineView({
                     onDelete={onDelete}
                     onUndo={onUndo}
                     onDeleteStage={onDeleteStage}
+                    onOpenEditStageName={onOpenEditStageName}
+                    onOpenEditStageForm={onOpenEditStageForm}
                     stageColors={stageColors}
                     isFetching={isFetching}
                     highlight={
@@ -1127,6 +1221,14 @@ export default function PipelinePage() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsId, setDetailsId] = useState<string | null>(null);
 
+  const [isEditStageNameOpen, setIsEditStageNameOpen] = useState(false);
+  const [stageToEditName, setStageToEditName] = useState<Etapa | null>(null);
+  const [editedStageName, setEditedStageName] = useState("");
+
+  const [isEditStageFormOpen, setIsEditStageFormOpen] = useState(false);
+  const [stageToEditForm, setStageToEditForm] = useState<Etapa | null>(null);
+  const [stageFormLoading, setStageFormLoading] = useState(false);
+
   const { data: session } = useSession();
   const queryClient = useQueryClient();
 
@@ -1142,6 +1244,32 @@ export default function PipelinePage() {
   const [collapsedStages, setCollapsedStages] = useState<Record<string, boolean>>(
     {}
   );
+
+  const editStageFormForm = useForm<StageFormInputs>({
+    defaultValues: {
+      nombre: "",
+      campos: [],
+    },
+  });
+
+  const {
+    register: registerEditStageForm,
+    control: controlEditStageForm,
+    handleSubmit: handleSubmitEditStageForm,
+    reset: resetEditStageForm,
+    watch: watchEditStageForm,
+  } = editStageFormForm;
+
+  const {
+    fields: editStageFormFields,
+    append: appendEditStageFormField,
+    remove: removeEditStageFormField,
+  } = useFieldArray({
+    control: controlEditStageForm,
+    name: "campos",
+  });
+
+  const watchCamposEditStageForm = watchEditStageForm("campos");
 
   const toggleStageCollapse = (stageId: string) => {
     setCollapsedStages((prev) => ({ ...prev, [stageId]: !prev[stageId] }));
@@ -1164,6 +1292,46 @@ export default function PipelinePage() {
   const openDetailsDialog = (id: string) => {
     setDetailsId(id);
     setDetailsOpen(true);
+  };
+
+  const openEditStageName = (etapa: Etapa) => {
+    setStageToEditName(etapa);
+    setEditedStageName(etapa.nombre);
+    setIsEditStageNameOpen(true);
+  };
+
+  const openEditStageForm = async (etapa: Etapa) => {
+    setStageToEditForm(etapa);
+    setStageFormLoading(true);
+    setIsEditStageFormOpen(true);
+
+    try {
+      const { data } = await axios.get(`/api/formularios-etapa/${etapa._id}`);
+      const formulario = (data?.data || null) as FormularioEtapaResponse | null;
+
+      const campos = Array.isArray(formulario?.campos)
+        ? formulario!.campos.map((campo) => ({
+            ...campo,
+            opciones: Array.isArray(campo.opciones)
+              ? campo.opciones.join(", ")
+              : campo.opciones ?? "",
+          }))
+        : [];
+
+      resetEditStageForm({
+        nombre: etapa.nombre,
+        campos: campos as Campo[],
+      });
+    } catch (error) {
+      console.error("Error cargando formulario de etapa:", error);
+      resetEditStageForm({
+        nombre: etapa.nombre,
+        campos: [],
+      });
+      toast.error("No se pudo cargar el formulario actual de la etapa.");
+    } finally {
+      setStageFormLoading(false);
+    }
   };
 
   // ✅ filtros: admin por defecto ve TODO (vendedorId = "")
@@ -1197,7 +1365,6 @@ export default function PipelinePage() {
 
   const [debouncedSearchTerm] = useDebounce(filters.searchTerm, 500);
 
-  // ✅ set default vendedor solo si NO sos admin
   useEffect(() => {
     const role = (session?.user as { role?: string } | undefined)?.role;
     if (!session?.user?.id) return;
@@ -1249,7 +1416,6 @@ export default function PipelinePage() {
     return colorMap;
   }, [etapas]);
 
-  // ✅ queryKey COMPLETO: incluye sucursalId y etapaId (si no, no refetch)
   const queryKey = [
     "cotizacionesPipeline",
     debouncedSearchTerm,
@@ -1269,7 +1435,7 @@ export default function PipelinePage() {
     queryFn: async () => {
       const params = {
         searchTerm: debouncedSearchTerm || undefined,
-        vendedorId: filters.vendedorId || undefined, // "" => no filtra
+        vendedorId: filters.vendedorId || undefined,
         sucursalId: filters.sucursalId || undefined,
         etapaId: filters.etapaId || undefined,
         fechaDesde: filters.dateRange?.from ? filters.dateRange.from.toISOString() : undefined,
@@ -1278,7 +1444,7 @@ export default function PipelinePage() {
       const { data } = await axios.get("/api/cotizaciones", { params });
       return data.data;
     },
-    enabled: !!etapas, // ✅ admin puede tener vendedorId vacío
+    enabled: !!etapas,
     placeholderData: keepPreviousData,
   });
 
@@ -1304,7 +1470,6 @@ export default function PipelinePage() {
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } })
   );
 
-  // ✅ SIEMPRE usamos /move (con o sin form)
   const updateQuoteWithFormData = useMutation({
     mutationFn: (data: {
       quoteId: string;
@@ -1342,6 +1507,48 @@ export default function PipelinePage() {
       setQuoteToDelete(null);
     },
     onError: () => toast.error("Error al eliminar la cotización."),
+  });
+
+  const updateStageNameMutation = useMutation({
+    mutationFn: ({ stageId, nombre }: { stageId: string; nombre: string }) =>
+      axios.patch(`/api/etapas-cotizacion/${stageId}`, { nombre }),
+    onSuccess: async () => {
+      toast.success("Etapa actualizada con éxito.");
+      await queryClient.invalidateQueries({ queryKey: ["etapasCotizacion"] });
+      await queryClient.invalidateQueries({ queryKey: ["cotizacionesPipeline"] });
+      setIsEditStageNameOpen(false);
+      setStageToEditName(null);
+      setEditedStageName("");
+    },
+    onError: (error: unknown) => {
+      const message =
+        error instanceof AxiosError
+          ? ((error.response?.data as { error?: string } | undefined)?.error ??
+            "No se pudo actualizar el nombre de la etapa.")
+          : "No se pudo actualizar el nombre de la etapa.";
+
+      toast.error(message);
+    },
+  });
+
+  const updateStageFormMutation = useMutation({
+    mutationFn: (data: { stageId: string; payload: { campos: Campo[] } }) =>
+      axios.put(`/api/formularios-etapa/${data.stageId}`, data.payload),
+    onSuccess: async () => {
+      toast.success("Formulario de etapa actualizado con éxito.");
+      await queryClient.invalidateQueries({ queryKey: ["cotizacionesPipeline"] });
+      setIsEditStageFormOpen(false);
+      setStageToEditForm(null);
+      resetEditStageForm({
+        nombre: "",
+        campos: [],
+      });
+    },
+    onError: (error: AxiosError<ApiErrorResponse>) => {
+      const message =
+        error.response?.data?.error || "No se pudo guardar el formulario.";
+      toast.error(message);
+    },
   });
 
   type DeleteStageErrorPayload = {
@@ -1418,7 +1625,6 @@ export default function PipelinePage() {
         );
         const camposFormulario: IFormField[] = data.data?.campos || [];
 
-        // Si hay formulario -> abrir modal
         if (camposFormulario.length > 0) {
           const preload: IFormularioData = {};
           camposFormulario.forEach((f) => {
@@ -1435,7 +1641,6 @@ export default function PipelinePage() {
           return;
         }
 
-        // ✅ Si NO hay formulario -> mover directo usando /move con historial {}
         setMoveBlockingLabel("Moviendo cotización...");
 
         const newSourceItems = [...columns[activeContainer]];
@@ -1463,7 +1668,7 @@ export default function PipelinePage() {
           await updateQuoteWithFormData.mutateAsync({
             quoteId: activeId,
             newStageId: overContainer,
-            formData: {}, // <- clave para /move
+            formData: {},
             montoTotal: movedItem.montoTotal,
           });
 
@@ -1508,7 +1713,6 @@ export default function PipelinePage() {
         setMoveBlockingLabel("");
       }
     } else {
-      // reorder dentro de la misma columna
       const activeIndex = columns[activeContainer].findIndex(
         (q) => q._id === activeId
       );
@@ -1543,7 +1747,6 @@ export default function PipelinePage() {
 
   const handleUndo = (quoteId: string) => undoQuoteStage.mutate(quoteId);
 
-  // ====== Auto modal para lead nuevo (evita F5 y evita reabrir si ya está lleno) ======
   const prevIdsRef = useRef<Set<string>>(new Set());
   const handledNewLeadsRef = useRef<Set<string>>(new Set());
   const didInitRef = useRef(false);
@@ -1615,6 +1818,35 @@ export default function PipelinePage() {
       }
     })();
   }, [cotizaciones, etapas, isStageFormModalOpen]);
+
+  const onSubmitEditStageForm: SubmitHandler<StageFormInputs> = (data) => {
+    if (!stageToEditForm?._id) {
+      toast.error("No se encontró la etapa.");
+      return;
+    }
+
+    const processedCampos: Campo[] = data.campos.map((campo) => ({
+      ...campo,
+      opciones:
+        campo.tipo === "seleccion" || campo.tipo === "combobox"
+          ? typeof campo.opciones === "string"
+            ? campo.opciones
+                .split(",")
+                .map((opt) => opt.trim())
+                .filter((opt) => opt.length > 0)
+            : Array.isArray(campo.opciones)
+            ? campo.opciones
+            : []
+          : undefined,
+    }));
+
+    updateStageFormMutation.mutate({
+      stageId: stageToEditForm._id,
+      payload: {
+        campos: processedCampos,
+      },
+    });
+  };
 
   if (isLoadingEtapas) {
     return (
@@ -1855,6 +2087,258 @@ export default function PipelinePage() {
           </AlertDialogContent>
         </AlertDialog>
 
+        <Dialog
+          open={isEditStageNameOpen}
+          onOpenChange={(open) => {
+            setIsEditStageNameOpen(open);
+            if (!open) {
+              setStageToEditName(null);
+              setEditedStageName("");
+            }
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar nombre de etapa</DialogTitle>
+              <DialogDescription>
+                Actualizá el nombre visible de la etapa.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-2 py-2">
+              <Label htmlFor="stage-name">Nombre</Label>
+              <Input
+                id="stage-name"
+                value={editedStageName}
+                onChange={(e) => setEditedStageName(e.target.value)}
+                placeholder="Nuevo nombre"
+              />
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsEditStageNameOpen(false);
+                  setStageToEditName(null);
+                  setEditedStageName("");
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                disabled={updateStageNameMutation.isPending}
+                onClick={() => {
+                  const nombre = editedStageName.trim();
+                  if (!stageToEditName?._id) {
+                    toast.error("No se encontró la etapa a editar.");
+                    return;
+                  }
+                  if (!nombre) {
+                    toast.error("El nombre no puede estar vacío.");
+                    return;
+                  }
+
+                  updateStageNameMutation.mutate({
+                    stageId: stageToEditName._id,
+                    nombre,
+                  });
+                }}
+              >
+                {updateStageNameMutation.isPending ? "Guardando..." : "Guardar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={isEditStageFormOpen}
+          onOpenChange={(open) => {
+            setIsEditStageFormOpen(open);
+            if (!open) {
+              setStageToEditForm(null);
+              setStageFormLoading(false);
+              resetEditStageForm({
+                nombre: "",
+                campos: [],
+              });
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-5xl max-h-[90vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>
+                Modificar formulario
+                {stageToEditForm ? `: ${stageToEditForm.nombre}` : ""}
+              </DialogTitle>
+              <DialogDescription>
+                Editá los campos del formulario que se pedirán al mover un lead a esta etapa.
+              </DialogDescription>
+            </DialogHeader>
+
+            {stageFormLoading ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            ) : (
+              <form
+                onSubmit={handleSubmitEditStageForm(onSubmitEditStageForm)}
+                className="flex flex-col flex-1 overflow-hidden"
+              >
+                <div className="p-4 border rounded-lg mb-4">
+                  <h3 className="font-semibold text-lg mb-2">Datos de la Etapa</h3>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-stage-name-disabled">Nombre de la Etapa</Label>
+                    <Input
+                      id="edit-stage-name-disabled"
+                      {...registerEditStageForm("nombre")}
+                      disabled
+                    />
+                  </div>
+                </div>
+
+                <div className="p-4 border rounded-lg flex flex-col flex-1 overflow-hidden">
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-semibold text-lg">Campos del Formulario</h3>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        appendEditStageFormField({
+                          titulo: "",
+                          tipo: "texto",
+                          requerido: false,
+                          opciones: "",
+                        })
+                      }
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Agregar Campo
+                    </Button>
+                  </div>
+
+                  <div className="overflow-y-auto border rounded-md max-h-[45vh]">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left p-2 w-1/4">Título del Campo</th>
+                          <th className="text-left p-2 w-1/5">Tipo</th>
+                          <th className="text-left p-2 w-1/3">Opciones</th>
+                          <th className="text-center p-2 w-[100px]">Oblig.</th>
+                          <th className="w-[40px]"></th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {editStageFormFields.map((field, index) => (
+                          <tr key={field.id} className="border-b hover:bg-muted/30">
+                            <td className="p-2 align-top">
+                              <Input
+                                {...registerEditStageForm(`campos.${index}.titulo`, {
+                                  required: true,
+                                })}
+                                placeholder="Ej: Fecha de visita"
+                              />
+                            </td>
+
+                            <td className="p-2 align-top">
+                              <Controller
+                                name={`campos.${index}.tipo`}
+                                control={controlEditStageForm}
+                                render={({ field: controllerField }) => (
+                                  <Select
+                                    onValueChange={controllerField.onChange}
+                                    value={controllerField.value}
+                                  >
+                                    <SelectTrigger className="h-9">
+                                      <SelectValue placeholder="Seleccionar..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {tiposDeCampo.map((tipo) => (
+                                        <SelectItem key={tipo.value} value={tipo.value}>
+                                          {tipo.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                              />
+                            </td>
+
+                            <td className="p-2 align-top">
+                              {watchCamposEditStageForm?.[index]?.tipo === "seleccion" ||
+                              watchCamposEditStageForm?.[index]?.tipo === "combobox" ? (
+                                <Input
+                                  {...registerEditStageForm(`campos.${index}.opciones`)}
+                                  placeholder="Opción 1, Opción 2"
+                                />
+                              ) : (
+                                <div className="text-muted-foreground text-xs italic pt-2">
+                                  —
+                                </div>
+                              )}
+                            </td>
+
+                            <td className="text-center p-2 align-top">
+                              <Controller
+                                name={`campos.${index}.requerido`}
+                                control={controlEditStageForm}
+                                render={({ field: controllerField }) => (
+                                  <Checkbox
+                                    checked={!!controllerField.value}
+                                    onCheckedChange={controllerField.onChange}
+                                  />
+                                )}
+                              />
+                            </td>
+
+                            <td className="text-center p-2 align-top">
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => removeEditStageFormField(index)}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <DialogFooter className="mt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setIsEditStageFormOpen(false);
+                      setStageToEditForm(null);
+                      setStageFormLoading(false);
+                      resetEditStageForm({
+                        nombre: "",
+                        campos: [],
+                      });
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={updateStageFormMutation.isPending}
+                  >
+                    {updateStageFormMutation.isPending
+                      ? "Guardando..."
+                      : "Guardar formulario"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
+
         {viewMode === "pipeline" ? (
           <PipelineView
             etapas={etapas || []}
@@ -1862,6 +2346,8 @@ export default function PipelinePage() {
             onDelete={setQuoteToDelete}
             onUndo={handleUndo}
             onDeleteStage={(etapa) => setStageToDelete(etapa)}
+            onOpenEditStageName={openEditStageName}
+            onOpenEditStageForm={openEditStageForm}
             sensors={sensors}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
