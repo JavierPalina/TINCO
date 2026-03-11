@@ -1,6 +1,16 @@
 export interface IFormField {
-    requerido: boolean;
-    titulo: string;
-    tipo: 'texto' | 'seleccion' | 'precio';
-    opciones?: string[];
+  _id?: string;
+  titulo: string;
+  tipo:
+    | "texto"
+    | "textarea"
+    | "numero"
+    | "precio"
+    | "fecha"
+    | "checkbox"
+    | "seleccion"
+    | "combobox"
+    | "archivo";
+  opciones?: string[] | string;
+  requerido: boolean;
 }
