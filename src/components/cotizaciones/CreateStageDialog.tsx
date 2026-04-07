@@ -1,3 +1,5 @@
+// src/components/cotizaciones/CreateStageDialog.tsx
+
 "use client";
 
 import { useForm, SubmitHandler, useFieldArray, Controller } from "react-hook-form";

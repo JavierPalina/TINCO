@@ -1,3 +1,5 @@
+// src/components/clientes/TableCellActions.tsx
+
 "use client";
 
 import { useState } from "react";

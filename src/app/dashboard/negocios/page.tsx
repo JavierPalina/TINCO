@@ -1,3 +1,10 @@
+// src/app/dashboard/negocios/page.tsx
+// CAMBIOS:
+//   Fix 1 → QuoteCard: el bloque de precio usa "shrink-0 min-w-fit" y font-size más pequeño
+//            para que el número completo sea siempre visible sin truncarse.
+//   Fix 7 → updateStageNameMutation: ya NO invalida "etapasCotizacion" (que reordena todo),
+//            sino que hace un setQueryData quirúrgico para actualizar solo el nombre en caché.
+
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
@@ -112,8 +119,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-// ✅ Tooltip imports (shadcn)
 import {
   Tooltip,
   TooltipContent,
@@ -184,7 +189,6 @@ type Columns = Record<string, Cotizacion[]>;
 type ViewMode = "pipeline" | "table";
 type StageColorMap = { [key: string]: string };
 
-// Para precargar valores del modal
 type FormValue = string | number | boolean | string[] | undefined;
 type IFormularioData = Record<string, FormValue>;
 
@@ -252,7 +256,6 @@ interface PipelineViewProps {
   onOpenDetails: (quoteId: string) => void;
 }
 
-/** ✅ Botón icon-only con tooltip */
 function IconCta({
   label,
   onClick,
@@ -287,7 +290,6 @@ function IconCta({
   );
 }
 
-/** ✅ Helper: "hace X días/horas/minutos" */
 function timeAgoEs(date: Date | null) {
   if (!date) return "—";
   const now = new Date();
@@ -306,8 +308,13 @@ function timeAgoEs(date: Date | null) {
   return `hace ${weeks} semana${weeks === 1 ? "" : "s"}`;
 }
 
-/** Overlay bloqueante */
-function BlockingMoveOverlay({ show, label }: { show: boolean; label?: string }) {
+function BlockingMoveOverlay({
+  show,
+  label,
+}: {
+  show: boolean;
+  label?: string;
+}) {
   if (!show) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/35 backdrop-blur-[1px]">
@@ -354,11 +361,17 @@ function QuoteCard({
   stageColors: StageColorMap;
   onOpenDetails: (quoteId: string) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({
-      id: quote._id,
-      data: { type: "Quote", quote },
-    });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: quote._id,
+    data: { type: "Quote", quote },
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -395,11 +408,9 @@ function QuoteCard({
   const handleWhatsApp = () => {
     const waPhone =
       normalizePhoneForWA(quote.cliente?.telefono) || "5491111111111";
-
     const text = encodeURIComponent(
       `Hola ${quote.cliente?.nombreCompleto || ""}, te escribo por la cotización ${quote.codigo}`
     );
-
     window.open(
       `https://wa.me/${waPhone}?text=${text}`,
       "_blank",
@@ -446,7 +457,7 @@ function QuoteCard({
         >
           <CardContent className="p-3">
             <div className="flex justify-between items-start gap-2">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
                     <Link href={`/dashboard/listados/${quote.cliente._id}`}>
@@ -549,9 +560,18 @@ function QuoteCard({
               </div>
             </div>
 
-            <div className="flex items-center justify-between border-t pt-3 mt-3 gap-2">
-              <div className="flex items-center gap-2">
-                <IconCta label="Ver archivos" onClick={() => setFilesOpen(true)}>
+            {/* ── Footer: acciones + precio ────────────────────────────────
+                FIX 1: el contenedor usa "items-center" y el bloque de precio
+                usa "shrink-0" + "whitespace-nowrap" para que nunca se corte.
+                Reducimos el font-size a "text-sm" para que incluso montos
+                grandes (ej: $10.000.000) quepan en el ancho de la card.
+            ─────────────────────────────────────────────────────────────── */}
+            <div className="flex items-center justify-between border-t pt-3 mt-3 gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <IconCta
+                  label="Ver archivos"
+                  onClick={() => setFilesOpen(true)}
+                >
                   <div className="relative">
                     <Paperclip className="h-4 w-4" />
                     <span className="absolute -top-2 -right-2 text-[10px] font-semibold bg-primary text-primary-foreground rounded-full px-1.5 leading-4">
@@ -580,11 +600,10 @@ function QuoteCard({
                 </IconCta>
               </div>
 
-              <div className="flex flex-col items-end">
-                <div className="flex items-center gap-1 font-semibold text-base whitespace-nowrap">
-                  <DollarSign className="h-4 w-4" />
-                  <span>{quote.montoTotal.toLocaleString("es-AR")}</span>
-                </div>
+              {/* Precio: shrink-0 + whitespace-nowrap → nunca se trunca */}
+              <div className="flex items-center gap-0.5 font-semibold text-sm whitespace-nowrap shrink-0 ml-auto">
+                <DollarSign className="h-3.5 w-3.5 shrink-0" />
+                <span>{quote.montoTotal.toLocaleString("es-AR")}</span>
               </div>
             </div>
           </CardContent>
@@ -700,7 +719,9 @@ function QuoteColumn({
                   className="w-2.5 h-2.5 rounded-full"
                   style={{ backgroundColor: stageColor }}
                 />
-                <h2 className="font-semibold text-base truncate">{etapa.nombre}</h2>
+                <h2 className="font-semibold text-base truncate">
+                  {etapa.nombre}
+                </h2>
               </div>
 
               <div className="flex items-center gap-2">
@@ -722,12 +743,16 @@ function QuoteColumn({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onSelect={() => onOpenEditStageName(etapa)}>
+                    <DropdownMenuItem
+                      onSelect={() => onOpenEditStageName(etapa)}
+                    >
                       <Pencil className="mr-2 h-4 w-4" />
                       Editar nombre
                     </DropdownMenuItem>
 
-                    <DropdownMenuItem onSelect={() => onOpenEditStageForm(etapa)}>
+                    <DropdownMenuItem
+                      onSelect={() => onOpenEditStageForm(etapa)}
+                    >
                       <FilePenLine className="mr-2 h-4 w-4" />
                       Modificar formulario
                     </DropdownMenuItem>
@@ -858,7 +883,8 @@ function QuotesTableView({
   }
 
   const handleWhatsApp = (q: Cotizacion) => {
-    const waPhone = normalizePhoneForWA(q.cliente?.telefono) || "5491111111111";
+    const waPhone =
+      normalizePhoneForWA(q.cliente?.telefono) || "5491111111111";
     const text = encodeURIComponent(
       `Hola ${q.cliente?.nombreCompleto || ""}, te escribo por la cotización ${q.codigo}`
     );
@@ -900,7 +926,9 @@ function QuotesTableView({
               quotes.map((quote) => {
                 const lastMove = quote.historialEtapas?.length
                   ? new Date(
-                      quote.historialEtapas[quote.historialEtapas.length - 1].fecha
+                      quote.historialEtapas[
+                        quote.historialEtapas.length - 1
+                      ].fecha
                     )
                   : quote.updatedAt
                   ? new Date(quote.updatedAt)
@@ -961,7 +989,10 @@ function QuotesTableView({
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center justify-center gap-2 flex-wrap">
-                        <IconCta label="Ver archivos" onClick={() => openFiles(quote)}>
+                        <IconCta
+                          label="Ver archivos"
+                          onClick={() => openFiles(quote)}
+                        >
                           <div className="relative">
                             <Paperclip className="h-4 w-4" />
                             <span className="absolute -top-2 -right-2 text-[10px] font-semibold bg-primary text-primary-foreground rounded-full px-1.5 leading-4">
@@ -997,7 +1028,11 @@ function QuotesTableView({
 
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="icon" className="h-9 w-9">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-9 w-9"
+                            >
                               <MoreVertical className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
@@ -1183,7 +1218,6 @@ function PipelineView({
   );
 }
 
-/** ✅ Detecta si el formulario de una etapa ya fue completado (mínimo) */
 function hasStageFormFilled(quote: Cotizacion, stageId: string) {
   const entries = quote.historialEtapas || [];
   for (let i = entries.length - 1; i >= 0; i--) {
@@ -1198,7 +1232,6 @@ function hasStageFormFilled(quote: Cotizacion, stageId: string) {
   return false;
 }
 
-/** Normalización: mismo helper que en el modal */
 const toFieldName = (title: string): string => {
   return title
     .normalize("NFD")
@@ -1210,7 +1243,9 @@ const toFieldName = (title: string): string => {
 
 export default function PipelinePage() {
   const [isStageFormModalOpen, setIsStageFormModalOpen] = useState(false);
-  const [formFieldsForStage, setFormFieldsForStage] = useState<IFormField[]>([]);
+  const [formFieldsForStage, setFormFieldsForStage] = useState<IFormField[]>(
+    []
+  );
   const [quoteToMove, setQuoteToMove] = useState<Cotizacion | null>(null);
   const [newStageId, setNewStageId] = useState<string | null>(null);
   const [isQuoteSidebarOpen, setIsQuoteSidebarOpen] = useState(false);
@@ -1241,15 +1276,12 @@ export default function PipelinePage() {
   const [isMoveBlocking, setIsMoveBlocking] = useState(false);
   const [moveBlockingLabel, setMoveBlockingLabel] = useState<string>("");
 
-  const [collapsedStages, setCollapsedStages] = useState<Record<string, boolean>>(
-    {}
-  );
+  const [collapsedStages, setCollapsedStages] = useState<
+    Record<string, boolean>
+  >({});
 
   const editStageFormForm = useForm<StageFormInputs>({
-    defaultValues: {
-      nombre: "",
-      campos: [],
-    },
+    defaultValues: { nombre: "", campos: [] },
   });
 
   const {
@@ -1264,10 +1296,7 @@ export default function PipelinePage() {
     fields: editStageFormFields,
     append: appendEditStageFormField,
     remove: removeEditStageFormField,
-  } = useFieldArray({
-    control: controlEditStageForm,
-    name: "campos",
-  });
+  } = useFieldArray({ control: controlEditStageForm, name: "campos" });
 
   const watchCamposEditStageForm = watchEditStageForm("campos");
 
@@ -1318,23 +1347,16 @@ export default function PipelinePage() {
           }))
         : [];
 
-      resetEditStageForm({
-        nombre: etapa.nombre,
-        campos: campos as Campo[],
-      });
+      resetEditStageForm({ nombre: etapa.nombre, campos: campos as Campo[] });
     } catch (error) {
       console.error("Error cargando formulario de etapa:", error);
-      resetEditStageForm({
-        nombre: etapa.nombre,
-        campos: [],
-      });
+      resetEditStageForm({ nombre: etapa.nombre, campos: [] });
       toast.error("No se pudo cargar el formulario actual de la etapa.");
     } finally {
       setStageFormLoading(false);
     }
   };
 
-  // ✅ filtros: admin por defecto ve TODO (vendedorId = "")
   const [filters, setFilters] = useState<Filters>(() => {
     if (typeof window === "undefined") {
       return {
@@ -1349,8 +1371,10 @@ export default function PipelinePage() {
     const savedFilters = localStorage.getItem("quotePipelineFilters");
     if (savedFilters) {
       const parsed = JSON.parse(savedFilters);
-      if (parsed.dateRange?.from) parsed.dateRange.from = new Date(parsed.dateRange.from);
-      if (parsed.dateRange?.to) parsed.dateRange.to = new Date(parsed.dateRange.to);
+      if (parsed.dateRange?.from)
+        parsed.dateRange.from = new Date(parsed.dateRange.from);
+      if (parsed.dateRange?.to)
+        parsed.dateRange.to = new Date(parsed.dateRange.to);
       return parsed;
     }
 
@@ -1370,7 +1394,10 @@ export default function PipelinePage() {
     if (!session?.user?.id) return;
 
     if (role !== "admin" && !filters.vendedorId) {
-      setFilters((prev) => ({ ...prev, vendedorId: session.user.id as string }));
+      setFilters((prev) => ({
+        ...prev,
+        vendedorId: session.user.id as string,
+      }));
     }
   }, [session, filters.vendedorId]);
 
@@ -1380,7 +1407,8 @@ export default function PipelinePage() {
 
   const { data: etapas, isLoading: isLoadingEtapas } = useQuery<Etapa[]>({
     queryKey: ["etapasCotizacion"],
-    queryFn: async () => (await axios.get("/api/etapas-cotizacion")).data.data,
+    queryFn: async () =>
+      (await axios.get("/api/etapas-cotizacion")).data.data,
   });
 
   const stageColors = useMemo(() => {
@@ -1438,8 +1466,12 @@ export default function PipelinePage() {
         vendedorId: filters.vendedorId || undefined,
         sucursalId: filters.sucursalId || undefined,
         etapaId: filters.etapaId || undefined,
-        fechaDesde: filters.dateRange?.from ? filters.dateRange.from.toISOString() : undefined,
-        fechaHasta: filters.dateRange?.to ? filters.dateRange.to.toISOString() : undefined,
+        fechaDesde: filters.dateRange?.from
+          ? filters.dateRange.from.toISOString()
+          : undefined,
+        fechaHasta: filters.dateRange?.to
+          ? filters.dateRange.to.toISOString()
+          : undefined,
       };
       const { data } = await axios.get("/api/cotizaciones", { params });
       return data.data;
@@ -1467,7 +1499,9 @@ export default function PipelinePage() {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } })
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 180, tolerance: 8 },
+    })
   );
 
   const updateQuoteWithFormData = useMutation({
@@ -1500,7 +1534,8 @@ export default function PipelinePage() {
   });
 
   const deleteQuoteMutation = useMutation({
-    mutationFn: (quoteId: string) => axios.delete(`/api/cotizaciones/${quoteId}`),
+    mutationFn: (quoteId: string) =>
+      axios.delete(`/api/cotizaciones/${quoteId}`),
     onSuccess: () => {
       toast.success("Cotización eliminada con éxito.");
       queryClient.invalidateQueries({ queryKey });
@@ -1509,24 +1544,65 @@ export default function PipelinePage() {
     onError: () => toast.error("Error al eliminar la cotización."),
   });
 
+  // ── FIX 7: editar nombre de etapa sin reordenar columnas ─────────────────
+  // En vez de invalidar "etapasCotizacion" (que dispara un refetch y reordena
+  // las columnas según el orden del servidor), hacemos un setQueryData
+  // quirúrgico que solo cambia el nombre en la caché local.
   const updateStageNameMutation = useMutation({
     mutationFn: ({ stageId, nombre }: { stageId: string; nombre: string }) =>
       axios.patch(`/api/etapas-cotizacion/${stageId}`, { nombre }),
-    onSuccess: async () => {
+
+    onSuccess: async (_data, variables) => {
       toast.success("Etapa actualizada con éxito.");
-      await queryClient.invalidateQueries({ queryKey: ["etapasCotizacion"] });
-      await queryClient.invalidateQueries({ queryKey: ["cotizacionesPipeline"] });
+
+      // ✅ Actualización quirúrgica: solo cambiamos el nombre en caché
+      //    sin refetch → las columnas mantienen su posición actual.
+      queryClient.setQueryData<Etapa[]>(
+        ["etapasCotizacion"],
+        (old) =>
+          old?.map((e) =>
+            e._id === variables.stageId
+              ? { ...e, nombre: variables.nombre }
+              : e
+          ) ?? old
+      );
+
+      // También actualizamos el nombre dentro de cada cotización en la caché
+      // del pipeline para que las cards muestren el nombre correcto.
+      queryClient.setQueriesData<Cotizacion[]>(
+        { queryKey: ["cotizacionesPipeline"], exact: false },
+        (old) =>
+          old?.map((q) =>
+            q.etapa._id === variables.stageId
+              ? { ...q, etapa: { ...q.etapa, nombre: variables.nombre } }
+              : q
+          ) ?? old
+      );
+
+      // Actualizamos también el estado local de columnas
+      setColumns((prev) => {
+        const next = { ...prev };
+        Object.keys(next).forEach((key) => {
+          next[key] = next[key].map((q) =>
+            q.etapa._id === variables.stageId
+              ? { ...q, etapa: { ...q.etapa, nombre: variables.nombre } }
+              : q
+          );
+        });
+        return next;
+      });
+
       setIsEditStageNameOpen(false);
       setStageToEditName(null);
       setEditedStageName("");
     },
+
     onError: (error: unknown) => {
       const message =
         error instanceof AxiosError
           ? ((error.response?.data as { error?: string } | undefined)?.error ??
             "No se pudo actualizar el nombre de la etapa.")
           : "No se pudo actualizar el nombre de la etapa.";
-
       toast.error(message);
     },
   });
@@ -1536,13 +1612,12 @@ export default function PipelinePage() {
       axios.put(`/api/formularios-etapa/${data.stageId}`, data.payload),
     onSuccess: async () => {
       toast.success("Formulario de etapa actualizado con éxito.");
-      await queryClient.invalidateQueries({ queryKey: ["cotizacionesPipeline"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["cotizacionesPipeline"],
+      });
       setIsEditStageFormOpen(false);
       setStageToEditForm(null);
-      resetEditStageForm({
-        nombre: "",
-        campos: [],
-      });
+      resetEditStageForm({ nombre: "", campos: [] });
     },
     onError: (error: AxiosError<ApiErrorResponse>) => {
       const message =
@@ -1573,7 +1648,9 @@ export default function PipelinePage() {
 
       if (err instanceof AxiosError) {
         status = err.response?.status;
-        const payload = err.response?.data as DeleteStageErrorPayload | undefined;
+        const payload = err.response?.data as
+          | DeleteStageErrorPayload
+          | undefined;
         message = payload?.error || err.message || message;
       }
 
@@ -1680,7 +1757,6 @@ export default function PipelinePage() {
                 cotizacionId: movedItem._id,
                 estadoActual: null,
               });
-
               toast.success(
                 `Proyecto creado para ${
                   movedItem.cliente?.nombreCompleto || "el cliente"
@@ -1726,7 +1802,10 @@ export default function PipelinePage() {
           activeIndex,
           overIndex
         );
-        setColumns((prev) => ({ ...prev, [overContainer]: newOrderedQuotes }));
+        setColumns((prev) => ({
+          ...prev,
+          [overContainer]: newOrderedQuotes,
+        }));
 
         reorderQuotesMutation.mutate({
           stageId: overContainer,
@@ -1737,7 +1816,8 @@ export default function PipelinePage() {
   }
 
   const undoQuoteStage = useMutation({
-    mutationFn: (quoteId: string) => axios.patch(`/api/cotizaciones/${quoteId}/undo`),
+    mutationFn: (quoteId: string) =>
+      axios.patch(`/api/cotizaciones/${quoteId}/undo`),
     onSuccess: () => {
       toast.success("Se deshizo la última acción");
       queryClient.invalidateQueries({ queryKey });
@@ -1811,7 +1891,10 @@ export default function PipelinePage() {
         setNewStageId(stageId);
         setIsStageFormModalOpen(true);
       } catch (e) {
-        console.error("Error verificando formulario de etapa para nuevo lead:", e);
+        console.error(
+          "Error verificando formulario de etapa para nuevo lead:",
+          e
+        );
       } finally {
         setIsMoveBlocking(false);
         setMoveBlockingLabel("");
@@ -1842,9 +1925,7 @@ export default function PipelinePage() {
 
     updateStageFormMutation.mutate({
       stageId: stageToEditForm._id,
-      payload: {
-        campos: processedCampos,
-      },
+      payload: { campos: processedCampos },
     });
   };
 
@@ -1911,11 +1992,14 @@ export default function PipelinePage() {
             const quoteId = quoteToMove._id;
 
             let newMontoTotal = quoteToMove.montoTotal;
-            const precioField = formFieldsForStage.find((f) => f.tipo === "precio");
+            const precioField = formFieldsForStage.find(
+              (f) => f.tipo === "precio"
+            );
             if (precioField) {
               const key = toFieldName(precioField.titulo);
               const raw = formData[key];
-              const parsed = typeof raw === "number" ? raw : Number(raw);
+              const parsed =
+                typeof raw === "number" ? raw : Number(raw);
               if (Number.isFinite(parsed)) newMontoTotal = parsed;
             }
 
@@ -1986,7 +2070,10 @@ export default function PipelinePage() {
                     }`
                   );
                 } catch (error) {
-                  console.error("Error creando proyecto desde cotización", error);
+                  console.error(
+                    "Error creando proyecto desde cotización",
+                    error
+                  );
                   toast.error(
                     "Se movió la cotización pero no se pudo crear el proyecto."
                   );
@@ -2046,7 +2133,10 @@ export default function PipelinePage() {
       </div>
 
       <div className="flex-grow overflow-auto px-4 py-4">
-        <AlertDialog open={!!quoteToDelete} onOpenChange={() => setQuoteToDelete(null)}>
+        <AlertDialog
+          open={!!quoteToDelete}
+          onOpenChange={() => setQuoteToDelete(null)}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
@@ -2066,19 +2156,24 @@ export default function PipelinePage() {
           </AlertDialogContent>
         </AlertDialog>
 
-        <AlertDialog open={!!stageToDelete} onOpenChange={() => setStageToDelete(null)}>
+        <AlertDialog
+          open={!!stageToDelete}
+          onOpenChange={() => setStageToDelete(null)}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Eliminar etapa</AlertDialogTitle>
               <AlertDialogDescription>
-                Esta acción eliminará la etapa y su formulario asociado. Si la etapa contiene leads,
-                se te pedirá moverlos antes.
+                Esta acción eliminará la etapa y su formulario asociado. Si la
+                etapa contiene leads, se te pedirá moverlos antes.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => deleteStageMutation.mutate(stageToDelete!._id)}
+                onClick={() =>
+                  deleteStageMutation.mutate(stageToDelete!._id)
+                }
                 className="bg-red-600 hover:bg-red-700"
               >
                 Sí, eliminar
@@ -2138,7 +2233,6 @@ export default function PipelinePage() {
                     toast.error("El nombre no puede estar vacío.");
                     return;
                   }
-
                   updateStageNameMutation.mutate({
                     stageId: stageToEditName._id,
                     nombre,
@@ -2158,10 +2252,7 @@ export default function PipelinePage() {
             if (!open) {
               setStageToEditForm(null);
               setStageFormLoading(false);
-              resetEditStageForm({
-                nombre: "",
-                campos: [],
-              });
+              resetEditStageForm({ nombre: "", campos: [] });
             }
           }}
         >
@@ -2172,7 +2263,8 @@ export default function PipelinePage() {
                 {stageToEditForm ? `: ${stageToEditForm.nombre}` : ""}
               </DialogTitle>
               <DialogDescription>
-                Editá los campos del formulario que se pedirán al mover un lead a esta etapa.
+                Editá los campos del formulario que se pedirán al mover un lead
+                a esta etapa.
               </DialogDescription>
             </DialogHeader>
 
@@ -2186,9 +2278,13 @@ export default function PipelinePage() {
                 className="flex flex-col flex-1 overflow-hidden"
               >
                 <div className="p-4 border rounded-lg mb-4">
-                  <h3 className="font-semibold text-lg mb-2">Datos de la Etapa</h3>
+                  <h3 className="font-semibold text-lg mb-2">
+                    Datos de la Etapa
+                  </h3>
                   <div className="space-y-2">
-                    <Label htmlFor="edit-stage-name-disabled">Nombre de la Etapa</Label>
+                    <Label htmlFor="edit-stage-name-disabled">
+                      Nombre de la Etapa
+                    </Label>
                     <Input
                       id="edit-stage-name-disabled"
                       {...registerEditStageForm("nombre")}
@@ -2199,7 +2295,9 @@ export default function PipelinePage() {
 
                 <div className="p-4 border rounded-lg flex flex-col flex-1 overflow-hidden">
                   <div className="flex justify-between items-center mb-3">
-                    <h3 className="font-semibold text-lg">Campos del Formulario</h3>
+                    <h3 className="font-semibold text-lg">
+                      Campos del Formulario
+                    </h3>
                     <Button
                       type="button"
                       variant="outline"
@@ -2221,7 +2319,9 @@ export default function PipelinePage() {
                     <table className="w-full text-sm">
                       <thead className="bg-muted/50">
                         <tr>
-                          <th className="text-left p-2 w-1/4">Título del Campo</th>
+                          <th className="text-left p-2 w-1/4">
+                            Título del Campo
+                          </th>
                           <th className="text-left p-2 w-1/5">Tipo</th>
                           <th className="text-left p-2 w-1/3">Opciones</th>
                           <th className="text-center p-2 w-[100px]">Oblig.</th>
@@ -2231,12 +2331,16 @@ export default function PipelinePage() {
 
                       <tbody>
                         {editStageFormFields.map((field, index) => (
-                          <tr key={field.id} className="border-b hover:bg-muted/30">
+                          <tr
+                            key={field.id}
+                            className="border-b hover:bg-muted/30"
+                          >
                             <td className="p-2 align-top">
                               <Input
-                                {...registerEditStageForm(`campos.${index}.titulo`, {
-                                  required: true,
-                                })}
+                                {...registerEditStageForm(
+                                  `campos.${index}.titulo`,
+                                  { required: true }
+                                )}
                                 placeholder="Ej: Fecha de visita"
                               />
                             </td>
@@ -2255,7 +2359,10 @@ export default function PipelinePage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                       {tiposDeCampo.map((tipo) => (
-                                        <SelectItem key={tipo.value} value={tipo.value}>
+                                        <SelectItem
+                                          key={tipo.value}
+                                          value={tipo.value}
+                                        >
                                           {tipo.label}
                                         </SelectItem>
                                       ))}
@@ -2266,10 +2373,14 @@ export default function PipelinePage() {
                             </td>
 
                             <td className="p-2 align-top">
-                              {watchCamposEditStageForm?.[index]?.tipo === "seleccion" ||
-                              watchCamposEditStageForm?.[index]?.tipo === "combobox" ? (
+                              {watchCamposEditStageForm?.[index]?.tipo ===
+                                "seleccion" ||
+                              watchCamposEditStageForm?.[index]?.tipo ===
+                                "combobox" ? (
                                 <Input
-                                  {...registerEditStageForm(`campos.${index}.opciones`)}
+                                  {...registerEditStageForm(
+                                    `campos.${index}.opciones`
+                                  )}
                                   placeholder="Opción 1, Opción 2"
                                 />
                               ) : (
@@ -2297,7 +2408,9 @@ export default function PipelinePage() {
                                 type="button"
                                 size="icon"
                                 variant="ghost"
-                                onClick={() => removeEditStageFormField(index)}
+                                onClick={() =>
+                                  removeEditStageFormField(index)
+                                }
                               >
                                 <Trash2 className="h-4 w-4 text-red-500" />
                               </Button>
@@ -2317,10 +2430,7 @@ export default function PipelinePage() {
                       setIsEditStageFormOpen(false);
                       setStageToEditForm(null);
                       setStageFormLoading(false);
-                      resetEditStageForm({
-                        nombre: "",
-                        campos: [],
-                      });
+                      resetEditStageForm({ nombre: "", campos: [] });
                     }}
                   >
                     Cancelar

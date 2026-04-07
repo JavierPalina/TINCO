@@ -1,3 +1,5 @@
+// src/components/cotizaciones/QuoteDetailsSheet.tsx
+
 "use client";
 
 import React, { useMemo, useRef, useState } from "react";

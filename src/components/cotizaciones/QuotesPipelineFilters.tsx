@@ -1,12 +1,20 @@
+// src/components/cotizaciones/QuotesPipelineFilters.tsx
+
 "use client";
 
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { DateRange } from "react-day-picker";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Filter, CalendarIcon, X } from "lucide-react";
@@ -34,9 +42,9 @@ type SessionUser = {
 
 export interface Filters {
   searchTerm: string;
-  vendedorId: string; // "" => todas
-  sucursalId: string; // "" => todas
-  etapaId: string; // "" => todas
+  vendedorId: string;
+  sucursalId: string;
+  etapaId: string;
   dateRange: DateRange | undefined;
 }
 
@@ -70,16 +78,19 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
   const router = useRouter();
   const sp = useSearchParams();
 
-  const sessionUserId = ((session?.user as unknown as SessionUser | undefined)?.id ?? "") || "";
+  const sessionUserId =
+    ((session?.user as unknown as SessionUser | undefined)?.id ?? "") || "";
   const sessionRole = (session?.user as unknown as SessionUser | undefined)?.role;
 
-  // Vendedores (si tu endpoint devuelve solo vendedores, ok)
+  // ── Vendedores ─────────────────────────────────────────────────────────────
   const { data: vendedores } = useQuery<User[]>({
     queryKey: ["users", "vendedores"],
-    queryFn: async () => (await axios.get("/api/users", { params: { role: "vendedor" } })).data.data as User[],
+    queryFn: async () =>
+      (await axios.get("/api/users", { params: { role: "vendedor" } })).data
+        .data as User[],
   });
 
-  // Sucursales
+  // ── Sucursales ─────────────────────────────────────────────────────────────
   const { data: sucursales = [] } = useSucursales();
 
   const sucursalNameById = useMemo(() => {
@@ -94,8 +105,14 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
     return m;
   }, [etapas]);
 
-  // URL -> State
+  // ── URL → State (solo al montar, no en cada cambio de `sp`) ───────────────
+  // Usamos una ref para ejecutarlo una sola vez al montar el componente.
+  const didSyncFromUrl = useRef(false);
+
   useEffect(() => {
+    if (didSyncFromUrl.current) return;
+    didSyncFromUrl.current = true;
+
     const urlSearch = sp.get("search");
     const urlVendedorId = sp.get("vendedorId");
     const urlSucursalId = sp.get("sucursalId");
@@ -119,18 +136,15 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
       vendedorId: urlVendedorId ?? prev.vendedorId ?? "",
       sucursalId: urlSucursalId ?? prev.sucursalId ?? "",
       etapaId: urlEtapaId ?? prev.etapaId ?? "",
-      dateRange:
-        from || to
-          ? {
-              from,
-              to,
-            }
-          : undefined,
+      dateRange: from || to ? { from, to } : undefined,
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sp]);
+  }, []); // ← intencional: solo al montar
 
-  // State -> URL
+  // ── State → URL ────────────────────────────────────────────────────────────
+  // Usamos refs para comparar y evitar reescribir la URL si los valores no cambiaron.
+  const prevUrlRef = useRef<string>("");
+
   useEffect(() => {
     const params = new URLSearchParams(sp.toString());
 
@@ -139,13 +153,19 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
     setOrDelete(params, "sucursalId", filters.sucursalId);
     setOrDelete(params, "etapaId", filters.etapaId);
 
-    if (filters.dateRange?.from) params.set("from", isoDateOnly(filters.dateRange.from));
+    if (filters.dateRange?.from)
+      params.set("from", isoDateOnly(filters.dateRange.from));
     else params.delete("from");
 
-    if (filters.dateRange?.to) params.set("to", isoDateOnly(filters.dateRange.to));
+    if (filters.dateRange?.to)
+      params.set("to", isoDateOnly(filters.dateRange.to));
     else params.delete("to");
 
-    router.replace(`?${params.toString()}`, { scroll: false });
+    const nextUrl = `?${params.toString()}`;
+    if (nextUrl === prevUrlRef.current) return; // sin cambios, no hacer nada
+    prevUrlRef.current = nextUrl;
+
+    router.replace(nextUrl, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     filters.searchTerm,
@@ -156,13 +176,18 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
     filters.dateRange?.to,
   ]);
 
-  const handleFilterChange = <K extends keyof Filters>(name: K, value: Filters[K]) => {
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  const handleFilterChange = <K extends keyof Filters>(
+    name: K,
+    value: Filters[K]
+  ) => {
     setFilters((prev) => ({ ...prev, [name]: value }));
   };
 
   const clearFilters = () => {
-    // Para admin, limpiar = ver todo (vendedorId vacío).
-    // Para vendedor, limpiar = mis cotizaciones.
+    // Para admin, limpiar = ver todo (vendedorId vacío = todos).
+    // Para vendedor, limpiar = sus propias cotizaciones.
     const defaultVendedor = sessionRole === "admin" ? "" : sessionUserId;
 
     setFilters({
@@ -176,18 +201,23 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
 
   const activeFilterCount = useMemo(() => {
     const defaultVendedor = sessionRole === "admin" ? "" : sessionUserId;
-
     const isVendedorActive = filters.vendedorId !== defaultVendedor;
     const isDateActive = !!filters.dateRange?.from;
     const isSucursalActive = !!filters.sucursalId;
     const isEtapaActive = !!filters.etapaId;
-
-    return (isVendedorActive ? 1 : 0) + (isDateActive ? 1 : 0) + (isSucursalActive ? 1 : 0) + (isEtapaActive ? 1 : 0);
+    return (
+      (isVendedorActive ? 1 : 0) +
+      (isDateActive ? 1 : 0) +
+      (isSucursalActive ? 1 : 0) +
+      (isEtapaActive ? 1 : 0)
+    );
   }, [filters, sessionRole, sessionUserId]);
 
   const vendedorName = useMemo(() => {
     if (!filters.vendedorId) return "Todas";
-    return vendedores?.find((v) => v._id === filters.vendedorId)?.name || "Otro";
+    return (
+      vendedores?.find((v) => v._id === filters.vendedorId)?.name || "Otro"
+    );
   }, [filters.vendedorId, vendedores]);
 
   const sucursalName = useMemo(() => {
@@ -200,6 +230,8 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
     return etapaNameById.get(filters.etapaId) || "Etapa";
   }, [filters.etapaId, etapaNameById]);
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
     <div className="flex items-center gap-4 mb-4 px-4 mt-4">
       <div className="flex-grow">
@@ -211,9 +243,8 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
         />
       </div>
 
-      {/* Badges */}
+      {/* ── Badges de filtros activos ── */}
       <div className="flex items-center gap-2 flex-shrink-0">
-        {/* vendedor badge sólo si no es el default */}
         {activeFilterCount > 0 && filters.vendedorId && (
           <Badge className="pl-2 pr-1 h-6 bg-primary">
             <span className="mr-1">Vendedor: {vendedorName}</span>
@@ -257,7 +288,8 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
           <Badge className="pl-2 pr-1 h-6 bg-primary">
             <span className="mr-1">
               {format(filters.dateRange.from, "d/MM", { locale: es })}
-              {filters.dateRange.to && ` - ${format(filters.dateRange.to, "d/MM", { locale: es })}`}
+              {filters.dateRange.to &&
+                ` - ${format(filters.dateRange.to, "d/MM", { locale: es })}`}
             </span>
             <button
               onClick={() => handleFilterChange("dateRange", undefined)}
@@ -270,7 +302,7 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
         )}
       </div>
 
-      {/* Popover filtros */}
+      {/* ── Popover filtros ── */}
       <Popover>
         <PopoverTrigger asChild>
           <Button variant="outline" className="relative flex-shrink-0">
@@ -288,7 +320,9 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
           <div className="grid gap-4">
             <div className="space-y-2">
               <h4 className="font-medium leading-none">Filtros Adicionales</h4>
-              <p className="text-sm text-muted-foreground">Refina tu búsqueda de negocios.</p>
+              <p className="text-sm text-muted-foreground">
+                Refina tu búsqueda de negocios.
+              </p>
             </div>
 
             <div className="grid gap-4">
@@ -297,16 +331,25 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
                 <Label>Vendedor</Label>
                 <Select
                   value={filters.vendedorId || "all"}
-                  onValueChange={(value) => handleFilterChange("vendedorId", value === "all" ? "" : value)}
+                  onValueChange={(value) =>
+                    handleFilterChange(
+                      "vendedorId",
+                      value === "all" ? "" : value
+                    )
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Filtrar por vendedor..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
+                    {/* "Todos" siempre disponible → vacía vendedorId */}
+                    <SelectItem value="all">Todos</SelectItem>
 
-                    {/* Si querés “Mis Cotizaciones” para todos */}
-                    {sessionUserId && <SelectItem value={sessionUserId}>Mis Cotizaciones</SelectItem>}
+                    {sessionUserId && (
+                      <SelectItem value={sessionUserId}>
+                        Mis Cotizaciones
+                      </SelectItem>
+                    )}
 
                     {vendedores
                       ?.filter((v) => v._id !== sessionUserId)
@@ -324,7 +367,12 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
                 <Label>Sucursal</Label>
                 <Select
                   value={filters.sucursalId || "all"}
-                  onValueChange={(value) => handleFilterChange("sucursalId", value === "all" ? "" : value)}
+                  onValueChange={(value) =>
+                    handleFilterChange(
+                      "sucursalId",
+                      value === "all" ? "" : value
+                    )
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Filtrar por sucursal..." />
@@ -345,7 +393,9 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
                 <Label>Etapa</Label>
                 <Select
                   value={filters.etapaId || "all"}
-                  onValueChange={(value) => handleFilterChange("etapaId", value === "all" ? "" : value)}
+                  onValueChange={(value) =>
+                    handleFilterChange("etapaId", value === "all" ? "" : value)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Filtrar por etapa..." />
@@ -361,35 +411,78 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
                 </Select>
               </div>
 
-              {/* Rango fechas */}
+              {/* Rango de fechas — calendario sin auto-decremento */}
               <div className="space-y-2">
                 <Label>Rango de Fechas</Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant={"outline"} className="w-full justify-start text-left font-normal">
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                    >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {filters.dateRange?.from ? (
                         filters.dateRange.to ? (
                           <>
-                            {format(filters.dateRange.from, "d LLL, y", { locale: es })} -{" "}
-                            {format(filters.dateRange.to, "d LLL, y", { locale: es })}
+                            {format(filters.dateRange.from, "d LLL, y", {
+                              locale: es,
+                            })}{" "}
+                            -{" "}
+                            {format(filters.dateRange.to, "d LLL, y", {
+                              locale: es,
+                            })}
                           </>
                         ) : (
-                          format(filters.dateRange.from, "d LLL, y", { locale: es })
+                          format(filters.dateRange.from, "d LLL, y", {
+                            locale: es,
+                          })
                         )
                       ) : (
                         <span>Seleccionar rango</span>
                       )}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar mode="range" selected={filters.dateRange} onSelect={(range) => handleFilterChange("dateRange", range)} initialFocus />
+                  <PopoverContent className="w-auto p-0" align="start">
+                    {/*
+                      ─── FIX BUG CALENDARIO ───────────────────────────────────
+                      El bug de "día que se decrementa" ocurre porque onSelect
+                      se dispara continuamente mientras el Popover está abierto
+                      y el estado re-renderiza.
+
+                      Solución:
+                      1. Usamos `defaultMonth` para fijar el mes inicial sin
+                         depender del estado `from` en cada render.
+                      2. Envolvemos onSelect con una comprobación de que el
+                         nuevo rango es distinto al anterior antes de llamar
+                         a setFilters, evitando el loop de re-renders.
+                    */}
+                    <Calendar
+                      mode="range"
+                      selected={filters.dateRange}
+                      defaultMonth={filters.dateRange?.from ?? new Date()}
+                      onSelect={(range) => {
+                        // Solo actualizamos si el valor cambió realmente
+                        const prevFrom = filters.dateRange?.from?.toISOString();
+                        const prevTo = filters.dateRange?.to?.toISOString();
+                        const nextFrom = range?.from?.toISOString();
+                        const nextTo = range?.to?.toISOString();
+
+                        if (prevFrom !== nextFrom || prevTo !== nextTo) {
+                          handleFilterChange("dateRange", range);
+                        }
+                      }}
+                      initialFocus
+                    />
                   </PopoverContent>
                 </Popover>
               </div>
             </div>
 
-            <Button variant="ghost" onClick={clearFilters} className="mt-2 w-full">
+            <Button
+              variant="ghost"
+              onClick={clearFilters}
+              className="mt-2 w-full"
+            >
               <X className="mr-2 h-4 w-4" />
               Limpiar Filtros
             </Button>
