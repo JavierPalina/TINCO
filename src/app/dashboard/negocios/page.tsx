@@ -126,26 +126,51 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-const GREEN_STAGE_NAMES = new Set([
-  "Proyecto por Iniciar",
-  "Proyectos no realizados",
-  "Proyecto Finalizado",
-]);
-
-function sortStagesGreenLast(etapas: Etapa[]) {
-  const normal: Etapa[] = [];
-  const green: Etapa[] = [];
-  for (const e of etapas) {
-    if (GREEN_STAGE_NAMES.has(e.nombre)) green.push(e);
-    else normal.push(e);
-  }
-  return [...normal, ...green];
-}
+type StageSystemKey =
+  | "proyecto_por_iniciar"
+  | "proyectos_no_realizados"
+  | "proyecto_finalizado";
 
 interface Etapa {
   _id: string;
   nombre: string;
   color: string;
+  systemKey?: StageSystemKey | null;
+}
+
+const GREEN_STAGE_KEYS = new Set<StageSystemKey>([
+  "proyecto_por_iniciar",
+  "proyectos_no_realizados",
+  "proyecto_finalizado",
+]);
+
+function inferStageSystemKey(etapa: Pick<Etapa, "nombre" | "systemKey">) {
+  if (etapa.systemKey) return etapa.systemKey;
+
+  const normalized = etapa.nombre.trim().toLowerCase();
+  if (normalized === "proyecto por iniciar") return "proyecto_por_iniciar";
+  if (normalized === "proyectos no realizados") return "proyectos_no_realizados";
+  if (normalized === "proyecto finalizado") return "proyecto_finalizado";
+  return null;
+}
+
+function isProjectSpecialStage(etapa: Pick<Etapa, "nombre" | "systemKey">) {
+  const systemKey = inferStageSystemKey(etapa);
+  return !!systemKey && GREEN_STAGE_KEYS.has(systemKey);
+}
+
+function isProjectCreationStage(etapa: Pick<Etapa, "nombre" | "systemKey">) {
+  return inferStageSystemKey(etapa) === "proyecto_por_iniciar";
+}
+
+function sortStagesGreenLast(etapas: Etapa[]) {
+  const normal: Etapa[] = [];
+  const green: Etapa[] = [];
+  for (const e of etapas) {
+    if (isProjectSpecialStage(e)) green.push(e);
+    else normal.push(e);
+  }
+  return [...normal, ...green];
 }
 
 type HistorialFormValue =
@@ -1120,11 +1145,7 @@ function PipelineView({
                   onOpenEditStageForm={onOpenEditStageForm}
                   stageColors={stageColors}
                   isFetching={isFetching}
-                  highlight={
-                    etapa.nombre === "Proyecto por Iniciar" ||
-                    etapa.nombre === "Proyectos no realizados" ||
-                    etapa.nombre === "Proyecto Finalizado"
-                  }
+                  highlight={isProjectSpecialStage(etapa)}
                   collapsed={!!collapsedStages[etapa._id]}
                   onToggleCollapse={() => onToggleCollapse(etapa._id)}
                   onOpenDetails={onOpenDetails}
@@ -1180,11 +1201,7 @@ function PipelineView({
                     onOpenEditStageForm={onOpenEditStageForm}
                     stageColors={stageColors}
                     isFetching={isFetching}
-                    highlight={
-                      etapa.nombre === "Proyecto por Iniciar" ||
-                      etapa.nombre === "Proyectos no realizados" ||
-                      etapa.nombre === "Proyecto Finalizado"
-                    }
+                    highlight={isProjectSpecialStage(etapa)}
                     collapsed={!!collapsedStages[etapa._id]}
                     onToggleCollapse={() => onToggleCollapse(etapa._id)}
                     onOpenDetails={onOpenDetails}
@@ -1480,11 +1497,7 @@ export default function PipelinePage() {
     const total = etapas.length;
 
     etapas.forEach((etapa, index) => {
-      if (
-        etapa.nombre === "Proyecto por Iniciar" ||
-        etapa.nombre === "Proyectos no realizados" ||
-        etapa.nombre === "Proyecto Finalizado"
-      ) {
+      if (isProjectSpecialStage(etapa)) {
         colorMap[etapa._id] = `hsla(${themePrimaryColor.h}, ${themePrimaryColor.s}%, ${themePrimaryColor.l}%, 1.0)`;
         return;
       }
@@ -1810,7 +1823,7 @@ export default function PipelinePage() {
             montoTotal: movedItem.montoTotal,
           });
 
-          if (nuevaEtapa?.nombre === "Proyecto por Iniciar") {
+          if (nuevaEtapa && isProjectCreationStage(nuevaEtapa)) {
             setMoveBlockingLabel("Creando proyecto...");
             try {
               await axios.post("/api/proyectos", {
@@ -2116,7 +2129,8 @@ export default function PipelinePage() {
 
               if (
                 activeContainer !== overContainer &&
-                newEtapa?.nombre === "Proyecto por Iniciar"
+                newEtapa &&
+                isProjectCreationStage(newEtapa)
               ) {
                 setMoveBlockingLabel("Creando proyecto...");
                 try {

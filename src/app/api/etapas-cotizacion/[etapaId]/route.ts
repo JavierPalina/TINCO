@@ -9,6 +9,15 @@ type RouteContext = {
   params: Promise<{ etapaId: string }>;
 };
 
+function inferSystemKeyFromName(nombre: string) {
+  const normalized = nombre.trim().toLowerCase();
+
+  if (normalized === "proyecto por iniciar") return "proyecto_por_iniciar";
+  if (normalized === "proyectos no realizados") return "proyectos_no_realizados";
+  if (normalized === "proyecto finalizado") return "proyecto_finalizado";
+  return null;
+}
+
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
   await dbConnect();
 
@@ -57,6 +66,10 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
           { success: false, error: "Ya existe otra etapa con ese nombre." },
           { status: 409 }
         );
+      }
+
+      if (!etapaActual.systemKey) {
+        etapaActual.systemKey = inferSystemKeyFromName(etapaActual.nombre);
       }
 
       etapaActual.nombre = nombre;

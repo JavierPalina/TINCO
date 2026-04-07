@@ -92,7 +92,6 @@ export function CreateQuoteDialog() {
   const [clienteMode, setClienteMode] = useState<"seleccionar" | "crear">(
     "seleccionar"
   );
-  // controla si el usuario eligió "Otro" en tipo de obra
   const [tipoObraEsCustom, setTipoObraEsCustom] = useState(false);
 
   const { data: session } = useSession();
@@ -126,8 +125,6 @@ export function CreateQuoteDialog() {
       },
     },
   });
-
-  const watchTipoObra = watch("tipoObra");
 
   // ── Clientes ───────────────────────────────────────────────────────────────
 
@@ -164,7 +161,21 @@ export function CreateQuoteDialog() {
 
   // ── Tipo de obra ───────────────────────────────────────────────────────────
 
+
   const TIPO_OBRA_OTRO = "__otro__";
+
+  const { data: tiposObraConfig = [] } = useQuery<
+    { _id: string; valor: string }[]
+  >({
+    queryKey: ["configuracion", "tipoObra"],
+    queryFn: async () =>
+      (await axios.get("/api/configuracion/tipoObra")).data.data as {
+        _id: string;
+        valor: string;
+      }[],
+  });
+
+  const watchTipoObra = watch("tipoObra");
 
   const tipoObraOptions = useMemo(
     () => [
@@ -178,6 +189,22 @@ export function CreateQuoteDialog() {
   );
 
   // ── Prioridad ──────────────────────────────────────────────────────────────
+
+  const tipoObraOptionsWithSaved = useMemo(() => {
+    const existing = new Set(
+      tipoObraOptions.map((option) => option.value.trim().toLowerCase())
+    );
+
+    return [
+      ...tipoObraOptions.filter((option) => option.value !== TIPO_OBRA_OTRO),
+      ...tiposObraConfig
+        .map((item) => item.valor.trim())
+        .filter(Boolean)
+        .filter((value) => !existing.has(value.toLowerCase()))
+        .map((value) => ({ value, label: value })),
+      { value: TIPO_OBRA_OTRO, label: "Otro..." },
+    ];
+  }, [tipoObraOptions, tiposObraConfig]);
 
   const prioridadOptions = useMemo(
     () => [
@@ -262,6 +289,21 @@ export function CreateQuoteDialog() {
           ? (formData.tipoObraCustom?.trim() || "")
           : (formData.tipoObra ?? "");
 
+      if (tipoObraFinal) {
+        const alreadyExists = tipoObraOptionsWithSaved.some(
+          (option) =>
+            option.value !== TIPO_OBRA_OTRO &&
+            option.value.trim().toLowerCase() ===
+              tipoObraFinal.trim().toLowerCase()
+        );
+
+        if (!alreadyExists) {
+          await axios.post("/api/configuracion/tipoObra", {
+            valor: tipoObraFinal,
+          });
+        }
+      }
+
       return axios.post("/api/cotizaciones", {
         cliente: clienteId,
         montoTotal: formData.montoTotal,
@@ -277,6 +319,7 @@ export function CreateQuoteDialog() {
       toast.success("Lead y cotización inicial creados con éxito.");
       queryClient.invalidateQueries({ queryKey: ["cotizacionesPipeline"] });
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      queryClient.invalidateQueries({ queryKey: ["configuracion", "tipoObra"] });
       resetForm();
       setOpen(false);
     },
@@ -631,10 +674,12 @@ export function CreateQuoteDialog() {
                 control={control}
                 render={({ field }) => (
                   <Combobox
-                    options={tipoObraOptions}
+                    options={tipoObraOptionsWithSaved}
                     value={field.value ?? ""}
                     onChange={field.onChange}
-                    placeholder="Selecciona el tipo de obra..."
+                    placeholder="Selecciona o escribÃ­ el tipo de obra..."
+                    searchText="Buscar o escribir tipo de obra..."
+                    emptyText="No se encontrÃ³. PresionÃ¡ Enter para guardarlo."
                   />
                 )}
               />

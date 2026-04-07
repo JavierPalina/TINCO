@@ -41,17 +41,31 @@ export async function POST(
   try {
     const { tipo } = await params;
     const body = await request.json(); // { valor: 'Nuevo Color' }
+    const valor =
+      typeof body?.valor === "string" ? body.valor.trim() : "";
 
-    if (!body.valor) {
+    if (!valor) {
       return NextResponse.json(
         { success: false, error: 'El campo "valor" es requerido' },
         { status: 400 },
       );
     }
 
+    const existente = await ConfigOpcion.findOne({
+      tipo,
+      valor: { $regex: `^${valor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
+    });
+
+    if (existente) {
+      return NextResponse.json(
+        { success: true, data: existente, duplicated: true },
+        { status: 200 },
+      );
+    }
+
     const nuevaOpcion = await ConfigOpcion.create({
       tipo,
-      valor: body.valor,
+      valor,
     });
 
     return NextResponse.json(
