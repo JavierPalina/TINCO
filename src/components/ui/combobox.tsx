@@ -26,6 +26,7 @@ interface ComboboxProps {
   placeholder?: string;
   emptyText?: string;
   searchText?: string;
+  allowCustomValue?: boolean;
 }
 
 export function Combobox({
@@ -48,7 +49,7 @@ export function Combobox({
         option.value?.toLowerCase?.() === value?.toLowerCase?.()
     )?.label ?? "";
 
-  const displayValue = selectedLabel || "";
+  const displayValue = selectedLabel || value || "";
 
   // Al abrir: limpiá el buscador para que NO se precargue con el ID
   React.useEffect(() => {
