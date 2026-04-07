@@ -675,7 +675,7 @@ function QuoteColumn({
     [quotes]
   );
 
-  const isGreenLocked = GREEN_STAGE_NAMES.has(etapa.nombre);
+  const isGreenLocked = isProjectSpecialStage(etapa);
   const { setNodeRef, isOver } = useSortable({ id, data: { type: "Column" } });
 
   const stageColor = stageColors[etapa._id] || etapa.color;
