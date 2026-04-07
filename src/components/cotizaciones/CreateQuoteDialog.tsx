@@ -677,9 +677,9 @@ export function CreateQuoteDialog() {
                     options={tipoObraOptionsWithSaved}
                     value={field.value ?? ""}
                     onChange={field.onChange}
-                    placeholder="Selecciona o escribÃ­ el tipo de obra..."
+                    placeholder="Seleccione o escriba el tipo de obra..."
                     searchText="Buscar o escribir tipo de obra..."
-                    emptyText="No se encontrÃ³. PresionÃ¡ Enter para guardarlo."
+                    emptyText="No se encontró. Presiona Enter para guardarlo."
                   />
                 )}
               />
