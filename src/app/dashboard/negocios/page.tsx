@@ -1232,6 +1232,24 @@ function hasStageFormFilled(quote: Cotizacion, stageId: string) {
   return false;
 }
 
+function normalizeFilterId(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const normalized = value.trim();
+  if (!normalized) return "";
+
+  const lowered = normalized.toLowerCase();
+  if (
+    lowered === "all" ||
+    lowered === "todos" ||
+    lowered === "null" ||
+    lowered === "undefined"
+  ) {
+    return "";
+  }
+
+  return normalized;
+}
+
 const toFieldName = (title: string): string => {
   return title
     .normalize("NFD")
@@ -1368,6 +1386,38 @@ export default function PipelinePage() {
       } as Filters;
     }
 
+    const searchParams = new URLSearchParams(window.location.search);
+    const urlSearchTerm = searchParams.get("search") ?? "";
+    const urlVendedorId = normalizeFilterId(searchParams.get("vendedorId"));
+    const urlSucursalId = normalizeFilterId(searchParams.get("sucursalId"));
+    const urlEtapaId = normalizeFilterId(searchParams.get("etapaId"));
+    const urlDateFrom = searchParams.get("from");
+    const urlDateTo = searchParams.get("to");
+
+    const hasUrlFilters =
+      !!urlSearchTerm ||
+      !!urlVendedorId ||
+      !!urlSucursalId ||
+      !!urlEtapaId ||
+      !!urlDateFrom ||
+      !!urlDateTo;
+
+    if (hasUrlFilters) {
+      return {
+        searchTerm: urlSearchTerm,
+        vendedorId: urlVendedorId,
+        sucursalId: urlSucursalId,
+        etapaId: urlEtapaId,
+        dateRange:
+          urlDateFrom || urlDateTo
+            ? {
+                from: urlDateFrom ? new Date(urlDateFrom) : undefined,
+                to: urlDateTo ? new Date(urlDateTo) : undefined,
+              }
+            : undefined,
+      } as Filters;
+    }
+
     const savedFilters = localStorage.getItem("quotePipelineFilters");
     if (savedFilters) {
       const parsed = JSON.parse(savedFilters);
@@ -1375,6 +1425,9 @@ export default function PipelinePage() {
         parsed.dateRange.from = new Date(parsed.dateRange.from);
       if (parsed.dateRange?.to)
         parsed.dateRange.to = new Date(parsed.dateRange.to);
+      parsed.vendedorId = normalizeFilterId(parsed.vendedorId);
+      parsed.sucursalId = normalizeFilterId(parsed.sucursalId);
+      parsed.etapaId = normalizeFilterId(parsed.etapaId);
       return parsed;
     }
 
@@ -1388,12 +1441,20 @@ export default function PipelinePage() {
   });
 
   const [debouncedSearchTerm] = useDebounce(filters.searchTerm, 500);
+  const didApplyDefaultVendorRef = useRef(false);
 
   useEffect(() => {
     const role = (session?.user as { role?: string } | undefined)?.role;
     if (!session?.user?.id) return;
+    if (didApplyDefaultVendorRef.current) return;
 
-    if (role !== "admin" && !filters.vendedorId) {
+    didApplyDefaultVendorRef.current = true;
+
+    const hasVendedorInUrl =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).has("vendedorId");
+
+    if (role !== "admin" && !filters.vendedorId && !hasVendedorInUrl) {
       setFilters((prev) => ({
         ...prev,
         vendedorId: session.user.id as string,

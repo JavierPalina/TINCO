@@ -27,6 +27,10 @@ function getErrorMessage(err: unknown): string {
   return "Error del servidor";
 }
 
+function normalizeRoleParam(value: string | null) {
+  return (value || "").trim().toLowerCase();
+}
+
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse("No autorizado", { status: 401 });
@@ -38,6 +42,9 @@ export async function GET(req: Request) {
 
     const searchTerm = (searchParams.get("searchTerm") || "").trim();
     const sucursalIdRaw = (searchParams.get("sucursalId") || "").trim(); // ObjectId | "none" | ""
+    const role = normalizeRoleParam(
+      searchParams.get("rol") || searchParams.get("role")
+    );
 
     const query: FilterQuery<UserListRow> = {};
 
@@ -62,6 +69,10 @@ export async function GET(req: Request) {
         }
         query.sucursal = new mongoose.Types.ObjectId(sucursalIdRaw);
       }
+    }
+
+    if (role) {
+      query.rol = role;
     }
 
     const users = await User.find(query)

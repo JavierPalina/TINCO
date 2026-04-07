@@ -1,3 +1,5 @@
+// src/app/api/cotizaciones/[id]/history/[historyIndex]/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import mongoose from "mongoose";

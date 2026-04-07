@@ -29,7 +29,7 @@ import { useSucursales } from "@/features/sucursales/sucursales.queries";
 interface User {
   _id: string;
   name: string;
-  role?: string;
+  rol?: string;
 }
 
 type EtapaLite = { _id: string; nombre: string };
@@ -73,6 +73,23 @@ function isoDateOnly(d: Date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function normalizeFilterId(value: string | null | undefined) {
+  const normalized = (value ?? "").trim();
+  if (!normalized) return "";
+
+  const lowered = normalized.toLowerCase();
+  if (
+    lowered === "all" ||
+    lowered === "todos" ||
+    lowered === "null" ||
+    lowered === "undefined"
+  ) {
+    return "";
+  }
+
+  return normalized;
+}
+
 export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
   const { data: session } = useSession();
   const router = useRouter();
@@ -86,7 +103,7 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
   const { data: vendedores } = useQuery<User[]>({
     queryKey: ["users", "vendedores"],
     queryFn: async () =>
-      (await axios.get("/api/users", { params: { role: "vendedor" } })).data
+      (await axios.get("/api/users", { params: { rol: "vendedor" } })).data
         .data as User[],
   });
 
@@ -114,17 +131,17 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
     didSyncFromUrl.current = true;
 
     const urlSearch = sp.get("search");
-    const urlVendedorId = sp.get("vendedorId");
-    const urlSucursalId = sp.get("sucursalId");
-    const urlEtapaId = sp.get("etapaId");
+    const urlVendedorId = normalizeFilterId(sp.get("vendedorId"));
+    const urlSucursalId = normalizeFilterId(sp.get("sucursalId"));
+    const urlEtapaId = normalizeFilterId(sp.get("etapaId"));
     const from = parseDateParam(sp.get("from"));
     const to = parseDateParam(sp.get("to"));
 
     const hasAny =
       urlSearch !== null ||
-      urlVendedorId !== null ||
-      urlSucursalId !== null ||
-      urlEtapaId !== null ||
+      sp.get("vendedorId") !== null ||
+      sp.get("sucursalId") !== null ||
+      sp.get("etapaId") !== null ||
       from !== undefined ||
       to !== undefined;
 
@@ -133,9 +150,9 @@ export function QuotesPipelineFilters({ filters, setFilters, etapas }: Props) {
     setFilters((prev) => ({
       ...prev,
       searchTerm: urlSearch ?? prev.searchTerm ?? "",
-      vendedorId: urlVendedorId ?? prev.vendedorId ?? "",
-      sucursalId: urlSucursalId ?? prev.sucursalId ?? "",
-      etapaId: urlEtapaId ?? prev.etapaId ?? "",
+      vendedorId: urlVendedorId || "",
+      sucursalId: urlSucursalId || "",
+      etapaId: urlEtapaId || "",
       dateRange: from || to ? { from, to } : undefined,
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps

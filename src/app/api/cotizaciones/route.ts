@@ -11,6 +11,32 @@ import { addDays, startOfDay, endOfDay, parseISO } from "date-fns";
 import mongoose from "mongoose";
 import EtapaCotizacion from "@/models/EtapaCotizacion";
 
+function normalizeObjectIdParam(value: string | null) {
+  const normalized = (value || "").trim();
+  if (!normalized) return null;
+
+  const lowered = normalized.toLowerCase();
+  if (
+    lowered === "all" ||
+    lowered === "todos" ||
+    lowered === "null" ||
+    lowered === "undefined"
+  ) {
+    return null;
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(normalized)) {
+    throw new Error(`ID inválido recibido: ${normalized}`);
+  }
+
+  return new mongoose.Types.ObjectId(normalized);
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  return "Error desconocido";
+}
+
 // -------------------- GET --------------------
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -29,12 +55,16 @@ export async function GET(request: NextRequest) {
     const etapaId = searchParams.get("etapaId");
 
     const matchFilter: Record<string, unknown> = {};
+    const vendedorObjectId = normalizeObjectIdParam(vendedorId);
+    const sucursalObjectId = normalizeObjectIdParam(sucursalId);
+    const etapaObjectId = normalizeObjectIdParam(etapaId);
+    const clienteObjectId = normalizeObjectIdParam(clienteId);
 
     // filtros por IDs (si vienen)
-    if (sucursalId) matchFilter.sucursalId = new mongoose.Types.ObjectId(sucursalId);
-    if (etapaId) matchFilter.etapa = new mongoose.Types.ObjectId(etapaId);
-    if (vendedorId) matchFilter.vendedor = new mongoose.Types.ObjectId(vendedorId);
-    if (clienteId) matchFilter.cliente = new mongoose.Types.ObjectId(clienteId);
+    if (sucursalObjectId) matchFilter.sucursalId = sucursalObjectId;
+    if (etapaObjectId) matchFilter.etapa = etapaObjectId;
+    if (vendedorObjectId) matchFilter.vendedor = vendedorObjectId;
+    if (clienteObjectId) matchFilter.cliente = clienteObjectId;
 
     // rango de fechas robusto: soporta solo desde, solo hasta, o ambos
     if (fechaDesde || fechaHasta) {
@@ -103,6 +133,7 @@ export async function GET(request: NextRequest) {
           montoTotal: 1,
           detalle: 1,
           archivos: 1,
+          orden: 1,
           sucursalId: 1,
           tipoAbertura: 1,
           comoNosConocio: 1,
@@ -152,8 +183,9 @@ export async function GET(request: NextRequest) {
     const cotizaciones = await Cotizacion.aggregate(pipeline);
     return NextResponse.json({ success: true, data: cotizaciones });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Error desconocido";
-    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
+    const errorMessage = getErrorMessage(error);
+    const status = errorMessage.startsWith("ID inválido recibido:") ? 400 : 500;
+    return NextResponse.json({ success: false, error: errorMessage }, { status });
   }
 }
 
@@ -264,7 +296,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: nuevaCotizacion }, { status: 201 });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+    const errorMessage = getErrorMessage(error);
     return NextResponse.json({ success: false, error: errorMessage }, { status: 400 });
   }
 }
