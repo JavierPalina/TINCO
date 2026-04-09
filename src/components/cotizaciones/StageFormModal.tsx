@@ -127,11 +127,17 @@ export function StageFormModal({
         const files = filesToUpload[fieldName];
         if (files?.length > 0) {
           const uploadPromise = async () => {
-            const formData = new FormData();
-            files.forEach((file) => formData.append("files", file));
-
-            const response = await axios.post("/api/upload", formData);
-            finalFormData[fieldName] = response.data.paths;
+            const urls: string[] = [];
+            for (const file of files) {
+              const formData = new FormData();
+              formData.append("file", file);
+              const response = await axios.post(
+                "/api/uploads/cloudinary?folder=tinco/cotizaciones",
+                formData,
+              );
+              urls.push(response.data.url);
+            }
+            finalFormData[fieldName] = urls;
           };
 
           const promise = uploadPromise();
