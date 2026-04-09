@@ -92,8 +92,10 @@ export async function GET(request: Request, { params }: RouteContext) {
     }
 
     return NextResponse.json({ success: true, data: cotizacion });
-  } catch {
-    return NextResponse.json({ success: false, error: "ID inválido" }, { status: 400 });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[GET /api/cotizaciones/[id]] error:", msg);
+    return NextResponse.json({ success: false, error: msg }, { status: 400 });
   }
 }
 
