@@ -40,7 +40,8 @@ type IFormField = Omit<OriginalFormField, "tipo"> & {
     | "checkbox"
     | "seleccion"
     | "combobox"
-    | "archivo";
+    | "archivo"
+    | "descuento";
 };
 
 // Valores posibles del form dinámico
@@ -82,6 +83,7 @@ export function StageFormModal({
     control,
     register,
     handleSubmit,
+    setValue,
     formState: { isSubmitting },
     reset,
   } = useForm<IFormularioData>({
@@ -256,6 +258,107 @@ export function StageFormModal({
     );
   };
 
+  const DescuentoField = ({ field }: { field: IFormField }) => {
+    const fieldName = toFieldName(field.titulo);
+    const isRequired = !!field.requerido;
+
+    const prevValueRaw = initialData?.[fieldName];
+    const safePrevValue =
+      typeof prevValueRaw === "number"
+        ? prevValueRaw
+        : Number.isFinite(Number(prevValueRaw))
+        ? Number(prevValueRaw)
+        : 0;
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {/* Precio anterior */}
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Precio anterior</Label>
+          <Input type="text" value={String(safePrevValue)} disabled />
+        </div>
+
+        {/* Descuento aplicado */}
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">
+            Descuento aplicado {isRequired && <span className="text-red-500">*</span>}
+          </Label>
+          <Controller
+            name={`${fieldName}_descuento_pct`}
+            control={control}
+            rules={{
+              required: isRequired ? "El descuento es obligatorio." : false,
+              validate: (v) => {
+                if (!isRequired && (v === undefined || v === "")) return true;
+                const n = parseFloat(String(v).replace(",", "."));
+                if (!Number.isFinite(n)) return "Ingresá un porcentaje válido.";
+                if (n < 0 || n > 100) return "El descuento debe estar entre 0 y 100.";
+                return true;
+              },
+            }}
+            render={({ field: cf, fieldState }) => (
+              <>
+                <div className="relative">
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="Ej: 25"
+                    className="pr-8"
+                    value={cf.value === undefined ? "" : String(cf.value)}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      if (/^[0-9]*[.,]?[0-9]*$/.test(next) || next === "") {
+                        cf.onChange(next);
+                        const d = parseFloat(next.replace(",", "."));
+                        if (Number.isFinite(d) && d >= 0 && d <= 100) {
+                          const computed = Math.round(safePrevValue * (1 - d / 100) * 100) / 100;
+                          setValue(fieldName, computed);
+                        } else {
+                          setValue(fieldName, undefined);
+                        }
+                      }
+                    }}
+                    onBlur={() => {
+                      const raw = String(cf.value ?? "");
+                      if (raw !== "") {
+                        const n = parseFloat(raw.replace(",", "."));
+                        if (Number.isFinite(n)) cf.onChange(n);
+                      }
+                      cf.onBlur();
+                    }}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                    %
+                  </span>
+                </div>
+                {fieldState.error?.message && (
+                  <p className="text-xs text-red-600 mt-1">{fieldState.error.message}</p>
+                )}
+              </>
+            )}
+          />
+        </div>
+
+        {/* Nuevo precio (calculado) */}
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Nuevo precio</Label>
+          <Controller
+            name={fieldName}
+            control={control}
+            render={({ field: cf }) => (
+              <Input
+                type="text"
+                value={cf.value !== undefined ? String(cf.value) : "—"}
+                disabled
+                className="bg-muted"
+              />
+            )}
+          />
+        </div>
+      </div>
+    );
+  };
+
   const renderField = (field: IFormField) => {
     const fieldName = toFieldName(field.titulo);
     const rules = { required: field.requerido ? "Este campo es obligatorio." : false };
@@ -309,6 +412,9 @@ export function StageFormModal({
 
       case "precio":
         return <PrecioField field={field} />;
+
+      case "descuento":
+        return <DescuentoField field={field} />;
 
       case "fecha":
         return <Input type="date" {...register(fieldName, rules)} />;
@@ -446,8 +552,8 @@ export function StageFormModal({
           {formFields.map((field) =>
             field.tipo !== "checkbox" ? (
               <div key={field.titulo} className="space-y-2">
-                {/* Para precio ya mostramos labels adentro (Precio anterior / Nuevo) */}
-                {field.tipo !== "precio" && (
+                {/* Para precio/descuento ya mostramos labels adentro */}
+                {field.tipo !== "precio" && field.tipo !== "descuento" && (
                   <Label>
                     {field.titulo} {field.requerido && <span className="text-red-500">*</span>}
                   </Label>

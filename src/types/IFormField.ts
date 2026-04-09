@@ -10,7 +10,8 @@ export interface IFormField {
     | "checkbox"
     | "seleccion"
     | "combobox"
-    | "archivo";
+    | "archivo"
+    | "descuento";
   opciones?: string[] | string;
   requerido: boolean;
 }

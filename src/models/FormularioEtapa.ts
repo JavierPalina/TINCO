@@ -11,7 +11,8 @@ export interface ICampoFormulario {
     | "checkbox"
     | "seleccion"
     | "combobox"
-    | "archivo";
+    | "archivo"
+    | "descuento";
   opciones?: string[];
   requerido?: boolean;
 }
@@ -34,7 +35,7 @@ const FormularioEtapaSchema: Schema = new Schema(
         titulo: { type: String, required: true },
         tipo: {
           type: String,
-          enum: ["texto", "textarea", "numero", "precio", "fecha", "checkbox", "seleccion", "combobox", "archivo"],
+          enum: ["texto", "textarea", "numero", "precio", "fecha", "checkbox", "seleccion", "combobox", "archivo", "descuento"],
           required: true,
         },
         opciones: { type: [String] },

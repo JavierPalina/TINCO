@@ -35,7 +35,8 @@ type Campo = {
     | "checkbox"
     | "seleccion"
     | "combobox"
-    | "archivo";
+    | "archivo"
+    | "descuento";
   opciones?: string | string[];
   requerido: boolean;
 };
@@ -60,6 +61,7 @@ const tiposDeCampo: Array<{ value: Campo["tipo"]; label: string }> = [
   { value: "seleccion", label: "Lista Desplegable" },
   { value: "combobox", label: "Lista Desplegable con Buscador" },
   { value: "archivo", label: "Subir Archivo(s)" },
+  { value: "descuento", label: "Descuento (%)" },
 ];
 
 export function CreateStageDialog() {
