@@ -194,6 +194,7 @@ interface Cotizacion {
   }[];
   _id: string;
   codigo: string;
+  nombre?: string;
   montoTotal: number;
   detalle?: string;
   archivos: string[];
@@ -487,11 +488,9 @@ function QuoteCard({
               <div className="min-w-0 flex-1">
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
-                    <Link href={`/dashboard/listados/${quote.cliente._id}`}>
-                      <div className="text-sm font-semibold hover:underline hover:text-primary transition-colors truncate">
-                        {quote.cliente.nombreCompleto} - {quote.codigo}
-                      </div>
-                    </Link>
+                    <div className="text-sm font-semibold truncate">
+                      {quote.nombre || quote.codigo}
+                    </div>
 
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <Badge
@@ -570,6 +569,14 @@ function QuoteCard({
               </p>
 
               <div className="grid grid-cols-1 gap-1 text-[11px] text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <span>Cliente:</span>
+                  <Link href={`/dashboard/listados/${quote.cliente._id}`}>
+                    <span className="font-medium hover:underline hover:text-primary transition-colors">
+                      {quote.cliente.nombreCompleto}
+                    </span>
+                  </Link>
+                </div>
                 <div className="flex items-center gap-1">
                   <span>Creada:</span>
                   <span className="font-medium">{fmt(createdAt)}</span>

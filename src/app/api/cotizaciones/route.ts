@@ -130,6 +130,7 @@ export async function GET(request: NextRequest) {
       {
         $project: {
           codigo: 1,
+          nombre: 1,
           montoTotal: 1,
           detalle: 1,
           archivos: 1,
@@ -270,6 +271,7 @@ export async function POST(request: NextRequest) {
       archivos: [],
       vendedor: session.user.id,
       codigo: nuevoCodigo,
+      nombre: nuevoCodigo,
 
       historialEtapas: [
         {

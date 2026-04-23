@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import dbConnect from "@/lib/dbConnect";
 import Cotizacion from "@/models/Cotizacion";
+import "@/models/EtapaCotizacion";
 
 type RouteContext = { params: Promise<{ id: string }> };
 

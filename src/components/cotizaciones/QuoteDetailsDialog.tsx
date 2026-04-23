@@ -802,9 +802,13 @@ export function QuoteDetailsDialog({
               <div className="min-w-0">
                 <DialogTitle className="text-base sm:text-lg truncate">{isLoading ? "Cargando…" : "Detalle de negocio"}</DialogTitle>
                 <div className="mt-2 flex items-center gap-2">
-                  <Badge className="rounded-full border border-primary/20 bg-primary text-primary-foreground shadow-sm">
-                    {quote?.etapa?.nombre || "Sin etapa"}
-                  </Badge>
+                  {isLoading ? (
+                    <Skeleton className="h-5 w-24 rounded-full" />
+                  ) : (
+                    <Badge className="rounded-full border border-primary/20 bg-primary text-primary-foreground shadow-sm">
+                      {quote?.etapa?.nombre || "Sin etapa"}
+                    </Badge>
+                  )}
                   <div className="text-xs text-muted-foreground truncate">{clienteNombre}</div>
                 </div>
               </div>

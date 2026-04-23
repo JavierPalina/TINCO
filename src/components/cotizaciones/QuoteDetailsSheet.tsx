@@ -1081,9 +1081,13 @@ export function QuoteDetailsSheet({
                   <SheetTitle className="text-base sm:text-lg truncate">
                     {isLoading ? "Cargando…" : `Detalle de negocio`}
                   </SheetTitle>
-                  <Badge className="rounded-full border border-primary/20 bg-primary text-primary-foreground shadow-sm">
-                    {quote?.etapa?.nombre || "Sin etapa"}
-                  </Badge>
+                  {isLoading ? (
+                    <Skeleton className="h-5 w-24 rounded-full" />
+                  ) : (
+                    <Badge className="rounded-full border border-primary/20 bg-primary text-primary-foreground shadow-sm">
+                      {quote?.etapa?.nombre || "Sin etapa"}
+                    </Badge>
+                  )}
                 </div>
 
                 <div className="mt-3 rounded-2xl border bg-background/60 shadow-sm p-3">
