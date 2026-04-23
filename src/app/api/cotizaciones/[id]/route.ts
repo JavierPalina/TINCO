@@ -6,6 +6,8 @@ import { authOptions } from "@/lib/authOptions";
 import dbConnect from "@/lib/dbConnect";
 import Cotizacion from "@/models/Cotizacion";
 import "@/models/EtapaCotizacion";
+import "@/models/Cliente";
+import "@/models/User";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
