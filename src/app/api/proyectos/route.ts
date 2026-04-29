@@ -41,8 +41,10 @@ export async function GET(request: NextRequest) {
     const estado = searchParams.get("estado");
     const estadosParam = searchParams.get("estados"); // CSV con varios estados
     const sinEstado = searchParams.get("sinEstado"); // "1" para incluir null/empty
+    const clienteId = searchParams.get("clienteId");
 
     const filtro: ProyectoFilter = {};
+    if (clienteId) filtro.cliente = clienteId;
 
     // Parse estados
     let estadosArray: string[] = [];

@@ -9,6 +9,7 @@ export type SectionKey =
   | "servicios"
   | "stock"
   | "users"
+  | "metricas"
   | "notificaciones";
 
 export type ProyectoStageKey = "tareas";
@@ -34,6 +35,7 @@ const RoleAccessSchema = new Schema<IRoleAccess>(
       servicios: { type: Boolean, default: false },
       stock: { type: Boolean, default: false },
       users: { type: Boolean, default: false },
+      metricas: { type: Boolean, default: false },
       notificaciones: { type: Boolean, default: false },
     },
 

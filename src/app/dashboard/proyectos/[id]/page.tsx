@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { useParams, useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowLeft, Download } from "lucide-react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import type { ProyectoDTO } from "@/types/proyecto";
@@ -88,6 +90,115 @@ export default function ProyectoDetallePage() {
 
   const defaultTab = useMemo(() => getDefaultTab(proyecto?.estadoActual), [proyecto?.estadoActual]);
 
+  const handleDownloadPdf = useCallback(async () => {
+    if (!proyecto) return;
+    toast.message("Generando PDF...");
+    try {
+      const { default: jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
+      const pw = doc.internal.pageSize.getWidth();
+      const mX = 15;
+      let y = 20;
+
+      const titulo = `Proyecto ${proyecto.numeroOrden}`;
+      const clienteObj = typeof proyecto.cliente === "object" && proyecto.cliente ? proyecto.cliente as ClientePopulado : null;
+      const line = (text: string, size = 10, bold = false) => {
+        doc.setFontSize(size);
+        doc.setFont("helvetica", bold ? "bold" : "normal");
+        const lines = doc.splitTextToSize(String(text), pw - mX * 2) as string[];
+        lines.forEach((l: string) => {
+          if (y > 270) { doc.addPage(); y = 20; }
+          doc.text(l, mX, y);
+          y += size * 0.45;
+        });
+        y += 2;
+      };
+      const section = (title: string) => {
+        y += 4;
+        if (y > 265) { doc.addPage(); y = 20; }
+        doc.setFillColor(79, 165, 136);
+        doc.rect(mX, y, pw - mX * 2, 7, "F");
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.text(title.toUpperCase(), mX + 3, y + 5);
+        doc.setTextColor(0, 0, 0);
+        y += 11;
+      };
+      const field = (label: string, value: unknown) => {
+        if (value === null || value === undefined || value === "") return;
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.text(`${label}:`, mX, y);
+        doc.setFont("helvetica", "normal");
+        const txt = String(value);
+        const lines = doc.splitTextToSize(txt, pw - mX * 2 - 40) as string[];
+        doc.text(lines[0], mX + 40, y);
+        y += 5;
+        for (let i = 1; i < lines.length; i++) {
+          if (y > 270) { doc.addPage(); y = 20; }
+          doc.text(lines[i], mX + 40, y);
+          y += 5;
+        }
+      };
+
+      // Header
+      line(titulo, 18, true);
+      line(`Estado: ${proyecto.estadoActual ?? "Sin estado"}`, 12);
+      if (clienteObj?.nombreCompleto) line(`Cliente: ${clienteObj.nombreCompleto}`, 11);
+      if (clienteObj?.telefono) line(`Teléfono: ${clienteObj.telefono}`, 10);
+      if (clienteObj?.direccion) line(`Dirección: ${clienteObj.direccion}`, 10);
+      y += 4;
+      doc.setDrawColor(200, 200, 200);
+      doc.line(mX, y, pw - mX, y);
+      y += 6;
+
+      // Visita técnica
+      const vt = proyecto.visitaTecnica;
+      if (Object.keys(vt).length > 0) {
+        section("Visita Técnica");
+        field("Fecha visita", vt.fechaVisita ? new Date(vt.fechaVisita as unknown as string).toLocaleDateString("es-AR") : "");
+        field("Hora", vt.horaVisita as string);
+        field("Tipo visita", vt.tipoVisita as string);
+        field("Dirección", vt.direccion as string);
+        field("Estado obra", vt.estadoObra as string);
+        field("Material solicitado", vt.materialSolicitado as string);
+        field("Color", vt.color as string);
+        field("Recomendación técnica", vt.recomendacionTecnica as string);
+        field("Estado tarea", vt.estadoTareaVisita as string);
+        field("Observaciones", vt.observacionesTecnicas as string);
+      }
+
+      const etapas: [string, Record<string, unknown>][] = [
+        ["Medición", proyecto.medicion as Record<string, unknown>],
+        ["Verificación", proyecto.verificacion as Record<string, unknown>],
+        ["Taller", proyecto.taller as Record<string, unknown>],
+        ["Depósito", proyecto.deposito as Record<string, unknown>],
+        ["Logística", proyecto.logistica as Record<string, unknown>],
+      ];
+      for (const [nombre, etapa] of etapas) {
+        if (etapa && Object.keys(etapa).length > 0) {
+          section(nombre);
+          Object.entries(etapa).forEach(([k, v]) => {
+            if (k.startsWith("_") || v === null || v === undefined || v === "") return;
+            const label = k.replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2");
+            field(label.charAt(0).toUpperCase() + label.slice(1), Array.isArray(v) ? v.join(", ") : v);
+          });
+        }
+      }
+
+      // Footer
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Generado el ${new Date().toLocaleString("es-AR")}`, mX, 290);
+
+      doc.save(`${proyecto.numeroOrden}.pdf`);
+      toast.success("PDF descargado");
+    } catch {
+      toast.error("Error al generar el PDF");
+    }
+  }, [proyecto]);
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -114,55 +225,53 @@ export default function ProyectoDetallePage() {
       : "Sin estado";
 
   return (
-    <div className="container mx-auto py-10">
-      <div className="mb-6">
-        <div className="flex items-start justify-between gap-3">
+    <div className="container mx-auto py-8 px-4">
+      {/* Header mejorado */}
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-start gap-4 justify-between border-b pb-6">
+        <div className="flex items-start gap-3">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="mt-0.5 flex-shrink-0">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
           <div>
-            <h1 className="text-3xl font-bold">Proyecto: {proyecto.numeroOrden}</h1>
-
-            <div className="flex flex-col md:flex-row gap-4 text-lg mt-2">
-              <span>
-                Cliente:{" "}
-                <span className="font-semibold">{cliente?.nombreCompleto ?? "—"}</span>
-              </span>
-
-              <span>
-                Teléfono:{" "}
-                <span className="font-semibold">{cliente?.telefono ?? "—"}</span>
-              </span>
-
-              <span>
-                Dirección:{" "}
-                <span className="font-semibold">{cliente?.direccion ?? "—"}</span>
-              </span>
-
-              <span className="inline-flex items-center gap-2">
-                Estado:
-                <Badge className={`text-lg ${getEstadoBadgeColor(estadoLabel)}`}>
-                  {estadoLabel}
-                </Badge>
-              </span>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl font-bold">Proyecto: {proyecto.numeroOrden}</h1>
+              <Badge className={`${getEstadoBadgeColor(estadoLabel)} text-sm px-3 py-1`}>
+                {estadoLabel}
+              </Badge>
+            </div>
+            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mt-2">
+              {cliente?.nombreCompleto && (
+                <span>Cliente: <span className="font-semibold text-foreground">{cliente.nombreCompleto}</span></span>
+              )}
+              {cliente?.telefono && (
+                <span>Tel: <span className="font-semibold text-foreground">{cliente.telefono}</span></span>
+              )}
+              {cliente?.direccion && (
+                <span>Dir: <span className="font-semibold text-foreground">{cliente.direccion}</span></span>
+              )}
             </div>
           </div>
-
-          <button
-            type="button"
-            className="text-sm text-muted-foreground hover:underline"
-            onClick={() => router.back()}
-          >
-            Volver
-          </button>
         </div>
+        <Button onClick={handleDownloadPdf} variant="outline" className="flex-shrink-0">
+          <Download className="h-4 w-4 mr-2" /> Descargar PDF
+        </Button>
       </div>
 
       <Tabs defaultValue={defaultTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-1 md:grid-cols-6">
-          <TabsTrigger value="visita-tecnica">1. Visita Técnica</TabsTrigger>
-          <TabsTrigger value="medicion">2. Medición</TabsTrigger>
-          <TabsTrigger value="verificacion">3. Verificación</TabsTrigger>
-          <TabsTrigger value="taller">4. Taller</TabsTrigger>
-          <TabsTrigger value="deposito">5. Depósito</TabsTrigger>
-          <TabsTrigger value="logistica">6. Logística</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 h-auto gap-1 mb-2">
+          {[
+            { value: "visita-tecnica", label: "Visita Técnica", n: 1 },
+            { value: "medicion", label: "Medición", n: 2 },
+            { value: "verificacion", label: "Verificación", n: 3 },
+            { value: "taller", label: "Taller", n: 4 },
+            { value: "deposito", label: "Depósito", n: 5 },
+            { value: "logistica", label: "Logística", n: 6 },
+          ].map(({ value, label, n }) => (
+            <TabsTrigger key={value} value={value} className="flex flex-col items-center py-2 px-1 text-xs gap-0.5">
+              <span className="text-[10px] font-bold opacity-50">{n}</span>
+              <span>{label}</span>
+            </TabsTrigger>
+          ))}
         </TabsList>
 
         <TabsContent value="visita-tecnica" className="mt-4">

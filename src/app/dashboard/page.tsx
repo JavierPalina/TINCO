@@ -1,270 +1,155 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { ArrowUp, Crown, Package, Building2, User, BarChart2, TrendingUp, DollarSign } from 'lucide-react';
 import { useState } from 'react';
-import { 
-    Bar, 
-    BarChart, 
-    ResponsiveContainer, 
-    Tooltip, 
-    XAxis, 
-    YAxis, 
-    Legend, 
-    Line,
-    ComposedChart,
-    PieChart,
-    Pie,
-    Cell
-} from 'recharts';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import axios from 'axios';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CalendarIcon, Loader2, CheckCircle2, AlertCircle, Clock, ListChecks } from 'lucide-react';
+import { AddTaskDialog } from '@/components/tareas/AddTaskDialog';
+import { TasksTimeline } from '@/components/tareas/TasksTimeline';
+import { TaskItem } from '@/components/tareas/TaskItem';
 import { InitialSetupModal } from '@/components/dashboard/InitialSetupModal';
+import { Card, CardContent } from '@/components/ui/card';
+import { Task } from '@/components/tareas/types';
 
-const COLORS = {
-    primary: '#4fa588',
-    light: '#e6f4f0',
-    medium: '#70bfa3',
-    dark: '#3e846b',
-    textPrimary: '#2d3748',
-    textSecondary: '#718096',
-    chart1: '#4fa588',
-    chart2: '#70bfa3',
-    chart3: '#a3d9c7',
-    chart4: '#3e846b',
-    pieChartColors: ['#4fa588', '#70bfa3', '#a3d9c7', '#3e846b']
-};
-
-const mockData = {
-    ventaTotalAnual: 12584350,
-    sucursalPrincipal: { nombre: "Sucursal Centro", ventaAnual: 4850200 },
-    vendedorEstrella: { nombre: "Ana García", ventaAnual: 2150000, avatar: "/avatars/02.png" },
-    productoMasVendido: { nombre: "Producto X Pro", unidades: 1240 },
-    
-    ventasMensualesSucursal: [
-        { mes: "Ene", Centro: 400, Norte: 240, Sur: 180 },
-        { mes: "Feb", Centro: 300, Norte: 139, Sur: 220 },
-        { mes: "Mar", Centro: 500, Norte: 480, Sur: 250 },
-        { mes: "Abr", Centro: 478, Norte: 390, Sur: 310 },
-        { mes: "May", Centro: 590, Norte: 480, Sur: 290 },
-        { mes: "Jun", Centro: 490, Norte: 380, Sur: 410 },
-    ],
-
-    ventasMensualesUsuario: [
-        { mes: "Ene", "Ana García": 210, "Carlos Ruiz": 150, "Laura Paz": 110 },
-        { mes: "Feb", "Ana García": 240, "Carlos Ruiz": 180, "Laura Paz": 130 },
-        { mes: "Mar", "Ana García": 290, "Carlos Ruiz": 200, "Laura Paz": 150 },
-        { mes: "Abr", "Ana García": 270, "Carlos Ruiz": 220, "Laura Paz": 160 },
-        { mes: "May", "Ana García": 310, "Carlos Ruiz": 210, "Laura Paz": 180 },
-        { mes: "Jun", "Ana García": 280, "Carlos Ruiz": 230, "Laura Paz": 190 },
-    ],
-
-    rankingUsuarios: [
-        { id: 1, nombre: "Ana García", ventas: 2150000, avatar: "/avatars/02.png" },
-        { id: 2, nombre: "Carlos Ruiz", ventas: 1890000, avatar: "/avatars/01.png" },
-        { id: 3, nombre: "Laura Paz", ventas: 1650000, avatar: "/avatars/03.png" },
-        { id: 4, nombre: "Marcos Díaz", ventas: 1320000, avatar: "/avatars/04.png" },
-    ],
-
-    ventasPorProducto: [
-        { name: 'Producto X Pro', value: 400 },
-        { name: 'Componente Z', value: 300 },
-        { name: 'Kit Inicial Y', value: 300 },
-        { name: 'Accesorio W', value: 200 },
-    ],
-};
-
-function StatCardModerno({ icon: Icon, title, value, footer }: { icon: React.ElementType, title: string, value: string, footer: string }) {
-    return (
-        <Card className="shadow-lg border-0 
-                        bg-gradient-to-br from-white to-gray-50 
-                        dark:from-slate-800 dark:to-slate-900 
-                        text-zinc-900 dark:text-zinc-100">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-                <Icon className="h-5 w-5 text-muted-foreground" style={{ color: COLORS.medium }} />
-            </CardHeader>
-            <CardContent>
-                <div className="text-3xl font-bold">{value}</div>
-                <p className="text-xs text-muted-foreground pt-1">{footer}</p>
-            </CardContent>
-        </Card>
-    );
+interface TasksData {
+  hoy: Task[];
+  vencidas: Task[];
+  proximas: Task[];
+  completadas: Task[];
 }
 
-function GraficoVentasMensuales() {
-    const [vista, setVista] = useState<'sucursal' | 'usuario'>('sucursal');
-    const datos = vista === 'sucursal' ? mockData.ventasMensualesSucursal : mockData.ventasMensualesUsuario;
-    const keys = Object.keys(datos[0]).filter(k => k !== 'mes');
-    const colors = [COLORS.chart1, COLORS.chart2, COLORS.chart3, COLORS.chart4];
+export default function HomePage() {
+  const [date, setDate] = useState<Date>(new Date());
 
-    return (
-        <Card className="col-span-1 lg:col-span-4 shadow-xl border-0 bg-white dark:bg-slate-800">
-            <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                    <CardTitle className="text-slate-800 dark:text-slate-100">Ventas Mensuales</CardTitle>
-                    <ToggleGroup 
-                        type="single" 
-                        value={vista} 
-                        onValueChange={(value: 'sucursal' | 'usuario') => value && setVista(value)} 
-                        className="mt-2 sm:mt-0 bg-gray-100 dark:bg-slate-700 rounded-lg p-0.5"
-                    >
-                        <ToggleGroupItem 
-                            value="sucursal" 
-                            aria-label="Por Sucursal" 
-                            className="data-[state=on]:bg-gradient-to-r data-[state=on]:from-[#4fa588] data-[state=on]:to-[#4fa588] data-[state=on]:text-white rounded-md px-3 py-1 text-sm font-medium"
-                        >
-                            Por Sucursal
-                        </ToggleGroupItem>
-                        <ToggleGroupItem 
-                            value="usuario" 
-                            aria-label="Por Usuario" 
-                            className="data-[state=on]:bg-gradient-to-r data-[state=on]:from-[#4fa588] data-[state=on]:to-[#4fa588] data-[state=on]:text-white rounded-md px-3 py-1 text-sm font-medium"
-                        >
-                            Por Usuario
-                        </ToggleGroupItem>
-                    </ToggleGroup>
-                </div>
-            </CardHeader>
-            <CardContent className="h-[400px] w-full p-2">
-                <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={datos}>
-                        <XAxis dataKey="mes" stroke={COLORS.textSecondary} fontSize={12} tickLine={false} axisLine={false} />
-                        <YAxis stroke={COLORS.textSecondary} fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${(Number(value) * 1000).toLocaleString('es-AR')}`} />
-                        <Tooltip
-                            cursor={{ fill: 'rgba(0,0,0,0.1)' }}
-                            contentStyle={{ backgroundColor: 'rgba(20, 20, 30, 0.8)', border: 'none', borderRadius: '8px' }}
-                            labelStyle={{ color: '#fff' }}
-                        />
-                        <Legend />
-                        {keys.map((key, index) => (
-                            <Bar key={key} dataKey={key} fill={colors[index % colors.length]} name={key} barSize={20} radius={[4, 4, 0, 0]} />
-                        ))}
-                    </ComposedChart>
-                </ResponsiveContainer>
-            </CardContent>
-        </Card>
-    );
-}
+  const { data, isLoading } = useQuery<TasksData>({
+    queryKey: ['tasks', format(date, 'yyyy-MM-dd')],
+    queryFn: async () => {
+      const { data } = await axios.get('/api/tareas', { params: { date: format(date, 'yyyy-MM-dd') } });
+      return data.data;
+    },
+  });
 
-function RankingList({ title, data, icon: Icon }: { title: string, data: { nombre: string, ventas: number, avatar: string }[], icon: React.ElementType }) {
-    const maxVentas = Math.max(...data.map(item => item.ventas));
-    return (
-        <Card className="col-span-1 lg:col-span-2 shadow-xl border-0 bg-white dark:bg-slate-800">
-            <CardHeader className="flex flex-row items-center">
-                <Icon className="h-5 w-5 mr-2" style={{ color: COLORS.primary }} />
-                <CardTitle className="text-slate-800 dark:text-slate-100">{title}</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <ul className="space-y-4">
-                    {data.map((item, index) => (
-                        <li key={item.nombre} className="flex items-center gap-4">
-                            <span className="text-lg font-bold text-muted-foreground" style={{ color: COLORS.medium }}>{index + 1}</span>
-                            <Avatar>
-                                <AvatarImage src={item.avatar} />
-                                <AvatarFallback>{item.nombre.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex-grow">
-                                <p className="font-medium text-slate-800 dark:text-slate-100">{item.nombre}</p>
-                                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-1">
-                                    <div 
-                                        className="h-2 rounded-full" 
-                                        style={{ width: `${(item.ventas / maxVentas) * 100}%`, backgroundColor: COLORS.primary }}>
-                                    </div>
-                                </div>
-                            </div>
-                            <span className="font-semibold text-right text-slate-800 dark:text-slate-100">${item.ventas.toLocaleString('es-AR')}</span>
-                        </li>
-                    ))}
-                </ul>
-            </CardContent>
-        </Card>
-    );
-}
+  const vencidasCount = data?.vencidas.length ?? 0;
+  const hoyCount = data?.hoy.length ?? 0;
+  const proximasCount = data?.proximas.length ?? 0;
 
-function GraficoVentasProducto({ data }: { data: typeof mockData.ventasPorProducto }) {
-    return (
-        <Card className="col-span-1 lg:col-span-2 shadow-xl border-0 bg-white dark:bg-slate-800">
-            <CardHeader className="flex flex-row items-center">
-                <Package className="h-5 w-5 mr-2" style={{ color: COLORS.primary }} />
-                <CardTitle className="text-slate-800 dark:text-slate-100">Ventas por Producto</CardTitle>
-            </CardHeader>
-            <CardContent className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                        <Pie
-                            data={data}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            outerRadius={100}
-                            innerRadius={60}
-                            fill={COLORS.primary}
-                            dataKey="value"
-                            paddingAngle={5}
-                        >
-                            {data.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS.pieChartColors[index % COLORS.pieChartColors.length]} />
-                            ))}
-                        </Pie>
-                        <Tooltip
-                            contentStyle={{ backgroundColor: 'rgba(20, 20, 30, 0.8)', border: 'none', borderRadius: '8px' }}
-                            itemStyle={{ color: '#fff' }}
-                            labelStyle={{ color: '#fff' }}
-                        />
-                        <Legend />
-                    </PieChart>
-                </ResponsiveContainer>
-            </CardContent>
-        </Card>
-    );
-}
-
-export default function DashboardPage() {
-    const stats = mockData;
-
-    return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-4 sm:p-6 lg:p-8">
-            <InitialSetupModal />
-            <div className="max-w-7xl mx-auto">
-                <h1 className="text-3xl font-bold mb-6 text-slate-800 dark:text-slate-100">Panel de Control</h1>
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-                    <StatCardModerno 
-                        icon={DollarSign}
-                        title="Venta Total (Anual)"
-                        value={`$${(stats.ventaTotalAnual / 1000000).toFixed(2)}M`}
-                        footer="Actualizado al día de hoy"
-                    />
-                    <StatCardModerno 
-                        icon={Building2}
-                        title="Sucursal Principal"
-                        value={stats.sucursalPrincipal.nombre}
-                        footer={`$${(stats.sucursalPrincipal.ventaAnual / 1000000).toFixed(2)}M en ventas`}
-                    />
-                    <StatCardModerno 
-                        icon={Crown}
-                        title="Vendedor Estrella"
-                        value={stats.vendedorEstrella.nombre}
-                        footer={`$${(stats.vendedorEstrella.ventaAnual / 1000000).toFixed(2)}M en ventas`}
-                    />
-                    <StatCardModerno 
-                        icon={Package}
-                        title="Producto Más Vendido"
-                        value={stats.productoMasVendido.nombre}
-                        footer={`${stats.productoMasVendido.unidades} unidades vendidas`}
-                    />
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                    <GraficoVentasMensuales />
-                    <RankingList 
-                        title="Ranking de Vendedores" 
-                        data={stats.rankingUsuarios}
-                        icon={TrendingUp}
-                    />
-                    <GraficoVentasProducto data={stats.ventasPorProducto} />
-                </div>
-            </div>
+  return (
+    <div className="min-h-screen flex flex-col">
+      <InitialSetupModal />
+      <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6 p-4 border-b">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Mis Tareas</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {format(date, "EEEE, d 'de' MMMM", { locale: es })}
+          </p>
         </div>
-    );
+        <div className="flex items-center gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-[220px] justify-start text-left font-normal">
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {format(date, "d MMM yyyy", { locale: es })}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar mode="single" selected={date} onSelect={(d) => setDate(d || new Date())} initialFocus />
+            </PopoverContent>
+          </Popover>
+          <AddTaskDialog />
+        </div>
+      </div>
+
+      {vencidasCount > 0 && (
+        <div className="mx-4 mb-4 flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          <span>Tenés <strong>{vencidasCount}</strong> tarea{vencidasCount !== 1 ? 's' : ''} vencida{vencidasCount !== 1 ? 's' : ''}.</span>
+        </div>
+      )}
+
+      <Tabs defaultValue="hoy" className="w-full p-4 pt-0 flex-1">
+        <TabsList className="mb-4">
+          <TabsTrigger value="hoy" className="flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5" />
+            Hoy
+            {hoyCount > 0 && (
+              <span className="ml-1 rounded-full bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 font-bold">{hoyCount}</span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="vencidas" className="flex items-center gap-1.5">
+            <AlertCircle className="h-3.5 w-3.5" />
+            Vencidas
+            {vencidasCount > 0 && (
+              <span className="ml-1 rounded-full bg-destructive text-destructive-foreground text-[10px] px-1.5 py-0.5 font-bold">{vencidasCount}</span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="proximas" className="flex items-center gap-1.5">
+            <ListChecks className="h-3.5 w-3.5" />
+            Próximas
+            {proximasCount > 0 && (
+              <span className="ml-1 rounded-full bg-muted-foreground/20 text-[10px] px-1.5 py-0.5 font-bold">{proximasCount}</span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="completadas" className="flex items-center gap-1.5">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Completadas
+          </TabsTrigger>
+        </TabsList>
+
+        {isLoading ? (
+          <div className="flex justify-center items-center p-20">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        ) : (
+          <>
+            <TabsContent value="hoy">
+              <TasksTimeline tasks={data?.hoy || []} />
+            </TabsContent>
+            <TabsContent value="vencidas">
+              <Card>
+                <CardContent className="p-4 space-y-2">
+                  {data?.vencidas.length ? (
+                    data.vencidas.map((task) => <TaskItem key={task._id} task={task} />)
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
+                      <CheckCircle2 className="h-10 w-10 text-green-500" />
+                      <p className="font-medium">¡Sin tareas vencidas!</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="proximas">
+              <Card>
+                <CardContent className="p-4 space-y-2">
+                  {data?.proximas.length ? (
+                    data.proximas.map((task) => <TaskItem key={task._id} task={task} />)
+                  ) : (
+                    <p className="text-center text-muted-foreground py-8">No hay tareas próximas</p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="completadas">
+              <Card>
+                <CardContent className="p-4 space-y-2">
+                  {data?.completadas.length ? (
+                    data.completadas.map((task) => <TaskItem key={task._id} task={task} />)
+                  ) : (
+                    <p className="text-center text-muted-foreground py-8">No hay tareas completadas</p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </>
+        )}
+      </Tabs>
+    </div>
+  );
 }

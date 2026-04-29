@@ -1,6 +1,7 @@
 "use client";
 
 import { useForm, useFieldArray, Controller, SubmitHandler } from 'react-hook-form';
+import { useCurrency } from '@/context/CurrencyContext';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import axios from 'axios';
@@ -24,6 +25,7 @@ interface QuoteFormData {
 }
 
 function CreateQuoteForm() {
+  const { formatMoney } = useCurrency();
   const router = useRouter();
   const searchParams = useSearchParams();
   const clientId = searchParams.get('clienteId');
@@ -118,7 +120,7 @@ function CreateQuoteForm() {
 
             <div className="flex justify-between items-center text-xl font-bold">
               <span>Total:</span>
-              <span>${watch('montoTotal').toLocaleString('es-AR')}</span>
+              <span>{formatMoney(watch('montoTotal'))}</span>
             </div>
 
             <div className="flex justify-end">

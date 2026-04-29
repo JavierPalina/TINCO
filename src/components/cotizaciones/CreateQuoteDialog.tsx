@@ -3,6 +3,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useCurrency } from "@/context/CurrencyContext";
 import { useForm, SubmitHandler, Controller } from "react-hook-form";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
@@ -88,6 +89,7 @@ function parseDuplicateKeyError(errorMsg: string): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function CreateQuoteDialog() {
+  const { formatMoney } = useCurrency();
   const [open, setOpen] = useState(false);
   const [clienteMode, setClienteMode] = useState<"seleccionar" | "crear">(
     "seleccionar"
@@ -572,7 +574,7 @@ export function CreateQuoteDialog() {
                   render={({ field }) => {
                     const displayValue =
                       typeof field.value === "number"
-                        ? formatARSInteger(field.value)
+                        ? formatMoney(field.value)
                         : "";
                     return (
                       <Input

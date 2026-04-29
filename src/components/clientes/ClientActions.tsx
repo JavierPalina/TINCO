@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useCurrency } from "@/context/CurrencyContext";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
@@ -148,7 +149,7 @@ const fetchAsDataUrl = async (src: string) => {
   });
 };
 
-async function generateClientPdf(client: ClientWithExtras) {
+async function generateClientPdf(client: ClientWithExtras, formatMoney: (n: unknown) => string) {
   const { default: jsPDF } = await import("jspdf");
 
   const doc = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
@@ -279,7 +280,7 @@ async function generateClientPdf(client: ClientWithExtras) {
   innerY = sectionCard("Datos de empresa", cardH3);
   innerY = twoCol(["Razón social", safeStr(client.razonSocial)], ["Contacto", safeStr(client.contactoEmpresa)], innerY);
   innerY = twoCol(["Dirección empresa", safeStr(client.direccionEmpresa)], ["Ciudad empresa", safeStr(client.ciudadEmpresa)], innerY);
-  innerY = twoCol(["País empresa", safeStr(client.paisEmpresa)], ["Última cotización", moneyARS(client.ultimaCotizacionMonto)], innerY);
+  innerY = twoCol(["País empresa", safeStr(client.paisEmpresa)], ["Última cotización", formatMoney(client.ultimaCotizacionMonto)], innerY);
 
   y += cardH3 + 10;
 
@@ -313,6 +314,7 @@ export function ClientActions({
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const queryClient = useQueryClient();
+  const { formatMoney } = useCurrency();
 
   const deleteMutation = useMutation({
     mutationFn: (clientId: string) => axios.delete(`/api/clientes/${clientId}`),
@@ -331,7 +333,7 @@ export function ClientActions({
   const handleDownloadPdf = async () => {
     try {
       toast.message("Generando PDF...");
-      await generateClientPdf(client as ClientWithExtras);
+      await generateClientPdf(client as ClientWithExtras, formatMoney);
       toast.success("PDF descargado.");
     } catch (e) {
       console.error(e);

@@ -7,11 +7,11 @@ import axios from "axios";
 import { useTheme } from "@/components/ThemeProvider";
 import { useSession, signOut } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
+import { useCurrency } from "@/context/CurrencyContext";
 
 import {
   Menu,
   X,
-  Search,
   User,
   Settings,
   LogOut,
@@ -32,10 +32,11 @@ import {
   Factory,
   Layers,
   ShieldCheck,
+  DollarSign,
+  BarChart2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -45,7 +46,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { NotificationBell } from "./NotificationBell";
+
 
 import type { UserRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
@@ -57,6 +58,7 @@ type SectionKey =
   | "servicios"
   | "stock"
   | "users"
+  | "metricas"
   | "notificaciones";
 
 type ProyectoStageKey = "tareas";
@@ -116,6 +118,7 @@ function emptyRoleAccess(role: UserRole): RoleAccessDoc {
       servicios: false,
       stock: false,
       users: false,
+      metricas: false,
       notificaciones: false,
     },
     proyectoStages: {
@@ -128,6 +131,7 @@ export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { setTheme, resolvedTheme } = useTheme();
   const { data: session } = useSession();
+  const { moneda, setCurrency } = useCurrency();
 
   const role = session?.user?.rol as UserRole | undefined;
 
@@ -166,7 +170,7 @@ export function Header() {
   const showServicios = canSection("servicios");
   const showStock = canSection("stock");
   const showUsers = canSection("users");
-  const showNotificaciones = canSection("notificaciones");
+  const isAdminOrGerente = role === "admin" || role === "gerente";
 
   const proyectosLinks = useMemo(() => {
     const items: Array<{
@@ -238,13 +242,7 @@ export function Header() {
     ];
   }, []);
 
-  const homeHref = showNegocios
-    ? "/dashboard/negocios"
-    : showProyectos
-      ? "/dashboard/proyectos"
-      : showClientes
-        ? "/dashboard/listados"
-        : "/dashboard";
+  const homeHref = "/dashboard";
 
   const avatarSrc =
     typeof session?.user?.image === "string" && session.user.image.trim() !== ""
@@ -304,7 +302,7 @@ export function Header() {
 
             {showClientes && <NavLink href="/dashboard/listados">Listados</NavLink>}
 
-            {showNotificaciones && <NavLink href="/dashboard/notificaciones">Notificaciones</NavLink>}
+            <NavLink href="/dashboard/metricas">Gráficos</NavLink>
 
             {showServicios && (
               <DropdownMenu>
@@ -391,16 +389,8 @@ export function Header() {
           </div>
         </div>
 
-        {/* BUSCADOR */}
-        <div className="flex-1 max-w-sm hidden md:flex items-center relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input type="search" placeholder="Buscar secciones..." className="pl-9 w-full" />
-        </div>
-
-        {/* NOTIFICACIONES + PERFIL + MENÚ MOBILE */}
+        {/* PERFIL + MENÚ MOBILE */}
         <div className="flex items-center gap-2">
-          {showNotificaciones && <NotificationBell />}
-
           {/* PERFIL */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -444,6 +434,13 @@ export function Header() {
                   </>
                 )}
               </DropdownMenuItem>
+
+              {isAdminOrGerente && (
+                <DropdownMenuItem onClick={() => setCurrency(moneda === "ARS" ? "USD" : "ARS")}>
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  <span>Moneda: {moneda === "ARS" ? "$ Pesos (ARS)" : "US$ Dólares (USD)"}</span>
+                </DropdownMenuItem>
+              )}
 
               <DropdownMenuItem asChild>
                 <Link href="/dashboard/configuracion">
@@ -523,11 +520,12 @@ export function Header() {
                   </DropdownMenuItem>
                 )}
 
-                {showNotificaciones && (
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard/notificaciones">Notificaciones</Link>
-                  </DropdownMenuItem>
-                )}
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard/metricas" className="flex items-center gap-2">
+                    <BarChart2 className="h-4 w-4 text-muted-foreground" />
+                    Gráficos
+                  </Link>
+                </DropdownMenuItem>
 
                 {showServicios && (
                   <>

@@ -3,6 +3,7 @@
 "use client";
 
 import React, { useMemo, useRef, useState } from "react";
+import { useCurrency } from "@/context/CurrencyContext";
 import Link from "next/link";
 import axios from "axios";
 import {
@@ -232,15 +233,15 @@ function isMoneyKey(k: string) {
   return t.includes("precio") || t.includes("monto") || t.includes("total") || t.includes("importe");
 }
 
-function renderValueWithKey(k: string, v: unknown) {
+function renderValueWithKey(k: string, v: unknown, fmt: (n: unknown) => string) {
   if (v === null || v === undefined || v === "") return "—";
   if (Array.isArray(v)) return v.join(", ");
   if (typeof v === "boolean") return v ? "Sí" : "No";
 
-  if (typeof v === "number" && isMoneyKey(k)) return money(v);
+  if (typeof v === "number" && isMoneyKey(k)) return fmt(v);
   if (typeof v === "string" && isMoneyKey(k)) {
     const n = Number(v);
-    if (Number.isFinite(n)) return money(n);
+    if (Number.isFinite(n)) return fmt(n);
   }
   return String(v);
 }
@@ -252,11 +253,6 @@ function fmtDate(d?: string) {
         timeStyle: "short",
       })
     : "—";
-}
-
-function money(n: unknown) {
-  const val = typeof n === "number" ? n : Number(n || 0);
-  return `$${(Number.isFinite(val) ? val : 0).toLocaleString("es-AR")}`;
 }
 
 function normalizePhoneForWA(raw?: string) {
@@ -527,6 +523,7 @@ export function QuoteDetailsSheet({
   quoteId: string | null;
 }) {
   const queryClient = useQueryClient();
+  const { formatMoney } = useCurrency();
 
   const attachmentsInputRef = useRef<HTMLInputElement | null>(null);
   const facturaInputRef = useRef<HTMLInputElement | null>(null);
@@ -1184,7 +1181,7 @@ export function QuoteDetailsSheet({
                       <div className="min-w-0">
                         <div className="text-xs text-muted-foreground">Monto total</div>
                         <div className="text-3xl font-semibold tracking-tight">
-                          {money(quote.montoTotal)}
+                          {formatMoney(quote.montoTotal)}
                         </div>
                         <div className="mt-2 text-xs text-muted-foreground">
                           Vendedor:{" "}
@@ -1305,7 +1302,7 @@ export function QuoteDetailsSheet({
                                         {prettifyKey(k)}
                                       </div>
                                       <div className="mt-1 text-sm font-semibold">
-                                        {renderValueWithKey(k, v)}
+                                        {renderValueWithKey(k, v, formatMoney)}
                                       </div>
                                     </div>
                                   ))}
@@ -1575,7 +1572,7 @@ export function QuoteDetailsSheet({
                                               {getFieldLabel(field)}
                                             </div>
                                             <div className="mt-1 text-sm font-semibold">
-                                              {renderValueWithKey(key, normalizedData[key])}
+                                              {renderValueWithKey(key, normalizedData[key], formatMoney)}
                                             </div>
                                           </div>
                                         );
@@ -1590,7 +1587,7 @@ export function QuoteDetailsSheet({
                                             {prettifyKey(key)}
                                           </div>
                                           <div className="mt-1 text-sm font-semibold">
-                                            {renderValueWithKey(key, value)}
+                                            {renderValueWithKey(key, value, formatMoney)}
                                           </div>
                                         </div>
                                       ))}

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useCurrency } from '@/context/CurrencyContext';
 
 interface Quote {
     _id: string;
@@ -25,6 +26,7 @@ const statusColors: Record<Quote['estado'], string> = {
 }
 
 export function ClientQuotes({ clientId }: { clientId: string }) {
+    const { formatMoney } = useCurrency();
     const { data: quotes, isLoading } = useQuery<Quote[]>({
         queryKey: ['quotes', clientId],
         queryFn: async () => {
@@ -52,7 +54,7 @@ export function ClientQuotes({ clientId }: { clientId: string }) {
                             <div>
                                 <p className="font-semibold">{quote.codigo}</p>
                                 <p className="text-sm text-muted-foreground">
-                                    Monto: ${quote.montoTotal.toLocaleString('es-AR')}
+                                    Monto: {formatMoney(quote.montoTotal)}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
                                     Creada: {format(new Date(quote.createdAt), 'd MMM yyyy', { locale: es })}

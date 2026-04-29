@@ -7,6 +7,7 @@ import { es } from 'date-fns/locale';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { DollarSign, FileText, History } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useCurrency } from '@/context/CurrencyContext';
 
 // ... (Interfaces sin cambios)
 interface Etapa {
@@ -31,6 +32,7 @@ interface Cotizacion {
 
 
 export function ClientQuotes2({ clientId }: { clientId: string }) {
+  const { formatMoney } = useCurrency();
   const { data: cotizaciones, isLoading } = useQuery<Cotizacion[]>({
     queryKey: ['cotizacionesCliente', clientId],
     queryFn: async () => {
@@ -60,7 +62,7 @@ export function ClientQuotes2({ clientId }: { clientId: string }) {
                   </div>
                   <div className="flex items-center gap-2 text-base font-semibold">
                     <DollarSign className="h-4 w-4"/>
-                    {cotizacion.montoTotal.toLocaleString('es-AR')}
+                    {formatMoney(cotizacion.montoTotal)}
                   </div>
                 </div>
               </AccordionTrigger>

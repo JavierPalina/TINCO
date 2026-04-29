@@ -3,6 +3,7 @@
 "use client";
 
 import React, { useMemo, useRef, useState } from "react";
+import { useCurrency } from "@/context/CurrencyContext";
 import Link from "next/link";
 import axios from "axios";
 import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
@@ -196,20 +197,15 @@ function isMoneyKey(k: string) {
   return t.includes("precio") || t.includes("monto") || t.includes("total") || t.includes("importe");
 }
 
-function money(n: unknown) {
-  const val = typeof n === "number" ? n : Number(n || 0);
-  return `$${(Number.isFinite(val) ? val : 0).toLocaleString("es-AR")}`;
-}
-
-function renderValueWithKey(k: string, v: unknown) {
+function renderValueWithKey(k: string, v: unknown, fmt: (n: unknown) => string) {
   if (v === null || v === undefined || v === "") return "—";
   if (Array.isArray(v)) return v.join(", ");
   if (typeof v === "boolean") return v ? "Sí" : "No";
 
-  if (typeof v === "number" && isMoneyKey(k)) return money(v);
+  if (typeof v === "number" && isMoneyKey(k)) return fmt(v);
   if (typeof v === "string" && isMoneyKey(k)) {
     const n = Number(v);
-    if (Number.isFinite(n)) return money(n);
+    if (Number.isFinite(n)) return fmt(n);
   }
   return String(v);
 }
@@ -416,6 +412,7 @@ export function QuoteDetailsDialog({
   quoteId: string | null;
 }) {
   const queryClient = useQueryClient();
+  const { formatMoney } = useCurrency();
 
   const attachmentsInputRef = useRef<HTMLInputElement | null>(null);
   const facturaInputRef = useRef<HTMLInputElement | null>(null);
@@ -879,7 +876,7 @@ export function QuoteDetailsDialog({
                     <Separator className="my-4" />
 
                     <div className="text-xs text-muted-foreground">Monto total</div>
-                    <div className="mt-1 text-2xl font-semibold tracking-tight">{money(quote.montoTotal)}</div>
+                    <div className="mt-1 text-2xl font-semibold tracking-tight">{formatMoney(quote.montoTotal)}</div>
 
                     <div className="mt-3 text-xs text-muted-foreground">
                       Vendedor: <span className="font-medium text-foreground">{quote.vendedor?.name || "—"}</span>
@@ -1010,7 +1007,7 @@ export function QuoteDetailsDialog({
                                     {Object.entries(lastMove.datosFormulario ?? {}).map(([k, v]) => (
                                       <div key={k} className="rounded-2xl border bg-background/60 p-3">
                                         <div className="text-[11px] text-muted-foreground">{prettifyKey(k)}</div>
-                                        <div className="mt-1 text-sm font-semibold">{renderValueWithKey(k, v)}</div>
+                                        <div className="mt-1 text-sm font-semibold">{renderValueWithKey(k, v, formatMoney)}</div>
                                       </div>
                                     ))}
                                   </div>

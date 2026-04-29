@@ -21,6 +21,7 @@ type SectionKey =
   | "servicios"
   | "stock"
   | "users"
+  | "metricas"
   | "notificaciones";
 
 type ProyectoStageKey = "tareas";
@@ -41,7 +42,8 @@ const SECTION_LABELS: Record<SectionKey, string> = {
   servicios: "Servicios",
   stock: "Stock",
   users: "Usuarios",
-  notificaciones: "Notificaciones",
+  metricas: "Métricas",
+  notificaciones: "Notificaciones (legacy)",
 };
 
 const STAGE_LABELS: Record<ProyectoStageKey, string> = {
@@ -67,6 +69,7 @@ function buildEmptyConfig(role: UserRole): Omit<RoleAccessDoc, "_id"> {
       servicios: false,
       stock: false,
       users: false,
+      metricas: false,
       notificaciones: false,
     },
     proyectoStages: {

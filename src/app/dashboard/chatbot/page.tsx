@@ -29,8 +29,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 export default function ChatbotWppIaPage() {
   return (
     <main className="relative">
-      <Header />
-
       {/* Background decoration */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute -top-40 right-[-140px] h-[520px] w-[720px] rounded-full bg-gradient-to-r from-primary/10 via-primary/5 to-transparent blur-3xl" />

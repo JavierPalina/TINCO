@@ -15,6 +15,7 @@ import { TableCellActions } from '../clientes/TableCellActions';
 import { Client } from '@/types/client';
 import { Loader2, DollarSign, MoreVertical, Trash2, Paperclip, Mail, LayoutGrid, Columns } from 'lucide-react';
 import { FaWhatsapp } from 'react-icons/fa';
+import { useCurrency } from "@/context/CurrencyContext";
 
 type StageColorMap = { [key: string]: string };
 
@@ -36,7 +37,8 @@ export interface Cotizacion {
 }
 
 function QuoteCard({ quote, onDelete, stageColors }: { quote: Cotizacion, onDelete: (quoteId: string) => void, stageColors: StageColorMap }) {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
+    const { formatMoney } = useCurrency();
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: quote._id, 
         data: { type: 'Quote', quote }
     });
@@ -119,7 +121,7 @@ function QuoteCard({ quote, onDelete, stageColors }: { quote: Cotizacion, onDele
                             </div>
                             <div className="flex items-center gap-1 font-semibold text-base">
                                 <DollarSign className="h-4 w-4" />
-                                <span>{quote.montoTotal.toLocaleString('es-AR')}</span>
+                                <span>{formatMoney(quote.montoTotal)}</span>
                             </div>
                         </div>
                     </CardContent>
