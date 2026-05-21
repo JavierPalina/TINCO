@@ -398,7 +398,7 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
       </div>
 
       {/* ✅ Todo lo que esté dentro de este contenedor se captura para el PDF */}
-      <div ref={pdfRef} className="rounded-lg border bg-white p-6">
+      <div ref={pdfRef} className="rounded-lg border bg-card p-6">
         {/* Alert para confirmar eliminación de MEDICIÓN */}
         <AlertDialog open={deleteMedicionOpen} onOpenChange={setDeleteMedicionOpen}>
           <AlertDialogContent>

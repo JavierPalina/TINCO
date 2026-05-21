@@ -28,10 +28,10 @@ export function TaskItem({ task }: { task: Task }) {
   return (
     <div
   className={cn(
-    "flex items-center justify-between p-4 rounded-xl border shadow-sm transition hover:shadow-md",
-    task.prioridad === "Alta" && "bg-muted",
-    task.prioridad === "Media" && "bg-muted-foreground",
-    task.prioridad === "Baja" && "bg-background"
+    "flex items-center justify-between p-3 rounded-xl border shadow-sm transition hover:shadow-md",
+    task.prioridad === "Alta" && "border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30",
+    task.prioridad === "Media" && "border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-950/30",
+    task.prioridad === "Baja" && "bg-card"
   )}
 >
   <div className="flex items-start gap-3 flex-1">
@@ -63,8 +63,13 @@ export function TaskItem({ task }: { task: Task }) {
           </Link>
         </p>
       )}
-      <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-        Prioridad: {task.prioridad}
+      <span className={cn(
+        "inline-block mt-1 text-xs px-2 py-0.5 rounded-full font-medium",
+        task.prioridad === "Alta" && "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+        task.prioridad === "Media" && "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
+        task.prioridad === "Baja" && "bg-muted text-muted-foreground",
+      )}>
+        {task.prioridad}
       </span>
     </div>
   </div>
