@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Trash2, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { EditVerificacionSheet } from "@/components/proyectos/edit/EditVerificacionSheet";
 
 type Props = {
   proyecto: ProyectoDTO;
@@ -477,7 +478,10 @@ export function VerificacionView({ proyecto, onDeleted }: Props) {
             Resumen de verificación de medidas, materiales y perfiles antes de pasar a taller.
           </p>
         </div>
-        <Badge className={getEstadoBadgeColor(proyecto.estadoActual)}>{estadoLabel}</Badge>
+        <div className="flex items-center gap-2">
+          <EditVerificacionSheet proyecto={proyecto} />
+          <Badge className={getEstadoBadgeColor(proyecto.estadoActual)}>{estadoLabel}</Badge>
+        </div>
       </div>
 
       {/* Datos generales */}

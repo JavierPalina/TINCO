@@ -9,6 +9,9 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 
 import { StockPageHeader } from "@/components/stock/StockPageHeader";
 import { FilterChipsBar } from "@/components/stock/FilterChipsBar";
@@ -83,6 +86,8 @@ function isMovementTypeFilter(v: string): v is MovementTypeFilter {
 export default function StockMovementsPage() {
   const [warehouseId, setWarehouseId] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<MovementTypeFilter>("all");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
 
   const { data: warehouses } = useQuery<Warehouse[]>({
     queryKey: ["warehouses"],
@@ -106,9 +111,12 @@ export default function StockMovementsPage() {
   const baseRows = data ?? [];
 
   const rows = useMemo(() => {
-    if (typeFilter === "all") return baseRows;
-    return baseRows.filter((r) => r.type === typeFilter);
-  }, [baseRows, typeFilter]);
+    let result = baseRows;
+    if (typeFilter !== "all") result = result.filter((r) => r.type === typeFilter);
+    if (dateFrom) result = result.filter((r) => new Date(r.createdAt) >= new Date(dateFrom));
+    if (dateTo) result = result.filter((r) => new Date(r.createdAt) <= new Date(dateTo + "T23:59:59"));
+    return result;
+  }, [baseRows, typeFilter, dateFrom, dateTo]);
 
   const chips = useMemo(() => {
     const arr: Array<{ key: string; label: string; value: string; onRemove: () => void }> = [];
@@ -246,8 +254,8 @@ export default function StockMovementsPage() {
   return (
     <div className="space-y-4">
       <StockPageHeader
-        title="Movimientos"
-        description="Auditoría operativa del stock (ledger). Cada registro representa un cambio de inventario o una acción relacionada (reserva/producción)."
+        title="Movimientos de Stock"
+        description="Historial completo de cambios de inventario. Cada registro es inmutable — funciona como un libro contable. Filtrá por tipo, depósito o rango de fechas."
         breadcrumbs={[
           { label: "Dashboard", href: "/dashboard" },
           { label: "Stock", href: "/dashboard/stock/balances" },
@@ -262,6 +270,27 @@ export default function StockMovementsPage() {
         }
       />
 
+      {/* Movement type legend */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        {[
+          { type: "IN", desc: "Compra o recepción de material" },
+          { type: "OUT", desc: "Entrega a proyecto o cliente" },
+          { type: "PRODUCE", desc: "Fabricación de ventana/puerta" },
+          { type: "TRANSFER", desc: "Mover entre depósitos" },
+          { type: "ADJUST", desc: "Corrección por inventario físico" },
+          { type: "RESERVE", desc: "Apartar material para proyecto" },
+          { type: "UNRESERVE", desc: "Liberar reserva de proyecto" },
+        ].map(({ type, desc }) => {
+          const b = typeBadge(type);
+          return (
+            <div key={type} className="flex items-start gap-2 rounded-lg border p-2.5 bg-card">
+              <Badge variant={b.variant} className="text-[10px] shrink-0">{b.label}</Badge>
+              <span className="text-[10px] text-muted-foreground leading-tight">{desc}</span>
+            </div>
+          );
+        })}
+      </div>
+
       <Card>
         <CardContent className="p-4 space-y-3">
           <FilterChipsBar
@@ -272,52 +301,54 @@ export default function StockMovementsPage() {
             }}
           />
 
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-            <div className="flex flex-col lg:flex-row lg:items-center gap-2">
-              <div className="flex items-center gap-2">
-                <div className="text-sm font-medium">Depósito</div>
-                <Select value={warehouseId} onValueChange={setWarehouseId}>
-                  <SelectTrigger className="w-[260px]">
-                    <SelectValue placeholder="Seleccionar..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {(warehouses ?? []).map((w) => (
-                      <SelectItem key={w._id} value={w._id}>
-                        {w.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <Select value={warehouseId} onValueChange={setWarehouseId}>
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder="Todos los depósitos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los depósitos</SelectItem>
+                  {(warehouses ?? []).map((w) => (
+                    <SelectItem key={w._id} value={w._id}>{w.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={typeFilter} onValueChange={(v) => { if (isMovementTypeFilter(v)) setTypeFilter(v); }}>
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder="Todos los tipos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los tipos</SelectItem>
+                  <SelectItem value="IN">Ingreso (IN)</SelectItem>
+                  <SelectItem value="OUT">Egreso (OUT)</SelectItem>
+                  <SelectItem value="PRODUCE">Producción (PRODUCE)</SelectItem>
+                  <SelectItem value="TRANSFER">Transferencia (TRANSFER)</SelectItem>
+                  <SelectItem value="ADJUST">Ajuste (ADJUST)</SelectItem>
+                  <SelectItem value="RESERVE">Reserva (RESERVE)</SelectItem>
+                  <SelectItem value="UNRESERVE">Libera reserva (UNRESERVE)</SelectItem>
+                </SelectContent>
+              </Select>
 
               <div className="flex items-center gap-2">
-                <div className="text-sm font-medium">Tipo</div>
-                <Select
-                  value={typeFilter}
-                  onValueChange={(v) => {
-                    if (isMovementTypeFilter(v)) setTypeFilter(v);
-                  }}
-                >
-                  <SelectTrigger className="w-[260px]">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="IN">Ingreso (IN)</SelectItem>
-                    <SelectItem value="OUT">Egreso (OUT)</SelectItem>
-                    <SelectItem value="ADJUST">Ajuste (ADJUST)</SelectItem>
-                    <SelectItem value="TRANSFER">Transferencia (TRANSFER)</SelectItem>
-                    <SelectItem value="RESERVE">Reserva (RESERVE)</SelectItem>
-                    <SelectItem value="UNRESERVE">Libera reserva (UNRESERVE)</SelectItem>
-                    <SelectItem value="PRODUCE">Producción (PRODUCE)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label className="text-xs whitespace-nowrap">Desde</Label>
+                <Input type="date" className="h-9 w-[150px]" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
               </div>
-            </div>
+              <div className="flex items-center gap-2">
+                <Label className="text-xs whitespace-nowrap">Hasta</Label>
+                <Input type="date" className="h-9 w-[150px]" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+              </div>
 
-            <div className="text-xs text-muted-foreground">
-              {isFetching ? "Actualizando..." : rows.length ? `${rows.length} registros` : ""}
+              {(dateFrom || dateTo) && (
+                <Button variant="ghost" size="sm" onClick={() => { setDateFrom(""); setDateTo(""); }} className="text-xs">
+                  Limpiar fechas
+                </Button>
+              )}
+
+              <div className="text-xs text-muted-foreground ml-auto">
+                {isFetching ? "Actualizando..." : rows.length ? `${rows.length} registros` : ""}
+              </div>
             </div>
           </div>
 

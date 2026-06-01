@@ -15,6 +15,7 @@ import { StockKpis } from "@/components/stock/StockKpis";
 import { DataTablePro } from "@/components/stock/DataTablePro";
 import { ExportCsvButton } from "@/components/stock/ExportCsvButton";
 import { FilterChipsBar } from "@/components/stock/FilterChipsBar";
+import { cn } from "@/lib/utils";
 
 import { MovementDialog } from "@/components/stock/MovementDialog";
 import { ReserveDialog } from "@/components/stock/ReserveDialog";
@@ -169,7 +170,14 @@ export default function StockBalancesPage() {
         id: "available",
         header: () => <div className="text-right">Disponible</div>,
         accessorFn: (r) => r.available,
-        cell: ({ row }) => <div className="text-right tabular-nums font-semibold">{row.original.available}</div>,
+        cell: ({ row }) => (
+          <div className={cn(
+            "text-right tabular-nums font-semibold",
+            row.original.available <= 0 ? "text-destructive" : row.original.available <= 5 ? "text-amber-600 dark:text-amber-400" : "",
+          )}>
+            {row.original.available}
+          </div>
+        ),
       },
       {
         id: "actions",
@@ -203,8 +211,8 @@ export default function StockBalancesPage() {
   return (
     <div className="space-y-4">
       <StockPageHeader
-        title="Balances"
-        description="Operación por SKU y depósito. Disponible = Físico - Reservado."
+        title="Balances de Stock"
+        description="Posición actual de inventario por ítem y depósito. Disponible = Físico − Reservado. Los ítems en rojo no tienen stock libre."
         breadcrumbs={[
           { label: "Dashboard", href: "/dashboard" },
           { label: "Stock", href: "/dashboard/stock/balances" },

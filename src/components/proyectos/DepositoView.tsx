@@ -23,6 +23,7 @@ import { Trash2, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ProyectoDTO } from "@/types/proyecto";
+import { EditDepositoSheet } from "@/components/proyectos/edit/EditDepositoSheet";
 
 type DepositoData = {
   numeroOrdenDeposito?: string;
@@ -528,16 +529,19 @@ export function DepositoView({ proyecto, onDeleted }: DepositoViewProps) {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center justify-between gap-2">
             <span>Información de Depósito</span>
-            {estadoActualPedido && (
-              <Badge
-                className={cn(
-                  "text-xs px-2 py-0.5",
-                  getEstadoBadgeColor(estadoActualPedido),
-                )}
-              >
-                {estadoActualPedido}
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              <EditDepositoSheet proyecto={proyecto} />
+              {estadoActualPedido && (
+                <Badge
+                  className={cn(
+                    "text-xs px-2 py-0.5",
+                    getEstadoBadgeColor(estadoActualPedido),
+                  )}
+                >
+                  {estadoActualPedido}
+                </Badge>
+              )}
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 text-sm md:grid-cols-3">

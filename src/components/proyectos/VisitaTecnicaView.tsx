@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Trash2, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { EditVisitaTecnicaSheet } from "@/components/proyectos/edit/EditVisitaTecnicaSheet";
 
 type Props = {
   proyecto: ProyectoDTO;
@@ -540,9 +541,12 @@ export function VisitaTecnicaView({ proyecto, onDeleted }: Props) {
             Información básica del proyecto y su estado actual.
           </p>
         </div>
-        <Badge className={getEstadoBadgeColor(proyecto.estadoActual)}>
-          {estadoLabel}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <EditVisitaTecnicaSheet proyecto={proyecto} />
+          <Badge className={getEstadoBadgeColor(proyecto.estadoActual)}>
+            {estadoLabel}
+          </Badge>
+        </div>
       </div>
 
       {/* DATOS GENERALES */}

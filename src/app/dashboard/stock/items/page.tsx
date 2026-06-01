@@ -14,6 +14,8 @@ import { StockPageHeader } from "@/components/stock/StockPageHeader";
 import { DataTablePro } from "@/components/stock/DataTablePro";
 import { ExportCsvButton } from "@/components/stock/ExportCsvButton";
 import { FilterChipsBar, type Chip } from "@/components/stock/FilterChipsBar";
+import { CreateItemDialog } from "@/components/stock/CreateItemDialog";
+import { Package, Layers, Boxes, Info } from "lucide-react";
 
 type Item = {
   _id: string;
@@ -26,12 +28,12 @@ type Item = {
   createdAt: string;
 };
 
-type TypeFilter = "all" | "RAW" | "COMPONENT" | "FINISHED";
+type TypeFilter = "all" | "SERVICE" | "COMPONENT" | "FINISHED";
 type ActiveFilter = "all" | "true" | "false";
 
 function typeLabel(t: string) {
   const map: Record<string, string> = {
-    RAW: "Materia prima",
+    SERVICE: "Materia prima / Insumo",
     COMPONENT: "Componente",
     FINISHED: "Producto terminado",
   };
@@ -42,13 +44,13 @@ function typeBadge(t: string) {
   const map: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
     FINISHED: { label: "Producto terminado", variant: "default" },
     COMPONENT: { label: "Componente", variant: "secondary" },
-    RAW: { label: "Materia prima", variant: "outline" },
+    SERVICE: { label: "Materia prima", variant: "outline" },
   };
   return map[t] ?? { label: t, variant: "outline" };
 }
 
 function isTypeFilter(v: string): v is TypeFilter {
-  return v === "all" || v === "RAW" || v === "COMPONENT" || v === "FINISHED";
+  return v === "all" || v === "SERVICE" || v === "COMPONENT" || v === "FINISHED";
 }
 
 function isActiveFilter(v: string): v is ActiveFilter {
@@ -178,14 +180,58 @@ export default function StockItemsPage() {
   return (
     <div className="space-y-4">
       <StockPageHeader
-        title="Items (SKU)"
-        description="Catálogo de ítems de stock: productos terminados, componentes y materias primas."
+        title="Catálogo de Ítems (SKU)"
+        description="Todos los materiales, componentes y productos terminados que manejás en stock. Cada ítem tiene un código único (SKU) y una unidad de medida."
         breadcrumbs={[
           { label: "Dashboard", href: "/dashboard" },
           { label: "Stock", href: "/dashboard/stock/balances" },
-          { label: "Items (SKU)" },
+          { label: "Catálogo" },
         ]}
+        actions={<CreateItemDialog />}
       />
+
+      {/* Contextual guide */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {[
+          {
+            icon: Boxes,
+            label: "Materia prima",
+            color: "text-slate-600 dark:text-slate-400",
+            bg: "bg-slate-50 dark:bg-slate-900/30",
+            examples: "Perfiles aluminio, vidrio crudo, chapas, selladores, silicona",
+          },
+          {
+            icon: Layers,
+            label: "Componente",
+            color: "text-amber-600 dark:text-amber-400",
+            bg: "bg-amber-50 dark:bg-amber-900/30",
+            examples: "Herrajes, bisagras, tornillos, juntas EPDM, correderas",
+          },
+          {
+            icon: Package,
+            label: "Producto terminado",
+            color: "text-primary",
+            bg: "bg-primary/5",
+            examples: "Ventana corrediza, puerta batiente con marco, celosía enrejada",
+          },
+        ].map((t) => (
+          <div key={t.label} className={`rounded-lg border p-3 flex items-start gap-3 ${t.bg}`}>
+            <t.icon className={`h-5 w-5 mt-0.5 flex-shrink-0 ${t.color}`} />
+            <div>
+              <p className="text-sm font-semibold">{t.label}</p>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{t.examples}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+        <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-primary" />
+        <span>
+          Hacé clic en un SKU para ver su stock detallado, movimientos y BOM (si aplica).
+          Usá <strong>UOM = M</strong> para perfiles, <strong>UN</strong> para herrajes y vidrios cortados, y <strong>M2</strong> para chapas por superficie.
+        </span>
+      </div>
 
       <Card>
         <CardContent className="p-4 space-y-3">
@@ -219,9 +265,9 @@ export default function StockItemsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="RAW">Materia prima (RAW)</SelectItem>
-                      <SelectItem value="COMPONENT">Componente (COMPONENT)</SelectItem>
-                      <SelectItem value="FINISHED">Producto terminado (FINISHED)</SelectItem>
+                      <SelectItem value="SERVICE">Materia prima / Insumo</SelectItem>
+                      <SelectItem value="COMPONENT">Componente</SelectItem>
+                      <SelectItem value="FINISHED">Producto terminado</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

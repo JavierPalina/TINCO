@@ -22,6 +22,7 @@ import { Trash2, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ProyectoDTO } from "@/types/proyecto";
+import { EditLogisticaSheet } from "@/components/proyectos/edit/EditLogisticaSheet";
 
 type LogisticaData = {
   numeroOrdenLogistica?: string;
@@ -541,16 +542,19 @@ export function LogisticaView({ proyecto, onDeleted }: LogisticaViewProps) {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center justify-between gap-2">
             <span>Información de Logística</span>
-            {estadoEntrega && (
-              <Badge
-                className={cn(
-                  "text-xs px-2 py-0.5",
-                  getEstadoEntregaColor(estadoEntrega),
-                )}
-              >
-                {estadoEntrega}
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              <EditLogisticaSheet proyecto={proyecto} />
+              {estadoEntrega && (
+                <Badge
+                  className={cn(
+                    "text-xs px-2 py-0.5",
+                    getEstadoEntregaColor(estadoEntrega),
+                  )}
+                >
+                  {estadoEntrega}
+                </Badge>
+              )}
+            </div>
           </CardTitle>
         </CardHeader>
 

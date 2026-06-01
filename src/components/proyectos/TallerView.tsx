@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Trash2, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { EditTallerSheet } from "@/components/proyectos/edit/EditTallerSheet";
+import { ProyectoMateriales } from "@/components/proyectos/stock/ProyectoMateriales";
 
 type Props = {
   proyecto: ProyectoDTO;
@@ -481,11 +483,16 @@ export function TallerView({ proyecto, onDeleted }: Props) {
         </AlertDialogContent>
       </AlertDialog>
 
+      <ProyectoMateriales proyectoId={String(proyecto._id)} />
+
       <Card>
         <CardHeader>
-          <CardTitle>
-            Taller – Orden {taller.numeroOrdenTaller ?? proyecto.numeroOrden}
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>
+              Taller – Orden {taller.numeroOrdenTaller ?? proyecto.numeroOrden}
+            </CardTitle>
+            <EditTallerSheet proyecto={proyecto} />
+          </div>
         </CardHeader>
         <CardContent className="space-y-6 text-sm">
           {/* Identificación */}

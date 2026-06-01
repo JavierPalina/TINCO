@@ -20,6 +20,7 @@ import {
 import { Trash2, Loader2, CheckCircle2, XCircle, Download } from "lucide-react";
 import { toast } from "sonner";
 import { exportElementToPdf } from "@/lib/pdf/exportElementToPdf";
+import { EditMedicionSheet } from "@/components/proyectos/edit/EditMedicionSheet";
 
 type Props = {
   proyecto: ProyectoDTO;
@@ -384,6 +385,7 @@ export function MedicionView({ proyecto, onDeleted }: Props) {
     <div className="space-y-6 text-sm">
       {/* Acciones top */}
       <div className="flex flex-wrap gap-2 justify-end">
+        <EditMedicionSheet proyecto={proyecto} />
         <Button
           type="button"
           variant="outline"
