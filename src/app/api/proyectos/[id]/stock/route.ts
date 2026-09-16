@@ -10,16 +10,17 @@ import Warehouse from "@/models/Warehouse";
 // GET — reservations linked to this project
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse("No autorizado", { status: 401 });
+  const { id } = await params;
 
   await dbConnect();
 
   const reservations = await StockReservation.find({
     "ref.kind": "PROJECT",
-    "ref.id": params.id,
+    "ref.id": id,
   })
     .populate("warehouseId", "name type")
     .lean();
@@ -51,10 +52,11 @@ export async function GET(
 // POST — create or replace reservation for this project
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse("No autorizado", { status: 401 });
+  const { id } = await params;
 
   await dbConnect();
 
@@ -89,7 +91,7 @@ export async function POST(
   }
 
   const reservation = await StockReservation.create({
-    ref: { kind: "PROJECT", id: params.id },
+    ref: { kind: "PROJECT", id },
     warehouseId,
     lines,
     status: "ACTIVE",
@@ -103,10 +105,11 @@ export async function POST(
 // DELETE — release a specific reservation
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await getServerSession(authOptions);
   if (!session) return new NextResponse("No autorizado", { status: 401 });
+  const { id } = await params;
 
   await dbConnect();
 
@@ -114,7 +117,7 @@ export async function DELETE(
   const res = await StockReservation.findOne({
     _id: reservationId,
     "ref.kind": "PROJECT",
-    "ref.id": params.id,
+    "ref.id": id,
     status: "ACTIVE",
   });
 
