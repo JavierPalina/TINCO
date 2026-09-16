@@ -56,7 +56,7 @@ export default function StockReservationsPage() {
         <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-primary" />
         <span>
           También podés reservar materiales directamente desde la etapa <strong>Taller</strong> del proyecto,
-          usando el panel <em>"Materiales del Proyecto"</em> que aparece en esa vista.
+          usando el panel <em>&ldquo;Materiales del Proyecto&rdquo;</em> que aparece en esa vista.
           Las reservas ahí creadas quedan vinculadas automáticamente al proyecto.
         </span>
       </div>
